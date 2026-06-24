@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/theme/app_colors.dart';
 import 'step_1_otp.dart';
 
 class Step1EmailScreen extends StatefulWidget {
@@ -13,8 +14,8 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = AppColors.primary;
+  static const _greyBg = AppColors.background;
 
   Future<void> _sendOTP() async {
     final email = _emailController.text.trim();
@@ -158,7 +159,7 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _sendOTP,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _primaryColor,
+                                  backgroundColor: AppColors.accent,
                                   foregroundColor: Colors.white,
                                   disabledBackgroundColor: _primaryColor.withOpacity(0.6),
                                   elevation: 0,

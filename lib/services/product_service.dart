@@ -10,16 +10,40 @@ class ProductService {
   static const _fullSelect = '''
     *,
     product_media(*),
-    product_specs(*),
-    product_inventory(*),
-    active_product_promotions(
-      product_id,
-      discount_type,
-      discount_value,
-      campaign_name,
-      ends_at
-    )
+    product_specs(*)
   ''';
+
+  static Future<List<Product>> _attachStock(List<Product> products) async {
+    if (products.isEmpty) return products;
+
+    try {
+      final productIds = products.map((p) => p.id).toList();
+      final stockResponse = await _client
+          .from('inventory_stock')
+          .select('product_id, quantity, current_stock, stock')
+          .inFilter('product_id', productIds);
+
+      final stockMap = <String, double>{};
+      for (final row in stockResponse as List) {
+        final pid = row['product_id'] as String?;
+        if (pid == null) continue;
+        
+        final quantityStr = row['quantity']?.toString() ?? row['current_stock']?.toString() ?? row['stock']?.toString() ?? '0';
+        final quantity = double.tryParse(quantityStr) ?? 0.0;
+        
+        stockMap[pid] = (stockMap[pid] ?? 0.0) + quantity;
+      }
+
+      return products.map((p) {
+        if (!p.trackInventory) return p;
+        final stockVal = stockMap[p.id]?.round() ?? 0;
+        return p.copyWith(stock: stockVal);
+      }).toList();
+    } catch (e) {
+      // In case of error, just return the products safely
+      return products;
+    }
+  }
 
   /// Get all active products with their images and specs
   static Future<List<Product>> getAllProducts({String? category, String? application}) async {
@@ -36,7 +60,8 @@ class ProductService {
     }
 
     final response = await query.order('name');
-    return (response as List).map((json) => Product.fromJson(json)).toList();
+    final rawProducts = (response as List).map((json) => Product.fromJson(json)).toList();
+    return _attachStock(rawProducts);
   }
 
   /// Get a single product by ID with full details
@@ -49,7 +74,9 @@ class ProductService {
         .maybeSingle();
 
     if (response == null) return null;
-    return Product.fromJson(response);
+    final product = Product.fromJson(response);
+    final productsWithStock = await _attachStock([product]);
+    return productsWithStock.isNotEmpty ? productsWithStock.first : product;
   }
 
   /// Search products by text (name, description, brand, sku)
@@ -60,7 +87,8 @@ class ProductService {
         .eq('is_active', true)
         .or('name.ilike.%$query%,description.ilike.%$query%,brand.ilike.%$query%,sku.ilike.%$query%,commercial_brand.ilike.%$query%')
         .order('name');
-    return (response as List).map((json) => Product.fromJson(json)).toList();
+    final rawProducts = (response as List).map((json) => Product.fromJson(json)).toList();
+    return _attachStock(rawProducts);
   }
 
   /// Get products by category ENUM

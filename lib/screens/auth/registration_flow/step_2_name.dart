@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/theme/app_colors.dart';
 
 class Step2NameScreen extends StatefulWidget {
   const Step2NameScreen({super.key});
@@ -13,8 +14,8 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
   final _apellidoController = TextEditingController();
   bool _isLoading = false;
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = AppColors.primary;
+  static const _greyBg = AppColors.background;
 
   Future<void> _saveName() async {
     final nombre = _nombreController.text.trim();
@@ -157,7 +158,7 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _saveName,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _primaryColor,
+                                  backgroundColor: AppColors.accent,
                                   foregroundColor: Colors.white,
                                   disabledBackgroundColor: _primaryColor.withOpacity(0.6),
                                   elevation: 0,

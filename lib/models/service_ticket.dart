@@ -10,25 +10,8 @@ class ServiceTicket {
   final String type;
   final String? requestedBy;
   final String? assignedTechnician;
-  final String? assignedTechnicianCustomName;
   final DateTime createdAt;
   final DateTime? updatedAt;
-
-  // Additional Admin/Service fields
-  final String? serviceAddress;
-  final String? serviceCity;
-  final String? serviceState;
-  final String? serviceRegion;
-  final DateTime? scheduledStartAt;
-  final DateTime? scheduledEndAt;
-  final String? requestedServiceDate;
-  final bool? isLocalService;
-  final String? contactName;
-  final String? contactPhone;
-  final String? contactEmail;
-  final String? serviceLocation;
-  final String? errorCode;
-  final String? productId;
 
   // Relations (loaded via join)
   final String? clientName;
@@ -46,23 +29,8 @@ class ServiceTicket {
     required this.type,
     this.requestedBy,
     this.assignedTechnician,
-    this.assignedTechnicianCustomName,
     required this.createdAt,
     this.updatedAt,
-    this.serviceAddress,
-    this.serviceCity,
-    this.serviceState,
-    this.serviceRegion,
-    this.scheduledStartAt,
-    this.scheduledEndAt,
-    this.requestedServiceDate,
-    this.isLocalService,
-    this.contactName,
-    this.contactPhone,
-    this.contactEmail,
-    this.serviceLocation,
-    this.errorCode,
-    this.productId,
     this.clientName,
     this.equipmentName,
   });
@@ -89,31 +57,12 @@ class ServiceTicket {
       priority: json['priority'] as String? ?? 'medium',
       type: json['type'] as String? ?? 'otro',
       requestedBy: json['requested_by'] as String?,
-      assignedTechnician: json['assigned_technician_id'] as String?,
-      assignedTechnicianCustomName: json['assigned_technician_custom_name'] as String?,
+      assignedTechnician: json['assigned_technician'] as String?,
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.now(),
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'] as String)
           : null,
-      serviceAddress: json['service_address'] as String?,
-      serviceCity: json['service_city'] as String?,
-      serviceState: json['service_state'] as String?,
-      serviceRegion: json['service_region'] as String?,
-      scheduledStartAt: json['scheduled_start_at'] != null
-          ? DateTime.tryParse(json['scheduled_start_at'] as String)
-          : null,
-      scheduledEndAt: json['scheduled_end_at'] != null
-          ? DateTime.tryParse(json['scheduled_end_at'] as String)
-          : null,
-      requestedServiceDate: json['requested_service_date'] as String?,
-      isLocalService: json['is_local_service'] as bool?,
-      contactName: json['contact_name'] as String?,
-      contactPhone: json['contact_phone'] as String?,
-      contactEmail: json['contact_email'] as String?,
-      serviceLocation: json['service_location'] as String?,
-      errorCode: json['error_code'] as String?,
-      productId: json['product_id'] as String?,
       clientName: clientName,
       equipmentName: equipmentName,
     );

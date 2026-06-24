@@ -718,6 +718,8 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imgHeight = isCompact ? 110.0 : 150.0;
+    final stockLabel = (product.trackInventory && (product.stock ?? 0) <= 0) ? 'Sin stock' : 'Disponible';
+    final stockColor = stockLabel == 'Sin stock' ? const Color(0xFFEF4444) : const Color(0xFF16A34A);
     final titleFontSize = isCompact ? 10.5 : 13.5;
     final oldPriceFontSize = isCompact ? 9.0 : 11.5;
     final priceFontSize = isCompact ? 12.5 : 18.5;
@@ -792,9 +794,7 @@ class _ProductCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(3),
                         ),
                         child: Text(
-                          product.activePromotion?.campaignName != null
-                              ? '${product.activePromotion!.campaignName!.toUpperCase()} · ${product.discountPercent}% OFF'
-                              : '${product.discountPercent}% OFF',
+                          '${product.discountPercent}% OFF',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: isCompact ? 8.0 : 9.0,
@@ -887,7 +887,6 @@ class _ProductCard extends StatelessWidget {
                                       textColor: Colors.white,
                                       onPressed: () {
                                         Navigator.popUntil(context, (route) => route.isFirst);
-                                        HomeScreen.showTab(2);
                                       },
                                     ),
                                   ),
@@ -1028,19 +1027,19 @@ class _ProductCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        product.stockStatusLabel == 'Sin stock'
+                        stockLabel == 'Sin stock'
                             ? Icons.highlight_off_rounded
                             : Icons.check_circle_outline_rounded,
                         size: isCompact ? 10.0 : 12.0,
-                        color: product.stockStatusColor,
+                        color: stockColor,
                       ),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
-                          product.stockStatusLabel,
+                          stockLabel,
                           style: TextStyle(
                             fontSize: infoFontSize,
-                            color: product.stockStatusColor,
+                            color: stockColor,
                             fontWeight: FontWeight.w600,
                           ),
                           maxLines: 1,

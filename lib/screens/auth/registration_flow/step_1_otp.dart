@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/theme/app_colors.dart';
 
 class Step1OtpScreen extends StatefulWidget {
   final String email;
@@ -10,17 +11,24 @@ class Step1OtpScreen extends StatefulWidget {
 }
 
 class _Step1OtpScreenState extends State<Step1OtpScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _controllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = AppColors.primary;
+  static const _greyBg = AppColors.background;
 
   @override
   void dispose() {
-    for (var c in _controllers) { c.dispose(); }
-    for (var f in _focusNodes) { f.dispose(); }
+    for (var c in _controllers) {
+      c.dispose();
+    }
+    for (var f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -64,10 +72,15 @@ class _Step1OtpScreenState extends State<Step1OtpScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Código incorrecto o expirado'), backgroundColor: Colors.red.shade600),
+          SnackBar(
+            content: Text('Código incorrecto o expirado'),
+            backgroundColor: Colors.red.shade600,
+          ),
         );
         // Clear all fields
-        for (var c in _controllers) { c.clear(); }
+        for (var c in _controllers) {
+          c.clear();
+        }
         _focusNodes[0].requestFocus();
       }
     } finally {
@@ -80,7 +93,10 @@ class _Step1OtpScreenState extends State<Step1OtpScreen> {
     return Theme(
       data: ThemeData(
         brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: _primaryColor, brightness: Brightness.light),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _primaryColor,
+          brightness: Brightness.light,
+        ),
         scaffoldBackgroundColor: _greyBg,
       ),
       child: Scaffold(
@@ -94,13 +110,20 @@ class _Step1OtpScreenState extends State<Step1OtpScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.black87,
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     const Expanded(
                       child: Text(
                         'Confirmar Código',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -141,26 +164,43 @@ class _Step1OtpScreenState extends State<Step1OtpScreen> {
                                 color: _primaryColor.withOpacity(0.1),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.mark_email_read_outlined, color: _primaryColor, size: 32),
+                              child: const Icon(
+                                Icons.mark_email_read_outlined,
+                                color: _primaryColor,
+                                size: 32,
+                              ),
                             ),
                             const SizedBox(height: 24),
                             const Text(
                               'Ingresa el código',
-                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 8),
                             RichText(
                               textAlign: TextAlign.center,
                               text: TextSpan(
-                                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                ),
                                 children: [
                                   const TextSpan(text: 'Lo enviamos a '),
                                   TextSpan(
                                     text: widget.email,
-                                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
                                   ),
-                                  const TextSpan(text: '. Si no lo encuentras, revisa la carpeta de spam.'),
+                                  const TextSpan(
+                                    text:
+                                        '. Si no lo encuentras, revisa la carpeta de spam.',
+                                  ),
                                 ],
                               ),
                             ),
@@ -179,21 +219,30 @@ class _Step1OtpScreenState extends State<Step1OtpScreen> {
                                     keyboardType: TextInputType.number,
                                     textAlign: TextAlign.center,
                                     maxLength: 1,
-                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                     decoration: InputDecoration(
                                       counterText: '',
                                       filled: true,
-                                      fillColor: const Color(0xFFFAFAFA),
+                                      fillColor: AppColors.background,
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
-                                        borderSide: const BorderSide(color: _primaryColor, width: 2),
+                                        borderSide: const BorderSide(
+                                          color: _primaryColor,
+                                          width: 2,
+                                        ),
                                       ),
                                     ),
-                                    onChanged: (value) => _onChanged(value, index),
+                                    onChanged: (value) =>
+                                        _onChanged(value, index),
                                   ),
                                 );
                               }),
@@ -205,21 +254,30 @@ class _Step1OtpScreenState extends State<Step1OtpScreen> {
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _verifyOTP,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _primaryColor,
+                                  backgroundColor: AppColors.accent,
                                   foregroundColor: Colors.white,
-                                  disabledBackgroundColor: _primaryColor.withOpacity(0.6),
+                                  disabledBackgroundColor: _primaryColor
+                                      .withOpacity(0.6),
                                   elevation: 0,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
                                 ),
                                 child: _isLoading
                                     ? const SizedBox(
                                         width: 20,
                                         height: 20,
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
                                       )
                                     : const Text(
                                         'Confirmar código',
-                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                               ),
                             ),
@@ -228,7 +286,10 @@ class _Step1OtpScreenState extends State<Step1OtpScreen> {
                               onPressed: () => Navigator.of(context).pop(),
                               child: const Text(
                                 'Cambiar e-mail',
-                                style: TextStyle(color: _primaryColor, fontWeight: FontWeight.w500),
+                                style: TextStyle(
+                                  color: _primaryColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ],

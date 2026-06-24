@@ -5,17 +5,10 @@ import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth/registration_flow/registration_checklist_screen.dart';
 import 'services/notification_service.dart';
-import 'services/quote_service.dart';
+import 'core/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Inicializar cotizaciones locales
-  try {
-    await QuoteService.init();
-  } catch (e) {
-    debugPrint('Error inicializando QuoteService: $e');
-  }
 
   // Inicializar Supabase si tenemos las credenciales (por ahora puede fallar si están vacías,
   // pero lo preparamos para cuando el usuario ponga las reales).
@@ -48,10 +41,7 @@ class GoMedicalApp extends StatelessWidget {
     return MaterialApp(
       title: 'Go Medical',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0D9488)),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.lightTheme,
       home: const AuthGate(),
     );
   }

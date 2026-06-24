@@ -10,12 +10,12 @@ class TicketService {
   // se omite porque las columnas varían según el schema.
   static const _select = '*, clients(business_name, trade_name)';
 
-  /// Fetches tickets linked to the current user's client profile or created by the user.
+  /// Fetches tickets linked to the current user's client profile.
   static Future<List<ServiceTicket>> getMyTickets() async {
     final userId = _db.auth.currentUser?.id;
     if (userId == null) return [];
 
-    // 1. Obtener client_id del perfil del usuario (si está vinculado)
+    // 1. Obtener client_id del perfil del usuario
     final profileRes = await _db
         .from('profiles')
         .select('client_id')
@@ -23,14 +23,25 @@ class TicketService {
         .maybeSingle();
 
     final clientId = profileRes?['client_id'] as String?;
-    final effectiveClientId = (clientId != null && clientId.isNotEmpty) ? clientId : userId;
 
-    // 2. Traer todos los tickets que pertenezcan a este cliente (effectiveClientId)
-    //    O que hayan sido creados por este usuario (requested_by = userId)
+    // 2. Sin client_id vinculado: tickets donde requested_by == userId
+    if (clientId == null || clientId.isEmpty) {
+      final res = await _db
+          .from('service_tickets')
+          .select(_select)
+          .eq('requested_by', userId)
+          .order('created_at', ascending: false);
+
+      return (res as List)
+          .map((e) => ServiceTicket.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
+    // 3. Tickets del cliente vinculado
     final res = await _db
         .from('service_tickets')
         .select(_select)
-        .or('client_id.eq.$effectiveClientId,requested_by.eq.$userId')
+        .eq('client_id', clientId)
         .order('created_at', ascending: false);
 
     return (res as List)
@@ -47,7 +58,7 @@ class TicketService {
         .maybeSingle();
 
     if (res == null) return null;
-    return ServiceTicket.fromJson(res);
+    return ServiceTicket.fromJson(res as Map<String, dynamic>);
   }
 
   /// Obtener mensajes de chat asociados al ticket (solo no internos)

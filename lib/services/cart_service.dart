@@ -1,8 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
 import 'product_service.dart';
-import 'quote_service.dart';
-
 
 /// Cart item model combining cart_items data with product info
 class CartItem {
@@ -32,17 +30,13 @@ class CartService {
   /// Ensure a client record exists for the current user.
   /// Users registered before the auto-create trigger was set up may be missing one.
   static Future<void> _ensureClientExists(String userId) async {
-    try {
-      final existing = await _client
-          .from('clients')
-          .select('id')
-          .eq('id', userId)
-          .maybeSingle();
+    final existing = await _client
+        .from('clients')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
 
-      if (existing != null) return; // already exists
-    } catch (_) {
-      // Ignorar errores al verificar existencia (debido a políticas SELECT restrictivas)
-    }
+    if (existing != null) return; // already exists
 
     final user = _client.auth.currentUser;
     final email = user?.email ?? '';
@@ -50,44 +44,28 @@ class CartService {
         user?.userMetadata?['name'] as String? ??
         email;
 
-    try {
-      // Usamos insert en lugar de upsert para evitar evaluar políticas de UPDATE;
-      // si ya existe, la base de datos lanzará un error de clave duplicada (23505) que controlaremos.
-      await _client.from('clients').insert({
-        'id': userId,
-        'client_type': 'otro',
-        'status': 'active',
-        'business_name': name.isNotEmpty ? name : email,
-        'contact_name': name,
-        'email': email,
-        'is_active': true,
-        'preferred_currency': 'MXN',
-        'country': 'México',
-      });
-    } catch (e) {
-      final errStr = e.toString();
-      // Si el error es por clave duplicada (23505 o mensaje de unique/duplicate), significa que ya existe y es seguro continuar.
-      if (!errStr.contains('23505') && 
-          !errStr.contains('duplicate key') && 
-          !errStr.contains('unique constraint')) {
-        rethrow;
-      }
-    }
+    await _client.from('clients').upsert({
+      'id': userId,
+      'client_type': 'otro',
+      'status': 'active',
+      'business_name': name.isNotEmpty ? name : email,
+      'contact_name': name,
+      'email': email,
+      'is_active': true,
+      'preferred_currency': 'MXN',
+      'country': 'México',
+    }, onConflict: 'id');
 
-    try {
-      // Also update profiles.client_id so RLS helper functions work correctly
-      await _client
-          .from('profiles')
-          .update({'client_id': userId})
-          .eq('id', userId)
-          .eq('role', 'client');
-    } catch (_) {
-      // Ignorar silenciosamente si hay restricciones de actualización en perfiles
-    }
+    // Also update profiles.client_id so RLS helper functions work correctly
+    await _client
+        .from('profiles')
+        .update({'client_id': userId})
+        .eq('id', userId)
+        .eq('role', 'client');
   }
 
-  /// Get or create active cart for current user, populating profile details
-  static Future<String> getOrCreateActiveCart() async {
+  /// Get or create active cart for current user
+  static Future<String> _getOrCreateCart() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('No autenticado');
 
@@ -104,25 +82,11 @@ class CartService {
 
     if (existing != null) return existing['id'] as String;
 
-    // Fetch user details from profile to populate contact info in carts
-    final profile = await _client
-        .from('profiles')
-        .select('full_name, email, phone')
-        .eq('id', userId)
-        .maybeSingle();
-
     try {
-      // Create new cart with lead details
+      // Create new cart
       final newCart = await _client
           .from('carts')
-          .insert({
-            'client_id': userId,
-            'status': 'active',
-            'source': 'mobile_app',
-            'lead_name': profile?['full_name'] ?? _client.auth.currentUser?.email ?? 'Cliente',
-            'lead_email': profile?['email'] ?? _client.auth.currentUser?.email,
-            'lead_phone': profile?['phone'],
-          })
+          .insert({'client_id': userId, 'status': 'active'})
           .select('id')
           .single();
       return newCart['id'] as String;
@@ -177,10 +141,7 @@ class CartService {
 
   /// Add product to cart (or increment if exists)
   static Future<void> addToCart(String productId, {int quantity = 1}) async {
-    // Garantizar exclusión mutua: si se añade al carrito, se remueve de cotizaciones
-    await QuoteService.removeFromQuote(productId);
-
-    final cartId = await getOrCreateActiveCart();
+    final cartId = await _getOrCreateCart();
 
     // Check if product already in cart
     final existing = await _client
@@ -217,10 +178,6 @@ class CartService {
               'cart_id': cartId,
               'product_id': productId,
               'quantity': quantity,
-              'unit_price': product?.unitPriceMxn ?? 0.0,
-              'product_name_snapshot': product?.name ?? 'Producto',
-              'sku_snapshot': product?.sku,
-              'product_category_snapshot': product?.category,
             });
       } catch (e) {
         // If concurrent insert occurred, update the existing item instead
@@ -278,28 +235,6 @@ class CartService {
         .from('cart_items')
         .delete()
         .eq('id', cartItemId);
-  }
-
-  /// Remove product from cart by product ID
-  static Future<void> removeProductFromCart(String productId) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return;
-
-    final cartData = await _client
-        .from('carts')
-        .select('id')
-        .eq('client_id', userId)
-        .eq('status', 'active')
-        .maybeSingle();
-
-    if (cartData == null) return;
-    final cartId = cartData['id'] as String;
-
-    await _client
-        .from('cart_items')
-        .delete()
-        .eq('cart_id', cartId)
-        .eq('product_id', productId);
   }
 
   /// Checkout the active cart and return the generated order ID

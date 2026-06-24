@@ -77,7 +77,12 @@ class QuoteService {
   static Future<void> addToQuote(Product product, {int quantity = 1}) async {
     try {
       // Garantizar exclusión mutua: si se añade a cotizaciones, se remueve del carrito
-      await CartService.removeProductFromCart(product.id);
+      final cartItems = await CartService.getCartItems();
+      for (final item in cartItems) {
+        if (item.productId == product.id) {
+          await CartService.removeFromCart(item.id);
+        }
+      }
 
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_keyQuote) ?? [];

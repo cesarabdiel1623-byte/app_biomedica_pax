@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 /// Product model matching the REAL Supabase `products` table schema.
 ///
 /// Categories (ENUM): equipo_medico, ultrasonido_humano, consumible, refaccion, servicio
@@ -34,9 +32,7 @@ class Product {
   final String? mainImageUrl;
   final List<ProductMedia> images;
   final List<ProductSpec> specs;
-  final int? currentStock;
-  final int? minimumStock;
-  final ActiveProductPromotion? activePromotion;
+  final int? stock;
 
   Product({
     required this.id,
@@ -66,35 +62,41 @@ class Product {
     this.mainImageUrl,
     this.images = const [],
     this.specs = const [],
-    this.currentStock,
-    this.minimumStock,
-    this.activePromotion,
+    this.stock,
   });
-
-  /// Expose stock as currentStock for backward compatibility
-  int? get stock => currentStock;
-
-  /// Getters for stock status and color according to business rules
-  String get stockStatusLabel {
-    final cur = currentStock ?? 0;
-    if (currentStock == null || cur <= 0) {
-      return 'Sin stock';
-    }
-    if (minimumStock != null && cur <= minimumStock!) {
-      return 'Bajo stock';
-    }
-    return 'Disponible';
-  }
-
-  Color get stockStatusColor {
-    final status = stockStatusLabel;
-    if (status == 'Sin stock') {
-      return const Color(0xFFEF4444); // _kRed
-    } else if (status == 'Bajo stock') {
-      return const Color(0xFFD97706); // Orange-800
-    } else {
-      return const Color(0xFF16A34A); // _kGreen
-    }
+  Product copyWith({
+    int? stock,
+  }) {
+    return Product(
+      id: this.id,
+      sku: this.sku,
+      name: this.name,
+      category: this.category,
+      application: this.application,
+      commercialBrand: this.commercialBrand,
+      description: this.description,
+      brand: this.brand,
+      model: this.model,
+      unitPriceMxn: this.unitPriceMxn,
+      referencePriceUsd: this.referencePriceUsd,
+      costPriceMxn: this.costPriceMxn,
+      oldPrice: this.oldPrice,
+      currency: this.currency,
+      unit: this.unit,
+      isActive: this.isActive,
+      requiresSerial: this.requiresSerial,
+      trackInventory: this.trackInventory,
+      leadTimeDays: this.leadTimeDays,
+      warrantyText: this.warrantyText,
+      shippingInfo: this.shippingInfo,
+      availabilityStatus: this.availabilityStatus,
+      subcategory: this.subcategory,
+      createdAt: this.createdAt,
+      mainImageUrl: this.mainImageUrl,
+      images: this.images,
+      specs: this.specs,
+      stock: stock ?? this.stock,
+    );
   }
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -120,42 +122,16 @@ class Product {
       primaryImage = mediaList.first.filePath;
     }
 
-    int? currentStockVal;
-    int? minimumStockVal;
-
+    int? stockVal;
     if (json['track_inventory'] == true) {
-      final stockData = json['product_inventory'];
-      if (stockData is List && stockData.isNotEmpty) {
-        final first = stockData.first;
-        if (first is Map) {
-          currentStockVal = _toInt(first['current_stock']);
-          minimumStockVal = _toInt(first['minimum_stock']);
+      double sum = 0.0;
+      final stockList = json['inventory_stock'] as List?;
+      if (stockList != null) {
+        for (final s in stockList) {
+          sum += _toDouble(s['quantity']);
         }
-      } else if (stockData is Map) {
-        currentStockVal = _toInt(stockData['current_stock']);
-        minimumStockVal = _toInt(stockData['minimum_stock']);
       }
-    }
-
-    // Parse active promotion if present
-    final promoList = json['active_product_promotions'] as List?;
-    ActiveProductPromotion? activePromo;
-    double calculatedUnitPrice = _toDouble(json['unit_price_mxn']);
-    double? calculatedOldPrice = json['old_price'] != null ? _toDouble(json['old_price']) : null;
-
-    if (promoList != null && promoList.isNotEmpty) {
-      activePromo = ActiveProductPromotion.fromJson(promoList.first as Map<String, dynamic>);
-      calculatedOldPrice = calculatedUnitPrice; // the original price becomes the old price to cross out
-      
-      final val = activePromo.discountValue;
-      if (activePromo.discountType == 'percentage') {
-        calculatedUnitPrice = calculatedUnitPrice * (1 - val / 100);
-      } else if (activePromo.discountType == 'fixed_amount') {
-        calculatedUnitPrice = calculatedUnitPrice - val;
-      } else if (activePromo.discountType == 'promotional_price') {
-        calculatedUnitPrice = val;
-      }
-      if (calculatedUnitPrice < 0) calculatedUnitPrice = 0.0;
+      stockVal = sum.round();
     }
 
     return Product(
@@ -168,10 +144,10 @@ class Product {
       description: json['description'] as String?,
       brand: json['brand'] as String?,
       model: json['model'] as String?,
-      unitPriceMxn: calculatedUnitPrice,
+      unitPriceMxn: _toDouble(json['unit_price_mxn']),
       referencePriceUsd: json['reference_price_usd'] != null ? _toDouble(json['reference_price_usd']) : null,
       costPriceMxn: _toDouble(json['cost_price_mxn']),
-      oldPrice: calculatedOldPrice,
+      oldPrice: json['old_price'] != null ? _toDouble(json['old_price']) : null,
       currency: json['currency'] as String? ?? 'MXN',
       unit: json['unit'] as String? ?? 'pieza',
       isActive: json['is_active'] as bool? ?? true,
@@ -186,9 +162,7 @@ class Product {
       mainImageUrl: primaryImage,
       images: mediaList,
       specs: specsList,
-      currentStock: currentStockVal,
-      minimumStock: minimumStockVal,
-      activePromotion: activePromo,
+      stock: stockVal,
     );
   }
 
@@ -229,17 +203,6 @@ class Product {
     if (value is int) return value.toDouble();
     if (value is String) return double.tryParse(value) ?? 0.0;
     return 0.0;
-  }
-
-  static int? _toInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is double) return value.round();
-    if (value is String) {
-      final parsed = double.tryParse(value);
-      return parsed != null ? parsed.round() : null;
-    }
-    return null;
   }
 
   static String _formatMoney(double value) {
@@ -301,37 +264,4 @@ class ProductSpec {
     specValue: json['spec_value'] as String,
     sortOrder: json['sort_order'] as int? ?? 0,
   );
-}
-
-class ActiveProductPromotion {
-  final String productId;
-  final String discountType; // percentage, fixed_amount, promotional_price
-  final double discountValue;
-  final String? campaignName;
-  final DateTime? endsAt;
-
-  ActiveProductPromotion({
-    required this.productId,
-    required this.discountType,
-    required this.discountValue,
-    this.campaignName,
-    this.endsAt,
-  });
-
-  factory ActiveProductPromotion.fromJson(Map<String, dynamic> json) {
-    return ActiveProductPromotion(
-      productId: json['product_id'] as String,
-      discountType: json['discount_type'] as String,
-      discountValue: _toDouble(json['discount_value']),
-      campaignName: (json['campaign_name'] ?? json['promotion_name']) as String?,
-      endsAt: json['ends_at'] != null ? DateTime.parse(json['ends_at'] as String) : null,
-    );
-  }
-
-  static double _toDouble(dynamic value) {
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0.0;
-    return 0.0;
-  }
 }

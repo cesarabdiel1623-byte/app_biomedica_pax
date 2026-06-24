@@ -5,17 +5,19 @@ import 'step_1_email.dart';
 import 'step_2_name.dart';
 import 'step_3_phone.dart';
 import 'step_4_password.dart';
+import '../../../core/theme/app_colors.dart';
 
 class RegistrationChecklistScreen extends StatefulWidget {
   const RegistrationChecklistScreen({super.key});
 
   @override
-  State<RegistrationChecklistScreen> createState() => _RegistrationChecklistScreenState();
+  State<RegistrationChecklistScreen> createState() =>
+      _RegistrationChecklistScreenState();
 }
 
-class _RegistrationChecklistScreenState extends State<RegistrationChecklistScreen>
+class _RegistrationChecklistScreenState
+    extends State<RegistrationChecklistScreen>
     with SingleTickerProviderStateMixin {
-
   bool _emailValidated = false;
   bool _nameCompleted = false;
   bool _phoneValidated = false;
@@ -29,13 +31,16 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = AppColors.primary;
+  static const _greyBg = AppColors.background;
 
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
     _loadExistingProgress();
@@ -64,7 +69,8 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
       }
 
       // Step 3: Phone is validated if phone exists or was skipped
-      if ((user.phone != null && user.phone!.isNotEmpty) || metadata['phone_skipped'] == true) {
+      if ((user.phone != null && user.phone!.isNotEmpty) ||
+          metadata['phone_skipped'] == true) {
         _phoneValidated = true;
         _userPhone = (user.phone != null && user.phone!.isNotEmpty)
             ? user.phone!
@@ -93,7 +99,8 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
     return 4; // All done
   }
 
-  bool get _allCompleted => _emailValidated && _nameCompleted && _phoneValidated && _passwordCreated;
+  bool get _allCompleted =>
+      _emailValidated && _nameCompleted && _phoneValidated && _passwordCreated;
 
   Widget _buildStepItem({
     required int stepIndex,
@@ -115,17 +122,17 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
         color: isCompleted
-            ? const Color(0xFFF0FDF9)
+            ? AppColors.info.withOpacity(0.16)
             : isActive
-                ? Colors.white
-                : const Color(0xFFFAFAFA),
+            ? Colors.white
+            : AppColors.background,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCompleted
               ? _primaryColor.withOpacity(0.3)
               : isActive
-                  ? _primaryColor.withOpacity(0.4)
-                  : Colors.grey.withOpacity(0.15),
+              ? _primaryColor.withOpacity(0.4)
+              : Colors.grey.withOpacity(0.15),
           width: isActive ? 1.5 : 1,
         ),
       ),
@@ -140,8 +147,8 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
               color: isCompleted
                   ? _primaryColor.withOpacity(0.1)
                   : isActive
-                      ? _primaryColor.withOpacity(0.08)
-                      : Colors.grey.withOpacity(0.08),
+                  ? _primaryColor.withOpacity(0.08)
+                  : Colors.grey.withOpacity(0.08),
             ),
             child: isCompleted
                 ? const Icon(Icons.check_circle, color: _primaryColor, size: 28)
@@ -185,13 +192,21 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
               child: ElevatedButton(
                 onPressed: () => onTap(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor,
+                  backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
-                child: Text(buttonText, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                child: Text(
+                  buttonText,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             )
           else
@@ -206,7 +221,10 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
     return Theme(
       data: ThemeData(
         brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: _primaryColor, brightness: Brightness.light),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _primaryColor,
+          brightness: Brightness.light,
+        ),
         scaffoldBackgroundColor: _greyBg,
       ),
       child: Scaffold(
@@ -221,11 +239,19 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                   children: [
                     Navigator.canPop(context)
                         ? IconButton(
-                            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+                            icon: const Icon(
+                              Icons.arrow_back_ios_new,
+                              color: Colors.black87,
+                              size: 20,
+                            ),
                             onPressed: () => Navigator.of(context).pop(),
                           )
                         : IconButton(
-                            icon: const Icon(Icons.logout, color: Colors.red, size: 20),
+                            icon: const Icon(
+                              Icons.logout,
+                              color: Colors.red,
+                              size: 20,
+                            ),
                             tooltip: 'Cerrar sesión',
                             onPressed: () async {
                               await Supabase.instance.client.auth.signOut();
@@ -233,8 +259,13 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                           ),
                     Expanded(
                       child: Text(
-                        Navigator.canPop(context) ? 'Crear Cuenta' : 'Completa tu registro',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        Navigator.canPop(context)
+                            ? 'Crear Cuenta'
+                            : 'Completa tu registro',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -251,7 +282,9 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                   child: LinearProgressIndicator(
                     value: _currentStep / 4,
                     backgroundColor: Colors.grey.shade200,
-                    valueColor: const AlwaysStoppedAnimation<Color>(_primaryColor),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      _primaryColor,
+                    ),
                     minHeight: 4,
                   ),
                 ),
@@ -285,12 +318,19 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                             children: [
                               const Text(
                                 'Tus datos',
-                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 'Valida tus datos para crear tu cuenta de forma segura.',
-                                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                ),
                               ),
                               const SizedBox(height: 28),
 
@@ -305,10 +345,15 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                                 isCompleted: _emailValidated,
                                 buttonText: 'Validar',
                                 onTap: () async {
-                                  final result = await Navigator.of(context).push<Map<String, dynamic>>(
-                                    MaterialPageRoute(builder: (context) => const Step1EmailScreen()),
-                                  );
-                                  if (result != null && result['success'] == true) {
+                                  final result = await Navigator.of(context)
+                                      .push<Map<String, dynamic>>(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const Step1EmailScreen(),
+                                        ),
+                                      );
+                                  if (result != null &&
+                                      result['success'] == true) {
                                     setState(() {
                                       _emailValidated = true;
                                       _userEmail = result['email'] ?? '';
@@ -327,10 +372,15 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                                 completedSubtitle: _userName,
                                 isCompleted: _nameCompleted,
                                 onTap: () async {
-                                  final result = await Navigator.of(context).push<Map<String, dynamic>>(
-                                    MaterialPageRoute(builder: (context) => const Step2NameScreen()),
-                                  );
-                                  if (result != null && result['success'] == true) {
+                                  final result = await Navigator.of(context)
+                                      .push<Map<String, dynamic>>(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const Step2NameScreen(),
+                                        ),
+                                      );
+                                  if (result != null &&
+                                      result['success'] == true) {
                                     setState(() {
                                       _nameCompleted = true;
                                       _userName = result['name'] ?? '';
@@ -350,15 +400,22 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                                 isCompleted: _phoneValidated,
                                 buttonText: 'Validar',
                                 onTap: () async {
-                                  final result = await Navigator.of(context).push<Map<String, dynamic>>(
-                                    MaterialPageRoute(builder: (context) => const Step3PhoneScreen()),
-                                  );
-                                  if (result != null && result['success'] == true) {
+                                  final result = await Navigator.of(context)
+                                      .push<Map<String, dynamic>>(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const Step3PhoneScreen(),
+                                        ),
+                                      );
+                                  if (result != null &&
+                                      result['success'] == true) {
                                     setState(() {
                                       _phoneValidated = true;
                                       _userPhone = result['phone'] ?? '';
-                                      if (_userPhone.isEmpty || result['skipped'] == true) {
-                                        _userPhone = 'Omitido - verificar después';
+                                      if (_userPhone.isEmpty ||
+                                          result['skipped'] == true) {
+                                        _userPhone =
+                                            'Omitido - verificar después';
                                       }
                                     });
                                   }
@@ -376,12 +433,17 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                                 isCompleted: _passwordCreated,
                                 buttonText: 'Crear',
                                 onTap: () async {
-                                  final result = await Navigator.of(context).push<Map<String, dynamic>>(
-                                    MaterialPageRoute(
-                                      builder: (context) => Step4PasswordScreen(userName: _userName),
-                                    ),
-                                  );
-                                  if (result != null && result['success'] == true) {
+                                  final result = await Navigator.of(context)
+                                      .push<Map<String, dynamic>>(
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              Step4PasswordScreen(
+                                                userName: _userName,
+                                              ),
+                                        ),
+                                      );
+                                  if (result != null &&
+                                      result['success'] == true) {
                                     setState(() => _passwordCreated = true);
                                   }
                                 },
@@ -393,12 +455,15 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
+                                    color: AppColors.background,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.grey.withOpacity(0.15)),
+                                    border: Border.all(
+                                      color: Colors.grey.withOpacity(0.15),
+                                    ),
                                   ),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       SizedBox(
                                         width: 24,
@@ -406,29 +471,56 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                                         child: Checkbox(
                                           value: _termsAccepted,
                                           activeColor: _primaryColor,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
                                           onChanged: (value) {
-                                            setState(() => _termsAccepted = value ?? false);
+                                            setState(
+                                              () => _termsAccepted =
+                                                  value ?? false,
+                                            );
                                           },
                                         ),
                                       ),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: GestureDetector(
-                                          onTap: () => setState(() => _termsAccepted = !_termsAccepted),
+                                          onTap: () => setState(
+                                            () => _termsAccepted =
+                                                !_termsAccepted,
+                                          ),
                                           child: RichText(
                                             text: TextSpan(
-                                              style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.4),
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87,
+                                                height: 1.4,
+                                              ),
                                               children: [
-                                                const TextSpan(text: 'Autorizo el uso de mis datos de acuerdo a la '),
-                                                TextSpan(
-                                                  text: 'Declaración de Privacidad',
-                                                  style: TextStyle(color: _primaryColor, fontWeight: FontWeight.w600),
+                                                const TextSpan(
+                                                  text:
+                                                      'Autorizo el uso de mis datos de acuerdo a la ',
                                                 ),
-                                                const TextSpan(text: ' y acepto los '),
                                                 TextSpan(
-                                                  text: 'Términos y condiciones.',
-                                                  style: TextStyle(color: _primaryColor, fontWeight: FontWeight.w600),
+                                                  text:
+                                                      'Declaración de Privacidad',
+                                                  style: TextStyle(
+                                                    color: _primaryColor,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                const TextSpan(
+                                                  text: ' y acepto los ',
+                                                ),
+                                                TextSpan(
+                                                  text:
+                                                      'Términos y condiciones.',
+                                                  style: TextStyle(
+                                                    color: _primaryColor,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -446,26 +538,43 @@ class _RegistrationChecklistScreenState extends State<RegistrationChecklistScree
                                     onPressed: _termsAccepted
                                         ? () async {
                                             // Save terms acceptance in user metadata
-                                            await Supabase.instance.client.auth.updateUser(
-                                              UserAttributes(data: {'terms_accepted': true}),
-                                            );
+                                            await Supabase.instance.client.auth
+                                                .updateUser(
+                                                  UserAttributes(
+                                                    data: {
+                                                      'terms_accepted': true,
+                                                    },
+                                                  ),
+                                                );
                                             // Refresh session so AuthGate detects completed registration
-                                            await Supabase.instance.client.auth.refreshSession();
-                                            if (mounted && Navigator.canPop(context)) {
+                                            await Supabase.instance.client.auth
+                                                .refreshSession();
+                                            if (mounted &&
+                                                Navigator.canPop(context)) {
                                               Navigator.of(context).pop();
                                             }
                                             // If rendered by AuthGate, the stream rebuild will show HomeScreen
                                           }
                                         : null,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: _primaryColor,
+                                      backgroundColor: AppColors.accent,
                                       foregroundColor: Colors.white,
-                                      disabledBackgroundColor: Colors.grey.shade300,
-                                      disabledForegroundColor: Colors.grey.shade500,
+                                      disabledBackgroundColor:
+                                          Colors.grey.shade300,
+                                      disabledForegroundColor:
+                                          Colors.grey.shade500,
                                       elevation: 0,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
                                     ),
-                                    child: const Text('Continuar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                    child: const Text(
+                                      'Continuar',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ],

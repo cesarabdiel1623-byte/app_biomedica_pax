@@ -84,7 +84,7 @@ class SearchService {
             isActive: true,
             requiresSerial: false,
             trackInventory: true,
-            currentStock: json['stock'] as int? ?? 1,
+            stock: json['stock'] as int? ?? 1,
             mainImageUrl: json['mainImageUrl'] as String?,
             shippingInfo: json['shippingInfo'] as String? ?? 'Envío nacional',
             availabilityStatus: 'Disponible',
