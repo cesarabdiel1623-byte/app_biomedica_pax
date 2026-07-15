@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/product.dart';
 import '../../services/question_service.dart';
 import 'ask_question_screen.dart';
 import 'product_detail_screen.dart';
@@ -204,7 +203,7 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
                                 ? Image.network(
                                     product.mainImageUrl!,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
+                                    errorBuilder: (_, _, _) => const Icon(
                                       Icons.shopping_bag_outlined,
                                       color: _kPrimary,
                                       size: 28,

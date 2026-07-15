@@ -1671,7 +1671,7 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (senderLabel != null) senderLabel,
+            ?senderLabel,
             Text(
               msg.message,
               style: TextStyle(

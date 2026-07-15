@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app_prueba/models/product.dart';
+import 'package:gomedical_app/models/product.dart';
 import 'package:flutter/material.dart';
 
 void main() {

@@ -3,16 +3,16 @@
 ========================================================================
 
 * SUPABASE_URL:
-  Configurado localmente en dart_defines.json o por dart-define al compilar.
+  Inyectado con dart-define al compilar.
 
 * SUPABASE_ANON_KEY (Public Key):
-  Configurada localmente en dart_defines.json o por dart-define al compilar.
+  Inyectada con dart-define al compilar.
 
 * GOOGLE_ANDROID_CLIENT_ID:
-  Configurado localmente en dart_defines.json o por dart-define al compilar.
+  Inyectado con dart-define al compilar.
 
 * GOOGLE_WEB_CLIENT_ID:
-  Configurado localmente en dart_defines.json o por dart-define al compilar.
+  Inyectado con dart-define al compilar.
 
 ========================================================================
 
@@ -30,7 +30,7 @@ Esta guía provee un desglose detallado, técnico y con lenguaje humano sobre el
 * Punto de Entrada: lib/main.dart
 
 ### Inyección de Credenciales
-Para evitar exponer claves secretas, la app lee la configuración en tiempo de compilación. Las credenciales se configuran en el archivo local dart_defines.json:
+Para evitar exponer configuracion real dentro del codigo o assets, la app lee la configuracion en tiempo de compilacion usando `--dart-define` o `--dart-define-from-file`:
 * SUPABASE_URL: Endpoint de la base de datos de Supabase.
 * SUPABASE_ANON_KEY: Clave pública de acceso a las APIs.
 * GOOGLE_ANDROID_CLIENT_ID y GOOGLE_WEB_CLIENT_ID: Identificadores para la autenticación de Google.

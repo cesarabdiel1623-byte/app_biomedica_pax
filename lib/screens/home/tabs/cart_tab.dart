@@ -967,7 +967,7 @@ class CartTabState extends State<CartTab> {
             ],
           ),
           const SizedBox(height: 16),
-          _summaryRow('Productos (${_totalQty})', _fmt(_subtotal)),
+          _summaryRow('Productos ($_totalQty)', _fmt(_subtotal)),
           const SizedBox(height: 8),
           _summaryRow('IVA (16%)', _fmt(_iva)),
           const SizedBox(height: 16),

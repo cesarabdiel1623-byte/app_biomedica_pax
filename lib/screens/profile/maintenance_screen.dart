@@ -35,6 +35,8 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   String _powerStatus = 'Sí';
   String _failureFrequency = 'Falla constante';
   String _accessoriesStatus = 'No';
+  String? _effectiveClientId;
+  String? _accessError;
 
   @override
   void initState() {
@@ -58,12 +60,34 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
 
   Future<void> _loadEquipments() async {
     try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        if (mounted) {
+          setState(() {
+            _accessError = 'No hay una sesión activa.';
+            _loading = false;
+          });
+        }
+        return;
+      }
+
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('client_id')
+          .eq('id', userId)
+          .maybeSingle();
+      final resolvedClientId = (profile?['client_id'] as String?) ?? userId;
+
       final response = await Supabase.instance.client
           .from('equipment_units')
           .select('*, products(name)')
-          .eq('current_client_id', widget.clientId);
+          .eq('current_client_id', resolvedClientId);
       if (mounted) {
         setState(() {
+          _effectiveClientId = resolvedClientId;
+          _accessError = widget.clientId != resolvedClientId
+              ? 'Se actualizó el cliente activo para proteger el acceso a tus equipos.'
+              : null;
           _equipments = response as List;
           _loading = false;
           if (_equipments.isNotEmpty) {
@@ -80,6 +104,15 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
 
   Future<void> _submitRequest() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_effectiveClientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo validar el cliente activo.'),
+          backgroundColor: kRed,
+        ),
+      );
+      return;
+    }
     setState(() => _submitting = true);
 
     try {
@@ -120,7 +153,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
       descriptionText.writeln(_descController.text.trim());
 
       await Supabase.instance.client.from('service_tickets').insert({
-        'client_id': widget.clientId,
+        'client_id': _effectiveClientId,
         'equipment_unit_id': eqUnitId,
         'title': 'Solicitud Mantenimiento: $eqName',
         'description': descriptionText.toString(),
@@ -171,6 +204,26 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  if (_accessError != null) ...[
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Text(
+                        _accessError!,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF92400E),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                   Card(
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,

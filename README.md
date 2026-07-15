@@ -2,25 +2,24 @@
 
 ## Configuracion de credenciales
 
-Las credenciales del cliente ya no viven en `lib/`. La app prioriza valores
-inyectados con `dart-define` y, para desarrollo local, puede leer
-`dart_defines.json`.
+Las credenciales del cliente ya no viven en `lib/` ni se empaquetan como asset.
+La app lee valores inyectados en tiempo de compilacion con `dart-define`.
 
-1. Crea un archivo `dart_defines.json` en la raiz del proyecto.
+1. Crea un archivo local `dart_defines.json` en la raiz del proyecto.
 2. Usa como base `dart_defines.example.json`.
-3. Ejecuta la app con:
+3. Ejecuta la app inyectando ese archivo:
 
 ```bash
 flutter run --dart-define-from-file=dart_defines.json
 ```
 
-Si usas VS Code, ya quedo lista una configuracion en `.vscode/launch.json`
-para correr la app con ese archivo automaticamente.
+Si usas VS Code, la configuracion en `.vscode/launch.json` ya inyecta ese
+archivo automaticamente.
 
 Nota de seguridad:
 `SUPABASE_ANON_KEY` es una clave publica de cliente, no una `service_role`.
 Las operaciones sensibles deben protegerse con RLS en Supabase. Para builds de
-release, conviene seguir usando `--dart-define-from-file`.
+release, usa `--dart-define-from-file` desde el sistema de build o CI/CD.
 
 ## Variables esperadas
 

@@ -11,7 +11,6 @@ import '../../product/favorites_screen.dart';
 import '../../product/recently_viewed_screen.dart';
 import '../../quotes/questions_screen.dart';
 import '../../quotes/reviews_screen.dart';
-import '../widgets/staggered_fade_slide.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 

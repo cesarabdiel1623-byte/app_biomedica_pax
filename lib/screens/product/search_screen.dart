@@ -5,14 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../../services/search_service.dart';
-import '../../services/cart_service.dart';
 import 'product_detail_screen.dart';
-import '../../services/quote_service.dart';
-import 'quote_cart_screen.dart';
 import '../../utils/ui_helpers.dart';
-import '../../services/notification_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../profile/notifications_screen.dart';
 
 
 const _kPrimary = Color(0xFF0D9488); // Teal principal
@@ -662,7 +656,7 @@ class _ProductCard extends StatefulWidget {
 }
 
 class _ProductCardState extends State<_ProductCard> {
-  bool _addingToCart = false;
+  final bool _addingToCart = false;
 
   @override
   Widget build(BuildContext context) {

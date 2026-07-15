@@ -48,24 +48,45 @@ class ClientAddress {
 class AddressService {
   static final _db = Supabase.instance.client;
 
-  static Future<List<ClientAddress>> getAddresses() async {
+  static Future<String?> _getEffectiveClientId() async {
     final user = _db.auth.currentUser;
-    if (user == null) return [];
+    if (user == null) return null;
+
+    try {
+      final profile = await _db
+          .from('profiles')
+          .select('client_id')
+          .eq('id', user.id)
+          .maybeSingle();
+      final clientId = profile?['client_id'] as String?;
+      if (clientId != null && clientId.isNotEmpty) {
+        return clientId;
+      }
+    } catch (_) {
+      // Fallback silencioso al auth.uid cuando aún no existe el perfil enlazado.
+    }
+
+    return user.id;
+  }
+
+  static Future<List<ClientAddress>> getAddresses() async {
+    final clientId = await _getEffectiveClientId();
+    if (clientId == null) return [];
     final data = await _db
         .from('client_addresses')
         .select()
-        .eq('client_id', user.id)
+        .eq('client_id', clientId)
         .order('created_at', ascending: false);
     return (data as List).map((e) => ClientAddress.fromMap(e)).toList();
   }
 
   static Future<ClientAddress?> getDefaultAddress() async {
-    final user = _db.auth.currentUser;
-    if (user == null) return null;
+    final clientId = await _getEffectiveClientId();
+    if (clientId == null) return null;
     final data = await _db
         .from('client_addresses')
         .select()
-        .eq('client_id', user.id)
+        .eq('client_id', clientId)
         .eq('is_default', true)
         .maybeSingle();
     return data != null ? ClientAddress.fromMap(data) : null;
@@ -77,9 +98,11 @@ class AddressService {
     if (user == null) return;
     final meta = user.userMetadata;
     try {
+      final clientId = await _getEffectiveClientId();
+      if (clientId == null) return;
       final nameStr = (meta?['full_name'] ?? meta?['name'] ?? '').toString();
       await _db.from('clients').upsert({
-        'id': user.id,
+        'id': clientId,
         'business_name': nameStr.isEmpty ? 'Usuario' : nameStr,
         'contact_name': nameStr,
         'email': user.email ?? '',
@@ -102,14 +125,14 @@ class AddressService {
     double? longitude,
     bool isDefault = true,
   }) async {
-    final user = _db.auth.currentUser;
-    if (user == null) throw Exception('No hay sesión activa');
+    final clientId = await _getEffectiveClientId();
+    if (clientId == null) throw Exception('No hay sesión activa');
 
     // Garantizar que el perfil existe antes de insertar
     await _ensureClientExists();
 
     final payload = {
-      'client_id': user.id,
+      'client_id': clientId,
       'label': label,
       'address': address,
       'city': city,
@@ -129,21 +152,28 @@ class AddressService {
   }
 
   static Future<void> setDefault(String addressId) async {
-    final user = _db.auth.currentUser;
-    if (user == null) return;
+    final clientId = await _getEffectiveClientId();
+    if (clientId == null) return;
     // Quitar default de todas
     await _db
         .from('client_addresses')
         .update({'is_default': false})
-        .eq('client_id', user.id);
+        .eq('client_id', clientId);
     // Poner default en la elegida
     await _db
         .from('client_addresses')
         .update({'is_default': true})
-        .eq('id', addressId);
+        .eq('id', addressId)
+        .eq('client_id', clientId);
   }
 
   static Future<void> deleteAddress(String addressId) async {
-    await _db.from('client_addresses').delete().eq('id', addressId);
+    final clientId = await _getEffectiveClientId();
+    if (clientId == null) return;
+    await _db
+        .from('client_addresses')
+        .delete()
+        .eq('id', addressId)
+        .eq('client_id', clientId);
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app_prueba/models/product.dart';
-import 'package:app_prueba/screens/home/widgets/product_card.dart';
+import 'package:gomedical_app/models/product.dart';
+import 'package:gomedical_app/screens/home/widgets/product_card.dart';
 
 void main() {
   testWidgets('ProductCard renders name, price and stock label correctly', (WidgetTester tester) async {

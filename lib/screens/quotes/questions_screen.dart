@@ -183,7 +183,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                   child: ListView.separated(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     itemCount: _questions.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12), // Gap between cards
+                    separatorBuilder: (_, _) => const SizedBox(height: 12), // Gap between cards
                     itemBuilder: (context, index) {
                       final q = _questions[index];
                       return _buildQuestionCard(q);
@@ -234,7 +234,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                             ? Image.network(
                                 product.mainImageUrl!,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
+                                errorBuilder: (_, _, _) => const Icon(
                                   Icons.shopping_bag_outlined,
                                   color: _kPrimary,
                                   size: 26,

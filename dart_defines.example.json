@@ -1,6 +1,6 @@
 {
-  "SUPABASE_URL": "https://hdxrlmknrkkagsfzncnb.supabase.co",
-  "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkeHJsbWtucmtrYWdzZnpuY25iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzAwMDYsImV4cCI6MjA5MzU0NjAwNn0.gzeSznxzye68BbwOFtzuLHm-fMpEIf-50YRQwA2JATA",
-  "GOOGLE_ANDROID_CLIENT_ID": "75792946228-aepeda2ssvvosm5r41ivqn3q01nc8t01.apps.googleusercontent.com",
-  "GOOGLE_WEB_CLIENT_ID": "75792946228-s1ju0neceuv3iokujofbfq7ukamjev5m.apps.googleusercontent.com"
+  "SUPABASE_URL": "https://TU-PROYECTO.supabase.co",
+  "SUPABASE_ANON_KEY": "TU_SUPABASE_ANON_KEY",
+  "GOOGLE_ANDROID_CLIENT_ID": "TU_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+  "GOOGLE_WEB_CLIENT_ID": "TU_WEB_CLIENT_ID.apps.googleusercontent.com"
 }

@@ -493,7 +493,7 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
                               padding: EdgeInsets.zero,
                               physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                               itemCount: _notifications.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+                              separatorBuilder: (_, _) => const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
                               itemBuilder: (context, i) => _buildNotifCard(_notifications[i]),
                             ),
                           ),
@@ -539,7 +539,7 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
                         ? Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _iconBox(style),
+                            errorBuilder: (_, _, _) => _iconBox(style),
                           )
                         : _iconBox(style),
                   ),

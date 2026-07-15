@@ -16,7 +16,6 @@ import '../../services/review_service.dart';
 import '../../services/question_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/ui_helpers.dart';
-import 'quote_cart_screen.dart';
 import '../home/widgets/checkout_sheet.dart';
 import 'search_screen.dart';
 import '../auth/login_screen.dart';
@@ -265,7 +264,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       PageRouteBuilder(
         opaque: false,
         barrierColor: Colors.black,
-        pageBuilder: (context, _, __) {
+        pageBuilder: (context, _, _) {
           int localIndex = initialIndex;
           return StatefulBuilder(
             builder: (context, setModalState) {

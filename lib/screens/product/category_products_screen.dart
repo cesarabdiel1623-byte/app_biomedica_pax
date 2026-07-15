@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
-import '../../services/cart_service.dart';
 import '../product/product_detail_screen.dart';
-import '../../services/quote_service.dart';
-import 'quote_cart_screen.dart';
 import '../../utils/ui_helpers.dart';
 
 
@@ -326,7 +323,7 @@ class _ProductCard extends StatefulWidget {
 }
 
 class _ProductCardState extends State<_ProductCard> {
-  bool _addingToCart = false;
+  final bool _addingToCart = false;
 
   @override
   Widget build(BuildContext context) {

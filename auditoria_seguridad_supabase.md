@@ -8,7 +8,8 @@ Revision basada en:
 
 - El codigo Flutter actual en `lib/`
 - Pruebas de lectura anonima con `SUPABASE_ANON_KEY`
-- Flujo actual de credenciales con `dart_defines.json`
+- Flujo actual de credenciales con `--dart-define` /
+  `--dart-define-from-file`
 
 ## Hallazgos
 

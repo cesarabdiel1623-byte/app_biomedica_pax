@@ -1,4 +1,4 @@
-package com.example.app_prueba
+package com.gomedical.marketplace
 
 import io.flutter.embedding.android.FlutterActivity
 

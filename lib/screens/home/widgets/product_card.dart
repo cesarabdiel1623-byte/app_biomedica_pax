@@ -1,12 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../models/product.dart';
-import '../../../services/cart_service.dart';
-import '../../../services/quote_service.dart';
 import '../../../utils/ui_helpers.dart';
 import '../../product/product_detail_screen.dart';
-import '../../product/quote_cart_screen.dart';
-import 'scale_press_button.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
@@ -22,7 +18,7 @@ class ProductCard extends StatefulWidget {
 }
 
 class _ProductCardState extends State<ProductCard> {
-  bool _addingToCart = false;
+  final bool _addingToCart = false;
   bool _isTapped = false;
 
   @override
@@ -294,4 +290,3 @@ class _MarqueeTextState extends State<MarqueeText> {
     );
   }
 }
-
