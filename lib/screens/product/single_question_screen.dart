@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/question_service.dart';
 import 'ask_question_screen.dart';
 import 'product_detail_screen.dart';
+import '../../utils/ui_helpers.dart';
 
 class SingleQuestionScreen extends StatefulWidget {
   final ProductQuestion question;
@@ -119,23 +120,13 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
       await QuestionService.deleteQuestion(_currentQuestion.id);
       if (mounted) {
         Navigator.of(context).pop(); // pop loading overlay
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pregunta eliminada exitosamente.'),
-            backgroundColor: _kPrimary,
-          ),
-        );
+        UiHelpers.showFloatingSuccessToast(context, 'Pregunta eliminada exitosamente.');
         Navigator.of(context).pop(true); // pop screen back with refresh flag
       }
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // pop loading overlay
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al eliminar la pregunta: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        UiHelpers.showFloatingDeleteToast(context, 'Error al eliminar la pregunta: $e');
       }
     }
   }

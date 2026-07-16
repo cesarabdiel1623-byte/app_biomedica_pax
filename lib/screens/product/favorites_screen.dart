@@ -54,15 +54,23 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al modificar favoritos.')),
-        );
+        UiHelpers.showErrorToast(context, 'Error al modificar favoritos.');
       }
     }
   }
 
   Future<void> _addToCart(Product product) async {
     if (_addingCartProductId != null) return;
+    if (_isUnavailable(product)) {
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute(
+              builder: (context) => ProductDetailScreen(productId: product.id),
+            ),
+          )
+          .then((_) => _loadFavorites());
+      return;
+    }
     setState(() => _addingCartProductId = product.id);
     try {
       await CartService.addToCart(product.id, quantity: 1);
@@ -73,10 +81,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       if (mounted) {
         final errStr = e.toString();
         if (errStr.contains('stock_limit_reached')) {
-          final stock = int.tryParse(errStr.split(':').last) ?? product.stock ?? 0;
+          final stock =
+              int.tryParse(errStr.split(':').last) ?? product.stock ?? 0;
           UiHelpers.showStockLimitToast(context, stock);
         } else {
-          UiHelpers.showErrorToast(context, 'Error al agregar al carrito: ${errStr.replaceAll('Exception: ', '')}');
+          UiHelpers.showErrorToast(
+            context,
+            'Error al agregar al carrito: ${errStr.replaceAll('Exception: ', '')}',
+          );
         }
       }
     } finally {
@@ -86,6 +98,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
   }
 
+  bool _isUnavailable(Product product) {
+    final status = product.stockStatusLabel.toLowerCase();
+    return status.contains('sin stock') || status.contains('agotado');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -93,7 +110,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       appBar: AppBar(
         title: const Text(
           'Favoritos',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 18,
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -111,33 +132,37 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _kPrimary))
           : _favorites.isEmpty
-              ? _buildEmptyState()
-              : RefreshIndicator(
-                  onRefresh: _loadFavorites,
-                  color: _kPrimary,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _favorites.length,
-                    itemBuilder: (context, index) {
-                      final product = _favorites[index];
-                      return _buildFavoriteCard(product);
-                    },
-                  ),
-                ),
+          ? _buildEmptyState()
+          : RefreshIndicator(
+              onRefresh: _loadFavorites,
+              color: _kPrimary,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _favorites.length,
+                itemBuilder: (context, index) {
+                  final product = _favorites[index];
+                  return _buildFavoriteCard(product);
+                },
+              ),
+            ),
     );
   }
 
   Widget _buildFavoriteCard(Product product) {
     final hasDiscount = product.hasDiscount;
     final oldPrice = product.oldPrice;
+    final isUnavailable = _isUnavailable(product);
 
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ProductDetailScreen(productId: product.id),
-          ),
-        ).then((_) => _loadFavorites());
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (context) =>
+                    ProductDetailScreen(productId: product.id),
+              ),
+            )
+            .then((_) => _loadFavorites());
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
@@ -174,7 +199,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                 ? Image.network(
                                     product.mainImageUrl!,
                                     fit: BoxFit.contain,
-                                    errorBuilder: (_, _, _) => _buildPlaceholderImage(),
+                                    errorBuilder: (_, _, _) =>
+                                        _buildPlaceholderImage(),
                                   )
                                 : _buildPlaceholderImage(),
                           ),
@@ -296,23 +322,21 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       Row(
                         children: [
                           Icon(
-                            (product.stock ?? 0) > 0
-                                ? Icons.check_circle_outline_rounded
-                                : Icons.highlight_off_rounded,
+                            isUnavailable
+                                ? Icons.highlight_off_rounded
+                                : Icons.check_circle_outline_rounded,
                             size: 10,
-                            color: (product.stock ?? 0) > 0
-                                ? const Color(0xFF16A34A)
-                                : const Color(0xFFEF4444),
+                            color: product.stockStatusColor,
                           ),
                           const SizedBox(width: 3),
                           Expanded(
                             child: Text(
-                              (product.stock ?? 0) > 0 ? 'Producto disponible' : 'Agotado',
+                              isUnavailable
+                                  ? 'Agotado'
+                                  : product.stockStatusLabel,
                               style: TextStyle(
                                 fontSize: 10,
-                                color: (product.stock ?? 0) > 0
-                                    ? const Color(0xFF16A34A)
-                                    : const Color(0xFFEF4444),
+                                color: product.stockStatusColor,
                                 fontWeight: FontWeight.w600,
                               ),
                               maxLines: 1,
@@ -326,10 +350,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              onTap: _addingCartProductId != null ? null : () => _addToCart(product),
+                              onTap: _addingCartProductId != null
+                                  ? null
+                                  : () => _addToCart(product),
                               child: Container(
                                 alignment: Alignment.center,
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
                                   color: _kPrimary,
                                   borderRadius: BorderRadius.circular(20),
@@ -353,10 +381,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                               strokeWidth: 1.5,
                                             ),
                                           )
-                                        : const Icon(Icons.add_shopping_cart, color: Colors.white, size: 12),
+                                        : Icon(
+                                            isUnavailable
+                                                ? Icons.visibility_outlined
+                                                : Icons.add_shopping_cart,
+                                            color: Colors.white,
+                                            size: 12,
+                                          ),
                                     const SizedBox(width: 4),
-                                    const Text(
-                                      'Agregar',
+                                    Text(
+                                      isUnavailable
+                                          ? 'Ver producto'
+                                          : 'Agregar',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
@@ -374,16 +410,24 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                               onTap: () => _removeFavorite(product),
                               child: Container(
                                 alignment: Alignment.center,
-                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFEF2F2),
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFFFEE2E2)),
+                                  border: Border.all(
+                                    color: const Color(0xFFFEE2E2),
+                                  ),
                                 ),
                                 child: const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 12),
+                                    Icon(
+                                      Icons.delete_outline,
+                                      color: Color(0xFFEF4444),
+                                      size: 12,
+                                    ),
                                     SizedBox(width: 4),
                                     Text(
                                       'Eliminar',
@@ -416,7 +460,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       width: 100,
       height: 100,
       color: Colors.grey.shade100,
-      child: Icon(Icons.image_not_supported_outlined, color: Colors.grey.shade400, size: 32),
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: Colors.grey.shade400,
+        size: 32,
+      ),
     );
   }
 
@@ -427,35 +475,25 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFEE2E2), // Soft Red
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.favorite_border_rounded,
-                color: Color(0xFFEF4444),
-                size: 64,
-              ),
+            Icon(
+              Icons.favorite_border_rounded,
+              color: Colors.grey.shade400,
+              size: 64,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             const Text(
               'Aún no tienes favoritos',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: _kNavy,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               'Agrega equipos médicos a tus favoritos pulsando el icono de corazón en su ficha de detalle.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
           ],
         ),

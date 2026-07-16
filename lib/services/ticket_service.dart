@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/service_ticket.dart';
 import '../models/ticket_message.dart';
+import '../utils/ui_helpers.dart';
 
 class TicketService {
   static final _db = Supabase.instance.client;
@@ -23,7 +24,9 @@ class TicketService {
         .maybeSingle();
 
     final clientId = profileRes?['client_id'] as String?;
-    final effectiveClientId = (clientId != null && clientId.isNotEmpty) ? clientId : userId;
+    final effectiveClientId = (clientId != null && clientId.isNotEmpty)
+        ? clientId
+        : userId;
 
     // 2. Traer todos los tickets que pertenezcan a este cliente (effectiveClientId)
     //    O que hayan sido creados por este usuario (requested_by = userId)
@@ -77,27 +80,47 @@ class TicketService {
   }
 
   /// Enviar un mensaje de chat desde la app móvil (siempre sender_type = 'client')
-  static Future<void> sendTicketMessage(String ticketId, String message, {String? attachmentUrl}) async {
+  static Future<void> sendTicketMessage(
+    String ticketId,
+    String message, {
+    String? attachmentUrl,
+  }) async {
     final userId = _db.auth.currentUser?.id;
+    final trustedAttachmentUrl = UiHelpers.sanitizeTrustedRemoteUrl(
+      attachmentUrl,
+    );
+    if (attachmentUrl != null && trustedAttachmentUrl == null) {
+      throw Exception('URL de adjunto no permitida.');
+    }
     await _db.from('service_ticket_messages').insert({
       'ticket_id': ticketId,
       'sender_type': 'client',
       'sender_profile_id': userId,
       'message': message,
-      'attachment_url': attachmentUrl,
+      'attachment_url': trustedAttachmentUrl,
       'is_internal': false,
     });
   }
 
   /// Subir archivo adjunto de chat a Supabase Storage y retornar su URL pública
-  static Future<String> uploadChatAttachment(String ticketId, String fileName, Uint8List bytes) async {
-    final cleanFileName = '${DateTime.now().millisecondsSinceEpoch}_$fileName';
+  static Future<String> uploadChatAttachment(
+    String ticketId,
+    String fileName,
+    Uint8List bytes,
+  ) async {
+    UiHelpers.validateImageUpload(bytes, fileName);
+    final cleanName = UiHelpers.sanitizeStorageFileName(fileName);
+    final cleanFileName = '${DateTime.now().millisecondsSinceEpoch}_$cleanName';
     final path = '$ticketId/$cleanFileName';
 
     await _db.storage.from('ticket-attachments').uploadBinary(path, bytes);
 
     final url = _db.storage.from('ticket-attachments').getPublicUrl(path);
-    return url;
+    final trustedUrl = UiHelpers.sanitizeTrustedRemoteUrl(url);
+    if (trustedUrl == null) {
+      throw Exception('No se pudo generar una URL segura para el adjunto.');
+    }
+    return trustedUrl;
   }
 
   /// Marcar todos los mensajes del soporte como leídos (implica entregados)
@@ -109,10 +132,7 @@ class TicketService {
       final nowStr = DateTime.now().toIso8601String();
       await _db
           .from('service_ticket_messages')
-          .update({
-            'read_at': nowStr,
-            'delivered_at': nowStr,
-          })
+          .update({'read_at': nowStr, 'delivered_at': nowStr})
           .eq('ticket_id', ticketId)
           .neq('sender_type', 'client')
           .isFilter('read_at', null);

@@ -81,7 +81,25 @@ class Product {
   /// Getters for stock status and color according to business rules
   String get stockStatusLabel {
     final cur = currentStock ?? 0;
-    if (currentStock == null || cur <= 0) {
+    if (currentStock == null) {
+      final status = availabilityStatus?.toLowerCase().trim();
+      if (status == null || status.isEmpty) return 'Disponible';
+      if (status.contains('agotado') ||
+          status.contains('sin') ||
+          status.contains('out')) {
+        return 'Sin stock';
+      }
+      if (status.contains('bajo') || status.contains('low')) {
+        return 'Bajo stock';
+      }
+      if (status.contains('pedido') ||
+          status.contains('preorder') ||
+          status.contains('lead')) {
+        return 'Sobre pedido';
+      }
+      return 'Disponible';
+    }
+    if (cur <= 0) {
       return 'Sin stock';
     }
     if (minimumStock != null && cur <= minimumStock!) {

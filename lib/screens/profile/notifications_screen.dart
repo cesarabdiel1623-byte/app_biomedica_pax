@@ -7,8 +7,10 @@ import 'quote_detail_screen.dart';
 import '../product/all_questions_screen.dart';
 import '../product/single_question_screen.dart';
 import '../tickets/ticket_detail_screen.dart';
+import '../../services/product_service.dart';
 import '../../services/question_service.dart';
 import '../../utils/ui_helpers.dart';
+import '../../widgets/load_error_state.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -58,7 +60,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Notificaciones', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Notificaciones',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: kPrimary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -69,8 +74,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               padding: const EdgeInsets.symmetric(vertical: 12),
               children: [
                 SwitchListTile(
-                  title: const Text('Alertas por WhatsApp', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Recibe actualizaciones de tus tickets y cotizaciones vía WhatsApp.', style: TextStyle(fontSize: 11)),
+                  title: const Text(
+                    'Alertas por WhatsApp',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Recibe actualizaciones de tus tickets y cotizaciones vía WhatsApp.',
+                    style: TextStyle(fontSize: 11),
+                  ),
                   value: _whatsapp,
                   activeThumbColor: kPrimary,
                   onChanged: (v) {
@@ -80,8 +91,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
-                  title: const Text('Notificaciones por Correo', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Recibe presupuestos y comprobantes de compra en tu email.', style: TextStyle(fontSize: 11)),
+                  title: const Text(
+                    'Notificaciones por Correo',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Recibe presupuestos y comprobantes de compra en tu email.',
+                    style: TextStyle(fontSize: 11),
+                  ),
                   value: _email,
                   activeThumbColor: kPrimary,
                   onChanged: (v) {
@@ -91,8 +108,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
-                  title: const Text('Seguimiento de Pedidos', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Notificaciones en tiempo real del estado de tus órdenes.', style: TextStyle(fontSize: 11)),
+                  title: const Text(
+                    'Seguimiento de Pedidos',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Notificaciones en tiempo real del estado de tus órdenes.',
+                    style: TextStyle(fontSize: 11),
+                  ),
                   value: _orderUpdates,
                   activeThumbColor: kPrimary,
                   onChanged: (v) {
@@ -102,8 +125,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
-                  title: const Text('Seguridad y Acceso', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Notificaciones sobre inicios de sesión y cambios de contraseña.', style: TextStyle(fontSize: 11)),
+                  title: const Text(
+                    'Seguridad y Acceso',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Notificaciones sobre inicios de sesión y cambios de contraseña.',
+                    style: TextStyle(fontSize: 11),
+                  ),
                   value: _security,
                   activeThumbColor: kPrimary,
                   onChanged: (v) {
@@ -121,7 +150,8 @@ class NotificationsListScreen extends StatefulWidget {
   const NotificationsListScreen({super.key});
 
   @override
-  State<NotificationsListScreen> createState() => _NotificationsListScreenState();
+  State<NotificationsListScreen> createState() =>
+      _NotificationsListScreenState();
 }
 
 class _NotificationsListScreenState extends State<NotificationsListScreen> {
@@ -136,7 +166,10 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
   }
 
   Future<void> _loadNotifications() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) throw Exception('No autenticado');
@@ -154,7 +187,12 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -180,23 +218,56 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     } catch (_) {}
   }
 
-  ({IconData icon, Color color, Color bg}) _notifStyle(String title, String body) {
+  ({IconData icon, Color color, Color bg}) _notifStyle(
+    String title,
+    String body,
+  ) {
     final t = title.toLowerCase();
     final b = body.toLowerCase();
     if (t.contains('ticket') || b.contains('tck-') || t.contains('soporte')) {
-      return (icon: Icons.build_circle_rounded, color: const Color(0xFF0D9488), bg: const Color(0xFFE6F7F6));
+      return (
+        icon: Icons.build_circle_rounded,
+        color: const Color(0xFF0D9488),
+        bg: const Color(0xFFE6F7F6),
+      );
     } else if (t.contains('cotiza') || b.contains('cot-')) {
-      return (icon: Icons.request_quote_rounded, color: const Color(0xFF1E3A5F), bg: const Color(0xFFE8EEF7));
-    } else if (t.contains('pedido') || t.contains('orden') || b.contains('ord-')) {
-      return (icon: Icons.local_shipping_rounded, color: const Color(0xFF7C3AED), bg: const Color(0xFFF3EEFF));
+      return (
+        icon: Icons.request_quote_rounded,
+        color: const Color(0xFF1E3A5F),
+        bg: const Color(0xFFE8EEF7),
+      );
+    } else if (t.contains('pedido') ||
+        t.contains('orden') ||
+        b.contains('ord-')) {
+      return (
+        icon: Icons.local_shipping_rounded,
+        color: const Color(0xFF7C3AED),
+        bg: const Color(0xFFF3EEFF),
+      );
     } else if (t.contains('pago') || t.contains('factura')) {
-      return (icon: Icons.payments_rounded, color: const Color(0xFF16A34A), bg: const Color(0xFFECFDF5));
+      return (
+        icon: Icons.payments_rounded,
+        color: const Color(0xFF16A34A),
+        bg: const Color(0xFFECFDF5),
+      );
     } else if (t.contains('bienvenid')) {
-      return (icon: Icons.celebration_rounded, color: const Color(0xFFF59E0B), bg: const Color(0xFFFFFBEB));
+      return (
+        icon: Icons.celebration_rounded,
+        color: const Color(0xFFF59E0B),
+        bg: const Color(0xFFFFFBEB),
+      );
     } else if (t.contains('pregunta') || b.contains('pregunta')) {
-      return (icon: Icons.question_answer_rounded, color: const Color(0xFF0D9488), bg: const Color(0xFFE0F2F1));
+      return (
+        icon: Icons.question_answer_rounded,
+        color: const Color(0xFF0D9488),
+        bg: const Color(0xFFE0F2F1),
+      );
     } else {
-      return (icon: Icons.notifications_rounded, color: const Color(0xFF64748B), bg: const Color(0xFFF1F5F9));
+      return (
+        icon: Icons.notifications_rounded,
+        color: const Color(0xFF64748B),
+        bg: const Color(0xFFF1F5F9),
+      );
     }
   }
 
@@ -211,7 +282,9 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       _markAsRead(id); // fire-and-forget in background
       setState(() {
         final idx = _notifications.indexWhere((n) => n['id'] == id);
-        if (idx != -1) _notifications[idx] = {..._notifications[idx], 'is_read': true};
+        if (idx != -1) {
+          _notifications[idx] = {..._notifications[idx], 'is_read': true};
+        }
       });
     }
 
@@ -277,7 +350,9 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       builder: (_) => const Center(
         child: Card(
           elevation: 8,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
           child: Padding(
             padding: EdgeInsets.all(24),
             child: CircularProgressIndicator(color: kPrimary),
@@ -317,7 +392,9 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
         if (userId != null) {
           final res = await Supabase.instance.client
               .from('product_questions')
-              .select('*, product_answers(*), products(*, product_media(*), product_specs(*), product_inventory(*), active_product_promotions(*))')
+              .select(
+                '*, product_answers(*), products(${ProductService.publicProductSelect})',
+              )
               .eq('product_id', productId)
               .eq('client_id', userId)
               .order('created_at', ascending: false);
@@ -333,7 +410,11 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
           if (answerHint != null && answerHint.isNotEmpty) {
             // Find the question matching the answer text snippet
             for (final q in parsedQuestions) {
-              final match = q.answers.any((a) => a.answerText.toLowerCase().contains(answerHint.toLowerCase()));
+              final match = q.answers.any(
+                (a) => a.answerText.toLowerCase().contains(
+                  answerHint.toLowerCase(),
+                ),
+              );
               if (match) {
                 selectedQuestion = q;
                 break;
@@ -345,7 +426,8 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => SingleQuestionScreen(question: selectedQuestion),
+                builder: (_) =>
+                    SingleQuestionScreen(question: selectedQuestion),
               ),
             );
             return;
@@ -405,12 +487,17 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) return;
       final profileRes = await Supabase.instance.client
-          .from('profiles').select('client_id').eq('id', userId).maybeSingle();
+          .from('profiles')
+          .select('client_id')
+          .eq('id', userId)
+          .maybeSingle();
       final clientId = profileRes?['client_id'] as String? ?? userId;
       if (mounted) {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => QuotesScreen(clientId: clientId)),
+          MaterialPageRoute(
+            builder: (context) => QuotesScreen(clientId: clientId),
+          ),
         );
       }
     }
@@ -439,13 +526,20 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
                   children: [
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                       onPressed: () => Navigator.of(context).maybePop(),
                     ),
                     const SizedBox(width: 12),
@@ -463,15 +557,28 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
                     if (hasUnread)
                       TextButton.icon(
                         onPressed: _markAllAsRead,
-                        icon: const Icon(Icons.done_all_rounded, color: Colors.white, size: 18),
+                        icon: const Icon(
+                          Icons.done_all_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                         label: const Text(
                           'Marcar todas',
-                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         style: TextButton.styleFrom(
                           backgroundColor: Colors.white.withValues(alpha: 0.18),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
                       ),
                   ],
@@ -481,22 +588,31 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: kPrimary))
+                ? const Center(
+                    child: CircularProgressIndicator(color: kPrimary),
+                  )
                 : _error != null
-                    ? _buildError()
-                    : _notifications.isEmpty
-                        ? _buildEmptyState()
-                        : RefreshIndicator(
-                            color: kPrimary,
-                            onRefresh: _loadNotifications,
-                            child: ListView.separated(
-                              padding: EdgeInsets.zero,
-                              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                              itemCount: _notifications.length,
-                              separatorBuilder: (_, _) => const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
-                              itemBuilder: (context, i) => _buildNotifCard(_notifications[i]),
-                            ),
-                          ),
+                ? _buildError()
+                : _notifications.isEmpty
+                ? _buildEmptyState()
+                : RefreshIndicator(
+                    color: kPrimary,
+                    onRefresh: _loadNotifications,
+                    child: ListView.separated(
+                      padding: EdgeInsets.zero,
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      itemCount: _notifications.length,
+                      separatorBuilder: (_, _) => const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFEEEEEE),
+                      ),
+                      itemBuilder: (context, i) =>
+                          _buildNotifCard(_notifications[i]),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -626,7 +742,6 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     );
   }
 
-
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -638,18 +753,30 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
               color: kPrimary.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.notifications_none_rounded, size: 56, color: kPrimary),
+            child: const Icon(
+              Icons.notifications_none_rounded,
+              size: 56,
+              color: kPrimary,
+            ),
           ),
           const SizedBox(height: 20),
           const Text(
             'Sin notificaciones',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kNavy),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: kNavy,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Te avisaremos sobre tus tickets,\ncotizaciones y pedidos.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 13, height: 1.5),
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 13,
+              height: 1.5,
+            ),
           ),
         ],
       ),
@@ -657,25 +784,11 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
   }
 
   Widget _buildError() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.wifi_off_rounded, size: 48, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text('Error al cargar: $_error', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _loadNotifications,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Reintentar'),
-              style: ElevatedButton.styleFrom(backgroundColor: kPrimary, foregroundColor: Colors.white),
-            ),
-          ],
-        ),
-      ),
+    return LoadErrorState(
+      error: _error,
+      onRetry: _loadNotifications,
+      genericTitle: 'Error al cargar notificaciones',
+      genericMessage: 'No pudimos cargar tus notificaciones por el momento.',
     );
   }
 }

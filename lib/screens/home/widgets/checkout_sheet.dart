@@ -1,9 +1,9 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/cart_service.dart';
 import '../../../services/address_service.dart';
+
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
 const _kGreen = Color(0xFF16A34A);
@@ -12,7 +12,11 @@ const _kBg = Color(0xFFF8FAFC);
 class CheckoutSheet extends StatefulWidget {
   final double total;
   final VoidCallback onSuccess;
-  const CheckoutSheet({super.key, required this.total, required this.onSuccess});
+  const CheckoutSheet({
+    super.key,
+    required this.total,
+    required this.onSuccess,
+  });
 
   @override
   State<CheckoutSheet> createState() => _CheckoutSheetState();
@@ -39,56 +43,16 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
   bool _isFinancing = false;
   int _selectedMonths = 3;
   String _paymentMethod = 'transfer';
-  String _codiOption = 'mobile';
-  bool _codiSimulatedPaid = false;
-  bool _codiRequestSent = false;
-  int _codiTimerSeconds = 120;
-  Timer? _codiTimer;
   bool _loading = false;
 
-  final _cardNumberController = TextEditingController();
-  final _cardHolderController = TextEditingController();
-  final _cardExpiryController = TextEditingController();
-  final _cardCvvController = TextEditingController();
-  final _codiPhoneController = TextEditingController();
   final _notesController = TextEditingController();
 
   @override
   void dispose() {
-    _cardNumberController.dispose();
-    _cardHolderController.dispose();
-    _cardExpiryController.dispose();
-    _cardCvvController.dispose();
-    _codiPhoneController.dispose();
     _notesController.dispose();
     _rfcController.dispose();
     _razonSocialController.dispose();
-    _codiTimer?.cancel();
     super.dispose();
-  }
-
-  void _startCodiTimer() {
-    _codiTimer?.cancel();
-    _codiTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        if (_codiTimerSeconds > 0) {
-          _codiTimerSeconds--;
-        } else {
-          _codiRequestSent = false;
-          timer.cancel();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('La solicitud de cobro CoDi ha expirado. Por favor intenta de nuevo.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      });
-    });
   }
 
   Future<void> _submit() async {
@@ -108,44 +72,6 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
       }
     }
 
-    if (!_isQuote) {
-      if (_paymentMethod == 'card') {
-        final cardNo = _cardNumberController.text.replaceAll(' ', '');
-        if (cardNo.length < 15 || cardNo.length > 16) {
-          _showError('Por favor ingresa un número de tarjeta válido.');
-          return;
-        }
-        if (_cardHolderController.text.trim().isEmpty) {
-          _showError('Por favor ingresa el nombre del titular.');
-          return;
-        }
-        if (_cardExpiryController.text.trim().length != 5) {
-          _showError('Por favor ingresa una fecha de expiración válida (MM/YY).');
-          return;
-        }
-        if (_cardCvvController.text.trim().length < 3) {
-          _showError('Por favor ingresa un CVV válido.');
-          return;
-        }
-      } else if (_paymentMethod == 'codi') {
-        if (_codiOption == 'mobile') {
-          if (_codiPhoneController.text.length != 10) {
-            _showError('Por favor ingresa un número de celular de 10 dígitos.');
-            return;
-          }
-          if (!_codiSimulatedPaid) {
-            _showError('Por favor simula la aprobación del pago CoDi en tu celular antes de confirmar.');
-            return;
-          }
-        } else {
-          if (!_codiSimulatedPaid) {
-            _showError('Por favor simula el escaneo del código QR CoDi antes de confirmar.');
-            return;
-          }
-        }
-      }
-    }
-
     setState(() => _loading = true);
 
     try {
@@ -162,7 +88,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               'rfc': _rfcController.text.trim().toUpperCase(),
               'razon_social': _razonSocialController.text.trim(),
               'cfdi_use': _selectedCfdi,
-            }
+            },
           };
 
           if (addr == null) {
@@ -177,7 +103,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               .update(updateFields)
               .eq('id', quoteId);
         } catch (quoteErr) {
-          debugPrint('Aviso al guardar la dirección/facturación de la cotización: $quoteErr');
+          debugPrint(
+            'Aviso al guardar la dirección/facturación de la cotización: $quoteErr',
+          );
         }
 
         if (mounted) {
@@ -194,12 +122,17 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
             showDialog(
               context: context,
               builder: (dialogCtx) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 title: const Row(
                   children: [
                     Icon(Icons.check_circle, color: _kPrimary, size: 28),
                     SizedBox(width: 10),
-                    Text('¡Cotización Solicitada!', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      '¡Cotización Solicitada!',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
                 content: const Text(
@@ -209,7 +142,13 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(dialogCtx),
-                    child: const Text('Aceptar', style: TextStyle(color: _kPrimary, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Aceptar',
+                      style: TextStyle(
+                        color: _kPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -218,7 +157,6 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
         }
       } else {
         String finalMethod = '';
-        String cardEnding = '';
         if (_isFinancing) {
           finalMethod = 'Financiamiento ($_selectedMonths Meses) - ';
         } else {
@@ -227,28 +165,16 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
 
         if (_paymentMethod == 'transfer') {
           finalMethod += 'SPEI';
-        } else if (_paymentMethod == 'codi') {
-          finalMethod += 'CoDi (${_codiOption == 'mobile' ? 'Celular' : 'QR'})';
-        } else if (_paymentMethod == 'card') {
-          finalMethod += 'Tarjeta';
-          final rawNo = _cardNumberController.text.replaceAll(' ', '');
-          cardEnding = ' [Tarjeta terminación: **** ${rawNo.substring(rawNo.length - 4)}]';
         } else if (_paymentMethod == 'cash') {
-          finalMethod += 'Efectivo';
+          finalMethod += 'Pago contra entrega';
         } else {
           finalMethod += 'Otro';
         }
 
         final notesBuf = StringBuffer();
-        notesBuf.write('Método de pago seleccionado: $finalMethod.');
+        notesBuf.write('Método de pago solicitado: $finalMethod.');
         if (_notesController.text.trim().isNotEmpty) {
           notesBuf.write(' Notas: ${_notesController.text.trim()}');
-        }
-        if (cardEnding.isNotEmpty) {
-          notesBuf.write(' $cardEnding');
-        }
-        if (_paymentMethod == 'codi' && _codiOption == 'mobile') {
-          notesBuf.write(' [CoDi Móvil: ${_codiPhoneController.text}]');
         }
 
         String dbPaymentMethod = 'other';
@@ -257,12 +183,8 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
         } else {
           if (_paymentMethod == 'transfer') {
             dbPaymentMethod = 'spei';
-          } else if (_paymentMethod == 'card') {
-            dbPaymentMethod = 'card';
           } else if (_paymentMethod == 'cash') {
             dbPaymentMethod = 'cash';
-          } else if (_paymentMethod == 'codi') {
-            dbPaymentMethod = 'spei';
           }
         }
 
@@ -280,7 +202,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               'rfc': _rfcController.text.trim().toUpperCase(),
               'razon_social': _razonSocialController.text.trim(),
               'cfdi_use': _selectedCfdi,
-            }
+            },
           };
 
           if (addr == null) {
@@ -295,7 +217,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               .update(updateFields)
               .eq('id', orderId);
         } catch (addrErr) {
-          debugPrint('Aviso al guardar la dirección/facturación del pedido: $addrErr');
+          debugPrint(
+            'Aviso al guardar la dirección/facturación del pedido: $addrErr',
+          );
         }
 
         if (mounted) {
@@ -312,16 +236,21 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
             showDialog(
               context: context,
               builder: (dialogCtx) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 title: const Row(
                   children: [
                     Icon(Icons.check_circle, color: _kPrimary, size: 28),
                     SizedBox(width: 10),
-                    Text('¡Compra Exitosa!', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      'Orden generada',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
                 content: Text(
-                  'Tu orden de compra ha sido generada bajo la modalidad de $finalMethod y el stock de los productos se ha actualizado en tiempo real.\n\nRecibirás una notificación con los detalles de tu compra.',
+                  'Tu orden fue enviada bajo la modalidad de $finalMethod.\n\nTe notificaremos el seguimiento de pago y entrega.',
                   style: const TextStyle(fontSize: 13, height: 1.4),
                 ),
                 actions: [
@@ -329,7 +258,13 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                     onPressed: () {
                       Navigator.pop(dialogCtx);
                     },
-                    child: const Text('Aceptar', style: TextStyle(color: _kPrimary, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Aceptar',
+                      style: TextStyle(
+                        color: _kPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -341,7 +276,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
       if (mounted) {
         setState(() => _loading = false);
         final errMsg = e.toString().replaceAll('Exception: ', '');
-        _showError('Error al procesar la solicitud: $errMsg');
+        _showError('Error al procesar la compra: $errMsg');
       }
     }
   }
@@ -376,7 +311,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               SuccessCheckmark(),
               SizedBox(height: 24),
               Text(
-                '¡Pago Confirmado!',
+                'Orden enviada',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -385,11 +320,8 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               ),
               SizedBox(height: 8),
               Text(
-                'Tu compra se ha procesado con éxito.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF64748B),
-                ),
+                'Gracias por tu compra.',
+                style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
               ),
             ],
           ),
@@ -420,7 +352,12 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
           const SizedBox(height: 8),
           Flexible(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                0,
+                20,
+                MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -430,9 +367,22 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Confirmar Compra', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _kNavy)),
+                          const Text(
+                            'Revisar pedido',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _kNavy,
+                            ),
+                          ),
                           const SizedBox(height: 2),
-                          Text('Finaliza tu pedido seleccionando tus opciones de pago.', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                          Text(
+                            'Completa tus datos para finalizar la compra.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
                         ],
                       ),
                       IconButton(
@@ -460,17 +410,35 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Total a Pagar:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _kNavy)),
+                        const Text(
+                          'Total a Pagar:',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: _kNavy,
+                          ),
+                        ),
                         Text(
                           _formatCurrency(widget.total),
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _kPrimary),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: _kPrimary,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  const Text('Tipo de Transacción', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _kNavy)),
+                  const Text(
+                    'Tipo de Transacción',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: _kNavy,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Container(
                     decoration: BoxDecoration(
@@ -482,11 +450,15 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: _loading ? null : () => setState(() => _isQuote = false),
+                            onTap: _loading
+                                ? null
+                                : () => setState(() => _isQuote = false),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: !_isQuote ? _kPrimary : Colors.transparent,
+                                color: !_isQuote
+                                    ? _kPrimary
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
@@ -494,7 +466,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: !_isQuote ? Colors.white : Colors.grey.shade700,
+                                  color: !_isQuote
+                                      ? Colors.white
+                                      : Colors.grey.shade700,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
@@ -503,11 +477,15 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                         ),
                         Expanded(
                           child: GestureDetector(
-                            onTap: _loading ? null : () => setState(() => _isQuote = true),
+                            onTap: _loading
+                                ? null
+                                : () => setState(() => _isQuote = true),
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: _isQuote ? _kPrimary : Colors.transparent,
+                                color: _isQuote
+                                    ? _kPrimary
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
@@ -515,7 +493,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: _isQuote ? Colors.white : Colors.grey.shade700,
+                                  color: _isQuote
+                                      ? Colors.white
+                                      : Colors.grey.shade700,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
@@ -528,7 +508,14 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                   const SizedBox(height: 20),
 
                   if (!_isQuote) ...[
-                    const Text('Modelo de Pago *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _kNavy)),
+                    const Text(
+                      'Modelo de Pago *',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Container(
                       decoration: BoxDecoration(
@@ -540,11 +527,17 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              onTap: _loading ? null : () => setState(() => _isFinancing = false),
+                              onTap: _loading
+                                  ? null
+                                  : () => setState(() => _isFinancing = false),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: !_isFinancing ? _kPrimary : Colors.transparent,
+                                  color: !_isFinancing
+                                      ? _kPrimary
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
@@ -552,7 +545,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
-                                    color: !_isFinancing ? Colors.white : Colors.grey.shade700,
+                                    color: !_isFinancing
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -561,11 +556,17 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                           ),
                           Expanded(
                             child: GestureDetector(
-                              onTap: _loading ? null : () => setState(() => _isFinancing = true),
+                              onTap: _loading
+                                  ? null
+                                  : () => setState(() => _isFinancing = true),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: _isFinancing ? _kPrimary : Colors.transparent,
+                                  color: _isFinancing
+                                      ? _kPrimary
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
@@ -573,7 +574,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
-                                    color: _isFinancing ? Colors.white : Colors.grey.shade700,
+                                    color: _isFinancing
+                                        ? Colors.white
+                                        : Colors.grey.shade700,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -586,7 +589,14 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                     const SizedBox(height: 16),
 
                     if (_isFinancing) ...[
-                      const Text('Selecciona el plazo de Financiamiento *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _kNavy)),
+                      const Text(
+                        'Selecciona el plazo de Financiamiento *',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: _kNavy,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
@@ -600,84 +610,20 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                       const SizedBox(height: 20),
                     ],
 
-                    const Text('Selecciona el Método de Pago *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _kNavy)),
+                    const Text(
+                      'Selecciona el metodo de pago solicitado *',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     _buildPaymentMethodsGrid(),
                     const SizedBox(height: 20),
 
                     if (_paymentMethod == 'transfer')
                       _buildSpeiFlow()
-                    else if (_paymentMethod == 'codi') ...[
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE2E8F0),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.all(2),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() {
-                                  _codiOption = 'mobile';
-                                  _codiSimulatedPaid = false;
-                                  _codiRequestSent = false;
-                                  _codiTimer?.cancel();
-                                }),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: _codiOption == 'mobile' ? _kPrimary : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'CoDi Móvil (Celular)',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: _codiOption == 'mobile' ? Colors.white : Colors.grey.shade700,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() {
-                                  _codiOption = 'qr';
-                                  _codiSimulatedPaid = false;
-                                  _codiRequestSent = false;
-                                  _codiTimer?.cancel();
-                                }),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: _codiOption == 'qr' ? _kPrimary : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'Código QR CoDi',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: _codiOption == 'qr' ? Colors.white : Colors.grey.shade700,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_codiOption == 'mobile')
-                        _buildCodiMobileFlow()
-                      else
-                        _buildCodiQrMock(),
-                    ] else if (_paymentMethod == 'card')
-                      _buildCardFlow()
                     else if (_paymentMethod == 'cash')
                       _buildCashFlow(),
                     const SizedBox(height: 20),
@@ -687,7 +633,11 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                   SwitchListTile(
                     title: const Text(
                       '¿Requiere factura fiscal?',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _kNavy),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
                     ),
                     subtitle: const Text(
                       'Se emitirá factura CFDI en México',
@@ -702,7 +652,14 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                   ),
                   if (_requiresInvoice) ...[
                     const SizedBox(height: 12),
-                    const Text('RFC *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _kNavy)),
+                    const Text(
+                      'RFC *',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: _rfcController,
@@ -711,31 +668,61 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                       enabled: !_loading,
                       decoration: InputDecoration(
                         hintText: 'ABCD123456XX0 o ABC123456XX0',
-                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                        hintStyle: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade400,
+                        ),
                         counterText: '',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         fillColor: Colors.white,
                         filled: true,
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text('Razón Social *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _kNavy)),
+                    const Text(
+                      'Razón Social *',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     TextFormField(
                       controller: _razonSocialController,
                       enabled: !_loading,
                       decoration: InputDecoration(
                         hintText: 'Nombre de la persona o empresa',
-                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        hintStyle: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade400,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         fillColor: Colors.white,
                         filled: true,
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text('Uso de CFDI *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _kNavy)),
+                    const Text(
+                      'Uso de CFDI *',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
+                    ),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -760,7 +747,10 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                               value: entry.key,
                               child: Text(
                                 entry.value,
-                                style: const TextStyle(fontSize: 13, color: _kNavy),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: _kNavy,
+                                ),
                               ),
                             );
                           }).toList(),
@@ -771,8 +761,14 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                   const SizedBox(height: 20),
 
                   Text(
-                    _isQuote ? 'Notas / Instrucciones Especiales' : 'Notas / Instrucciones de Entrega',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _kNavy),
+                    _isQuote
+                        ? 'Notas / Instrucciones Especiales'
+                        : 'Notas / Instrucciones de Entrega',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: _kNavy,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
@@ -783,8 +779,13 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                       hintText: _isQuote
                           ? 'Ej. Solicito entrega inmediata, o color específico.'
                           : 'Ej. Entregar por la mañana, o requiere facturar.',
-                      hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      hintStyle: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade400,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       fillColor: Colors.white,
                       filled: true,
                     ),
@@ -799,14 +800,21 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _kPrimary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         elevation: 2,
                       ),
                       child: _loading
                           ? const CircularProgressIndicator(color: Colors.white)
                           : Text(
-                              _isQuote ? 'Solicitar Cotización' : 'Confirmar y Comprar',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              _isQuote
+                                  ? 'Solicitar Cotización'
+                                  : 'Confirmar compra',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                     ),
                   ),
@@ -846,7 +854,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                     color: _kPrimary.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
-                  )
+                  ),
                 ]
               : [],
         ),
@@ -886,22 +894,22 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
   }
 
   Widget _buildPaymentMethodsGrid() {
-    return Column(
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(child: _buildPaymentMethodCard('transfer', 'SPEI / Transf.', Icons.account_balance)),
-            const SizedBox(width: 12),
-            Expanded(child: _buildPaymentMethodCard('codi', 'CoDi Móvil / QR', Icons.qr_code_scanner)),
-          ],
+        Expanded(
+          child: _buildPaymentMethodCard(
+            'transfer',
+            'SPEI / Transferencia',
+            Icons.account_balance,
+          ),
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _buildPaymentMethodCard('card', 'Tarjeta Créd/Déb', Icons.credit_card)),
-            const SizedBox(width: 12),
-            Expanded(child: _buildPaymentMethodCard('cash', 'Efectivo / Entrega', Icons.local_shipping)),
-          ],
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildPaymentMethodCard(
+            'cash',
+            'Contra entrega',
+            Icons.local_shipping,
+          ),
         ),
       ],
     );
@@ -910,14 +918,13 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
   Widget _buildPaymentMethodCard(String value, String label, IconData icon) {
     final isSelected = _paymentMethod == value;
     return GestureDetector(
-      onTap: _loading ? null : () {
-        setState(() {
-          _paymentMethod = value;
-          _codiRequestSent = false;
-          _codiSimulatedPaid = false;
-          _codiTimer?.cancel();
-        });
-      },
+      onTap: _loading
+          ? null
+          : () {
+              setState(() {
+                _paymentMethod = value;
+              });
+            },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
@@ -934,14 +941,18 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                     color: _kPrimary.withValues(alpha: 0.1),
                     blurRadius: 6,
                     offset: const Offset(0, 3),
-                  )
+                  ),
                 ]
               : [],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isSelected ? _kPrimary : Colors.grey.shade600, size: 24),
+            Icon(
+              icon,
+              color: isSelected ? _kPrimary : Colors.grey.shade600,
+              size: 24,
+            ),
             const SizedBox(height: 8),
             Text(
               label,
@@ -975,7 +986,11 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               SizedBox(width: 8),
               Text(
                 'Datos para Transferencia SPEI',
-                style: TextStyle(fontWeight: FontWeight.bold, color: _kNavy, fontSize: 14),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: _kNavy,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
@@ -991,7 +1006,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                 icon: const Icon(Icons.copy, color: _kPrimary, size: 18),
                 tooltip: 'Copiar CLABE',
                 onPressed: () {
-                  Clipboard.setData(const ClipboardData(text: '646180001234567890'));
+                  Clipboard.setData(
+                    const ClipboardData(text: '646180001234567890'),
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('CLABE copiada al portapapeles'),
@@ -1006,8 +1023,12 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
           _buildSpeiRow('Referencia:', 'GOMED-CHECKOUT'),
           const SizedBox(height: 10),
           const Text(
-            '* Tu orden será revisada por nuestro equipo una vez que se detecte la transferencia. La verificación suele tomar menos de 10 minutos.',
-            style: TextStyle(fontSize: 11, color: Colors.black54, fontStyle: FontStyle.italic),
+            '* Tu orden se procesa una vez que se detecte la transferencia. La verificación suele tomar menos de 10 minutos.',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.black54,
+              fontStyle: FontStyle.italic,
+            ),
           ),
         ],
       ),
@@ -1021,438 +1042,16 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
         text: TextSpan(
           style: const TextStyle(fontSize: 13, color: Colors.black87),
           children: [
-            TextSpan(text: '$label ', style: const TextStyle(fontWeight: FontWeight.bold, color: _kNavy)),
+            TextSpan(
+              text: '$label ',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _kNavy,
+              ),
+            ),
             TextSpan(text: value),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCodiQrMock() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 160,
-            height: 160,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: CustomPaint(
-              size: const Size(140, 140),
-              painter: _QrPainter(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.qr_code_scanner, color: _kPrimary, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                _codiSimulatedPaid ? '¡Pago detectado con éxito!' : 'Esperando escaneo de código...',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: _codiSimulatedPaid ? _kGreen : Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (!_codiSimulatedPaid)
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _codiSimulatedPaid = true;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Simulación: Código QR escaneado y pagado'),
-                    backgroundColor: _kGreen,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kPrimary.withValues(alpha: 0.1),
-                foregroundColor: _kPrimary,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text('Simular Escaneo CoDi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            )
-          else
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle, color: _kGreen, size: 20),
-                SizedBox(width: 6),
-                Text('Pago Confirmado', style: TextStyle(color: _kGreen, fontWeight: FontWeight.bold, fontSize: 13)),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCodiMobileFlow() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Ingresa el número celular asociado a tu cuenta CoDi / App Bancaria para recibir la solicitud de cobro de inmediato.',
-          style: TextStyle(fontSize: 12, color: Colors.black54),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _codiPhoneController,
-          keyboardType: TextInputType.phone,
-          maxLength: 10,
-          enabled: !_codiRequestSent && !_loading,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: InputDecoration(
-            labelText: 'Número de Celular (10 dígitos)',
-            prefixIcon: const Icon(Icons.phone_android),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            fillColor: Colors.white,
-            filled: true,
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (!_codiRequestSent)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                final phone = _codiPhoneController.text.trim();
-                if (phone.length != 10) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Por favor ingresa un número celular de 10 dígitos'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-                setState(() {
-                  _codiRequestSent = true;
-                  _codiTimerSeconds = 120;
-                  _codiSimulatedPaid = false;
-                });
-                _startCodiTimer();
-              },
-              icon: const Icon(Icons.send_to_mobile),
-              label: const Text('Enviar Solicitud de Cobro'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kPrimary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          )
-        else ...[
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (!_codiSimulatedPaid)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary),
-                      ),
-                    const SizedBox(width: 10),
-                    Text(
-                      _codiSimulatedPaid 
-                          ? '¡Pago CoDi recibido y confirmado!'
-                          : 'Esperando pago en tu app... (0${_codiTimerSeconds ~/ 60}:${(_codiTimerSeconds % 60).toString().padLeft(2, '0')})',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (!_codiSimulatedPaid)
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _codiSimulatedPaid = true;
-                        _codiTimer?.cancel();
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Simulación: Solicitud de cobro CoDi aprobada en banco'),
-                          backgroundColor: _kGreen,
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _kPrimary.withValues(alpha: 0.1),
-                      foregroundColor: _kPrimary,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text('Simular Aprobación Bancaria', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  )
-                else
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle, color: _kGreen, size: 20),
-                      SizedBox(width: 6),
-                      Text('Pago Confirmado', style: TextStyle(color: _kGreen, fontWeight: FontWeight.bold, fontSize: 13)),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Center(
-            child: TextButton(
-              onPressed: () {
-                setState(() {
-                  _codiRequestSent = false;
-                  _codiTimer?.cancel();
-                });
-              },
-              child: const Text('Reingresar número o cambiar método', style: TextStyle(fontSize: 11, color: Colors.black45)),
-            ),
-          )
-        ]
-      ],
-    );
-  }
-
-  Widget _buildCardFlow() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildVirtualCard(),
-        const SizedBox(height: 20),
-        const Text(
-          'Datos de la Tarjeta',
-          style: TextStyle(fontWeight: FontWeight.bold, color: _kNavy, fontSize: 14),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _cardNumberController,
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            _CardNumberFormatter(),
-          ],
-          decoration: InputDecoration(
-            labelText: 'Número de Tarjeta',
-            prefixIcon: const Icon(Icons.credit_card),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            fillColor: Colors.white,
-            filled: true,
-          ),
-          onChanged: (_) => setState(() {}),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _cardHolderController,
-          keyboardType: TextInputType.name,
-          decoration: InputDecoration(
-            labelText: 'Nombre del Titular',
-            prefixIcon: const Icon(Icons.person),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            fillColor: Colors.white,
-            filled: true,
-          ),
-          onChanged: (_) => setState(() {}),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: TextFormField(
-                controller: _cardExpiryController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  _CardExpiryFormatter(),
-                ],
-                decoration: InputDecoration(
-                  labelText: 'Expiración (MM/YY)',
-                  prefixIcon: const Icon(Icons.calendar_today),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  fillColor: Colors.white,
-                  filled: true,
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextFormField(
-                controller: _cardCvvController,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                maxLength: 4,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  labelText: 'CVV',
-                  prefixIcon: const Icon(Icons.lock),
-                  counterText: '',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  fillColor: Colors.white,
-                  filled: true,
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildVirtualCard() {
-    final numStr = _cardNumberController.text.isEmpty ? '•••• •••• •••• ••••' : _cardNumberController.text;
-    final holderStr = _cardHolderController.text.isEmpty ? 'NOMBRE DEL TITULAR' : _cardHolderController.text.toUpperCase();
-    final expiryStr = _cardExpiryController.text.isEmpty ? 'MM/YY' : _cardExpiryController.text;
-    final cvvStr = _cardCvvController.text.isEmpty ? '•••' : _cardCvvController.text;
-
-    final isVisa = _cardNumberController.text.startsWith('4');
-    final isMastercard = _cardNumberController.text.startsWith('5');
-
-    return Container(
-      width: double.infinity,
-      height: 180,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF1E3A5F),
-            Color(0xFF0D9488),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1E3A5F).withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                width: 40,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Stack(
-                  children: [
-                    Positioned(left: 10, top: 0, bottom: 0, child: VerticalDivider(color: Colors.black26, width: 1)),
-                    Positioned(left: 20, top: 0, bottom: 0, child: VerticalDivider(color: Colors.black26, width: 1)),
-                    Positioned(left: 30, top: 0, bottom: 0, child: VerticalDivider(color: Colors.black26, width: 1)),
-                    Positioned(top: 10, left: 0, right: 0, child: Divider(color: Colors.black26, height: 1)),
-                    Positioned(top: 20, left: 0, right: 0, child: Divider(color: Colors.black26, height: 1)),
-                  ],
-                ),
-              ),
-              Text(
-                isVisa ? 'VISA' : (isMastercard ? 'mastercard' : 'CREDIT CARD'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  fontStyle: FontStyle.italic,
-                  shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
-                ),
-              ),
-            ],
-          ),
-          Text(
-            numStr,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              letterSpacing: 2.0,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('TITULAR', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 2),
-                    Text(
-                      holderStr,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, overflow: TextOverflow.ellipsis),
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text('EXPIRA', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
-                  Text(
-                    expiryStr,
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 15),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text('CVV', style: TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
-                  Text(
-                    cvvStr,
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -1473,24 +1072,28 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               Icon(Icons.local_shipping, color: _kPrimary, size: 20),
               SizedBox(width: 8),
               Text(
-                'Pago Contra Entrega / Efectivo',
-                style: TextStyle(fontWeight: FontWeight.bold, color: _kNavy, fontSize: 14),
+                'Pago contra entrega',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: _kNavy,
+                  fontSize: 14,
+                ),
               ),
             ],
           ),
           Divider(height: 20),
           Text(
-            '• Puedes pagar en efectivo o con tarjeta al momento de recibir tus productos.',
+            '• Nuestro equipo coordinará contigo la forma de pago al momento de la entrega.',
             style: TextStyle(fontSize: 13, height: 1.4),
           ),
           SizedBox(height: 6),
           Text(
-            '• Nuestros choferes y repartidores cuentan con terminal móvil bancaria.',
+            '• Los tiempos de entrega pueden variar según cobertura y método de pago.',
             style: TextStyle(fontSize: 13, height: 1.4),
           ),
           SizedBox(height: 6),
           Text(
-            '• Si pagas en efectivo, por favor ten listo el importe exacto para agilizar la entrega.',
+            '• Recibirás indicaciones por notificación o contacto de seguimiento.',
             style: TextStyle(fontSize: 13, height: 1.4),
           ),
         ],
@@ -1509,111 +1112,6 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
   }
 }
 
-class _CardNumberFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    var text = newValue.text.replaceAll(' ', '');
-    if (text.length > 16) text = text.substring(0, 16);
-    final buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      if (i > 0 && i % 4 == 0) buffer.write(' ');
-      buffer.write(text[i]);
-    }
-    final formatted = buffer.toString();
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-}
-
-class _CardExpiryFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    var text = newValue.text.replaceAll('/', '');
-    if (text.length > 4) text = text.substring(0, 4);
-    final buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      if (i == 2) buffer.write('/');
-      buffer.write(text[i]);
-    }
-    final formatted = buffer.toString();
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-}
-
-class _QrPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black87;
-    final double finderSize = size.width * 0.25;
-
-    _drawFinderPattern(canvas, const Offset(0, 0), finderSize, paint);
-    _drawFinderPattern(canvas, Offset(size.width - finderSize, 0), finderSize, paint);
-    _drawFinderPattern(canvas, Offset(0, size.height - finderSize), finderSize, paint);
-
-    final randPattern = [
-      [1,0,1,1,0,1,0,1,1,0],
-      [0,1,0,0,1,0,1,0,0,1],
-      [1,1,0,1,1,0,0,1,1,0],
-      [0,0,1,0,0,1,1,0,0,1],
-      [1,0,1,1,0,1,0,1,1,0],
-      [0,1,0,0,1,0,1,0,0,1],
-      [1,1,0,1,1,0,0,1,1,0],
-      [0,0,1,0,0,1,1,0,0,1],
-      [1,0,1,1,0,1,0,1,1,0],
-      [0,1,0,0,1,0,1,0,0,1],
-    ];
-
-    final blockSize = size.width / 14;
-    final startOffset = finderSize + blockSize;
-
-    for (int r = 0; r < randPattern.length; r++) {
-      for (int c = 0; c < randPattern[r].length; c++) {
-        if (randPattern[r][c] == 1) {
-          canvas.drawRect(
-            Rect.fromLTWH(
-              startOffset + c * blockSize,
-              startOffset + r * blockSize,
-              blockSize - 1,
-              blockSize - 1,
-            ),
-            paint,
-          );
-        }
-      }
-    }
-
-    for (double x = finderSize + blockSize; x < size.width - finderSize - blockSize; x += blockSize * 2) {
-      canvas.drawRect(Rect.fromLTWH(x, 0, blockSize, blockSize), paint);
-      canvas.drawRect(Rect.fromLTWH(0, x, blockSize, blockSize), paint);
-    }
-  }
-
-  void _drawFinderPattern(Canvas canvas, Offset offset, double size, Paint paint) {
-    canvas.drawRect(Rect.fromLTWH(offset.dx, offset.dy, size, size), paint);
-    final whitePaint = Paint()..color = Colors.white;
-    final double innerWhiteStart = size * 0.15;
-    final double innerWhiteSize = size * 0.7;
-    canvas.drawRect(
-      Rect.fromLTWH(offset.dx + innerWhiteStart, offset.dy + innerWhiteStart, innerWhiteSize, innerWhiteSize),
-      whitePaint,
-    );
-    final double innerBlackStart = size * 0.3;
-    final double innerBlackSize = size * 0.4;
-    canvas.drawRect(
-      Rect.fromLTWH(offset.dx + innerBlackStart, offset.dy + innerBlackStart, innerBlackSize, innerBlackSize),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 class SuccessCheckmark extends StatefulWidget {
   const SuccessCheckmark({super.key});
 
@@ -1621,7 +1119,8 @@ class SuccessCheckmark extends StatefulWidget {
   State<SuccessCheckmark> createState() => _SuccessCheckmarkState();
 }
 
-class _SuccessCheckmarkState extends State<SuccessCheckmark> with SingleTickerProviderStateMixin {
+class _SuccessCheckmarkState extends State<SuccessCheckmark>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _checkAnimation;
@@ -1700,7 +1199,7 @@ class SuccessCheckmarkPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round;
 
       final path = Path();
-      
+
       final start = Offset(size.width * 0.32, size.height * 0.5);
       final mid = Offset(size.width * 0.46, size.height * 0.64);
       final end = Offset(size.width * 0.68, size.height * 0.36);
@@ -1722,6 +1221,7 @@ class SuccessCheckmarkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(SuccessCheckmarkPainter oldDelegate) {
-    return oldDelegate.scale != scale || oldDelegate.checkProgress != checkProgress;
+    return oldDelegate.scale != scale ||
+        oldDelegate.checkProgress != checkProgress;
   }
 }

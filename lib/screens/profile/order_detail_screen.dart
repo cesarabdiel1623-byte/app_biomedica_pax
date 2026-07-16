@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/product_service.dart';
 import 'profile_helpers.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -25,7 +26,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     try {
       final response = await Supabase.instance.client
           .from('order_items')
-          .select('*, products(brand, product_media(*))')
+          .select('*, products(brand, product_media(${ProductService.publicMediaColumns}))')
           .eq('order_id', widget.order['id']);
       if (mounted) {
         setState(() {

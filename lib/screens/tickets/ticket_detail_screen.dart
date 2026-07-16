@@ -6,6 +6,7 @@ import '../../models/service_ticket.dart';
 import '../../models/ticket_message.dart';
 import '../../services/ticket_service.dart';
 import '../../utils/ui_helpers.dart';
+import '../../widgets/load_error_state.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
@@ -16,11 +17,11 @@ class TicketDetailScreen extends StatefulWidget {
   final String? ticketId;
   final String? ticketNumber;
 
-  const TicketDetailScreen({
-    super.key,
-    this.ticketId,
-    this.ticketNumber,
-  }) : assert(ticketId != null || ticketNumber != null, 'ticketId or ticketNumber required');
+  const TicketDetailScreen({super.key, this.ticketId, this.ticketNumber})
+    : assert(
+        ticketId != null || ticketNumber != null,
+        'ticketId or ticketNumber required',
+      );
 
   @override
   State<TicketDetailScreen> createState() => _TicketDetailScreenState();
@@ -65,7 +66,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       ServiceTicket? ticket;
       if (widget.ticketId != null && widget.ticketId!.isNotEmpty) {
         ticket = await TicketService.getTicketById(widget.ticketId!);
-      } else if (widget.ticketNumber != null && widget.ticketNumber!.isNotEmpty) {
+      } else if (widget.ticketNumber != null &&
+          widget.ticketNumber!.isNotEmpty) {
         ticket = await TicketService.getTicketByNumber(widget.ticketNumber!);
       }
       if (mounted) {
@@ -121,7 +123,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     final client = Supabase.instance.client;
 
     _chatChannel = client
-        .channel('public:service_ticket_messages:ticket_id=eq.$_effectiveTicketId')
+        .channel(
+          'public:service_ticket_messages:ticket_id=eq.$_effectiveTicketId',
+        )
         .onPostgresChanges(
           event: PostgresChangeEvent.all,
           schema: 'public',
@@ -170,27 +174,51 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'open': return const Color(0xFF3B82F6);
-      case 'in_progress': return const Color(0xFFF59E0B);
-      case 'resolved': return const Color(0xFF16A34A);
-      case 'closed': return Colors.grey;
-      case 'cancelled': return const Color(0xFFEF4444);
-      default: return Colors.grey;
+      case 'open':
+        return const Color(0xFF3B82F6);
+      case 'in_progress':
+        return const Color(0xFFF59E0B);
+      case 'resolved':
+        return const Color(0xFF16A34A);
+      case 'closed':
+        return Colors.grey;
+      case 'cancelled':
+        return const Color(0xFFEF4444);
+      default:
+        return Colors.grey;
     }
   }
 
   Color _priorityColor(String priority) {
     switch (priority) {
-      case 'critical': return const Color(0xFF7C3AED);
-      case 'high': return const Color(0xFFEF4444);
-      case 'medium': return const Color(0xFFF59E0B);
-      case 'low': return const Color(0xFF16A34A);
-      default: return Colors.grey;
+      case 'critical':
+        return const Color(0xFF7C3AED);
+      case 'high':
+        return const Color(0xFFEF4444);
+      case 'medium':
+        return const Color(0xFFF59E0B);
+      case 'low':
+        return const Color(0xFF16A34A);
+      default:
+        return Colors.grey;
     }
   }
 
   String _formatDate(DateTime d) {
-    final months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    final months = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
     final hour = d.hour.toString().padLeft(2, '0');
     final minute = d.minute.toString().padLeft(2, '0');
     return '${d.day} ${months[d.month - 1]} ${d.year} - $hour:$minute hrs';
@@ -198,7 +226,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
   bool get _canChat {
     final status = _ticket?.status.toLowerCase();
-    return status != 'resolved' && status != 'closed' && status != 'cancelled' && status != 'canceled';
+    return status != 'resolved' &&
+        status != 'closed' &&
+        status != 'cancelled' &&
+        status != 'canceled';
   }
 
   Widget _buildChatCard(ServiceTicket ticket) {
@@ -238,7 +269,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   const SizedBox(
                     width: 14,
                     height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _kPrimary,
+                    ),
                   ),
               ],
             ),
@@ -248,53 +282,70 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             height: MediaQuery.of(context).size.height * 0.45,
             color: const Color(0xFFF8FAFC),
             child: _loadingMessages
-                ? const Center(child: CircularProgressIndicator(color: _kPrimary))
+                ? const Center(
+                    child: CircularProgressIndicator(color: _kPrimary),
+                  )
                 : _messages.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: _kPrimary.withValues(alpha: 0.08),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.chat_bubble_outline_rounded, size: 40, color: _kPrimary),
-                            ),
-                            const SizedBox(height: 14),
-                            const Text(
-                              'Sin mensajes aún',
-                              style: TextStyle(color: _kNavy, fontSize: 14, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 6),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 32),
-                              child: Text(
-                                'Envía un mensaje para comunicarte con el equipo de soporte técnico.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Color(0xFF64748B), fontSize: 11.5, height: 1.4),
-                              ),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: _kPrimary.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 40,
+                            color: _kPrimary,
+                          ),
                         ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(12),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = _messages[index];
-                          final isMe = msg.senderType == 'client' && msg.senderProfileId == curUserId;
-                          return _ChatBubbleItem(
-                            key: ValueKey(msg.id),
-                            message: msg,
-                            isMe: isMe,
-                            curUserId: curUserId,
-                            onImageTap: () => _showFullImageLightbox(msg.attachmentUrl!),
-                          );
-                        },
-                      ),
+                        const SizedBox(height: 14),
+                        const Text(
+                          'Sin mensajes aún',
+                          style: TextStyle(
+                            color: _kNavy,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            'Envía un mensaje para comunicarte con el equipo de soporte técnico.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 11.5,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(12),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = _messages[index];
+                      final isMe =
+                          msg.senderType == 'client' &&
+                          msg.senderProfileId == curUserId;
+                      return _ChatBubbleItem(
+                        key: ValueKey(msg.id),
+                        message: msg,
+                        isMe: isMe,
+                        curUserId: curUserId,
+                        onImageTap: () =>
+                            _showFullImageLightbox(msg.attachmentUrl!),
+                      );
+                    },
+                  ),
           ),
           const Divider(height: 1),
           if (_canChat)
@@ -311,9 +362,16 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _kPrimary,
+                            ),
                           )
-                        : const Icon(Icons.add_photo_alternate_outlined, color: Color(0xFF64748B), size: 24),
+                        : const Icon(
+                            Icons.add_photo_alternate_outlined,
+                            color: Color(0xFF64748B),
+                            size: 24,
+                          ),
                     onPressed: _uploadingFile ? null : _pickAndUploadImage,
                     tooltip: 'Adjuntar imágenes',
                   ),
@@ -321,11 +379,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   Expanded(
                     child: TextField(
                       controller: _messageController,
-                      style: const TextStyle(fontSize: 13.5, color: Colors.black),
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        color: Colors.black,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Escribe un mensaje...',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        hintStyle: const TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 13,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         filled: true,
                         fillColor: const Color(0xFFF1F5F9),
                         border: OutlineInputBorder(
@@ -354,7 +421,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         color: _kPrimary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ],
@@ -368,7 +439,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.lock_outline, size: 14, color: Colors.grey.shade600),
+                  Icon(
+                    Icons.lock_outline,
+                    size: 14,
+                    color: Colors.grey.shade600,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Ticket resuelto/cerrado. Chat archivado.',
@@ -397,7 +472,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al enviar mensaje: $e'), backgroundColor: _kRed),
+          SnackBar(
+            content: Text('Error al enviar mensaje: $e'),
+            backgroundColor: _kRed,
+          ),
         );
       }
     }
@@ -433,7 +511,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     trustedUrl,
                     fit: BoxFit.contain,
                     errorBuilder: (_, _, _) => const Center(
-                      child: Icon(Icons.broken_image_outlined, color: Colors.white, size: 48),
+                      child: Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.white,
+                        size: 48,
+                      ),
                     ),
                   ),
                 ),
@@ -457,7 +539,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     child: Align(
                       alignment: Alignment.topLeft,
                       child: IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ),
@@ -498,7 +584,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudieron leer los bytes de los archivos.'), backgroundColor: _kRed),
+            const SnackBar(
+              content: Text('No se pudieron leer los bytes de los archivos.'),
+              backgroundColor: _kRed,
+            ),
           );
         }
         return;
@@ -511,7 +600,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al seleccionar imágenes: $e'), backgroundColor: _kRed),
+          SnackBar(
+            content: Text('Error al seleccionar imágenes: $e'),
+            backgroundColor: _kRed,
+          ),
         );
       }
     }
@@ -520,7 +612,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   Future<void> _showMultiImagePreviewDialog(List<PlatformFile> files) async {
     final captionController = TextEditingController();
     int currentIndex = 0;
-    
+
     List<PlatformFile> dialogFiles = List.from(files);
     final PageController pageController = PageController();
 
@@ -551,7 +643,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: isSelected
                         ? Border.all(color: Colors.white, width: 2)
-                        : Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
+                        : Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(6),
@@ -569,13 +664,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                               color: Colors.black.withValues(alpha: 0.4),
                               child: Center(
                                 child: IconButton(
-                                  icon: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 30),
+                                  icon: const Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
                                   onPressed: () {
                                     setDialogState(() {
                                       dialogFiles.removeAt(idx);
-                                      if (currentIndex >= dialogFiles.length && dialogFiles.isNotEmpty) {
+                                      if (currentIndex >= dialogFiles.length &&
+                                          dialogFiles.isNotEmpty) {
                                         currentIndex = dialogFiles.length - 1;
                                       }
                                     });
@@ -663,13 +763,22 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                       ),
                       child: SafeArea(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           child: Align(
                             alignment: Alignment.topLeft,
                             child: CircleAvatar(
-                              backgroundColor: Colors.black.withValues(alpha: 0.4),
+                              backgroundColor: Colors.black.withValues(
+                                alpha: 0.4,
+                              ),
                               child: IconButton(
-                                icon: const Icon(Icons.close, color: Colors.white, size: 24),
+                                icon: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
                                 onPressed: () => Navigator.pop(context),
                               ),
                             ),
@@ -706,20 +815,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                   buildThumbnailsList(setDialogState),
                                   const SizedBox(height: 16),
                                 ],
-                                
+
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     GestureDetector(
                                       onTap: () async {
                                         try {
-                                           final addResult = await FilePicker.pickFiles(
-                                            type: FileType.image,
-                                            allowMultiple: true,
-                                            withData: true,
-                                          );
-                                          if (addResult != null && addResult.files.isNotEmpty) {
-                                            final newFiles = addResult.files.where((f) => f.bytes != null).toList();
+                                          final addResult =
+                                              await FilePicker.pickFiles(
+                                                type: FileType.image,
+                                                allowMultiple: true,
+                                                withData: true,
+                                              );
+                                          if (addResult != null &&
+                                              addResult.files.isNotEmpty) {
+                                            final newFiles = addResult.files
+                                                .where((f) => f.bytes != null)
+                                                .toList();
                                             if (newFiles.isNotEmpty) {
                                               setDialogState(() {
                                                 dialogFiles.addAll(newFiles);
@@ -727,49 +840,72 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                             }
                                           }
                                         } catch (e) {
-                                          debugPrint('Error picking additional files: $e');
+                                          debugPrint(
+                                            'Error picking additional files: $e',
+                                          );
                                         }
                                       },
                                       child: Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.15),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.15,
+                                          ),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.add_photo_alternate_rounded, color: Colors.white, size: 22),
+                                        child: const Icon(
+                                          Icons.add_photo_alternate_rounded,
+                                          color: Colors.white,
+                                          size: 22,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    
+
                                     Expanded(
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(24),
+                                          color: Colors.white.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            24,
+                                          ),
                                           border: Border.all(
-                                            color: Colors.white.withValues(alpha: 0.25),
+                                            color: Colors.white.withValues(
+                                              alpha: 0.25,
+                                            ),
                                             width: 1,
                                           ),
                                         ),
                                         child: TextField(
                                           controller: captionController,
-                                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                          ),
                                           maxLines: 4,
                                           minLines: 1,
                                           decoration: InputDecoration(
                                             hintText: 'Añade un comentario...',
                                             hintStyle: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.55),
+                                              color: Colors.white.withValues(
+                                                alpha: 0.55,
+                                              ),
                                               fontSize: 14,
                                             ),
                                             border: InputBorder.none,
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 16,
+                                                  vertical: 10,
+                                                ),
                                           ),
                                         ),
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    
+
                                     GestureDetector(
                                       onTap: isSent
                                           ? null
@@ -778,22 +914,30 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                                 isSent = true;
                                               });
                                               Navigator.pop(context, {
-                                                'caption': captionController.text.trim(),
+                                                'caption': captionController
+                                                    .text
+                                                    .trim(),
                                                 'files': dialogFiles,
                                               });
                                             },
                                       child: AnimatedContainer(
-                                        duration: const Duration(milliseconds: 180),
+                                        duration: const Duration(
+                                          milliseconds: 180,
+                                        ),
                                         width: 48,
                                         height: 48,
                                         decoration: BoxDecoration(
-                                          color: isSent ? Colors.grey.shade600 : _kPrimary,
+                                          color: isSent
+                                              ? Colors.grey.shade600
+                                              : _kPrimary,
                                           shape: BoxShape.circle,
                                           boxShadow: isSent
                                               ? []
                                               : [
                                                   BoxShadow(
-                                                    color: _kPrimary.withValues(alpha: 0.4),
+                                                    color: _kPrimary.withValues(
+                                                      alpha: 0.4,
+                                                    ),
                                                     blurRadius: 8,
                                                     offset: const Offset(0, 4),
                                                   ),
@@ -801,7 +945,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                         ),
                                         child: Icon(
                                           Icons.send_rounded,
-                                          color: isSent ? Colors.white.withValues(alpha: 0.5) : Colors.white,
+                                          color: isSent
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.5,
+                                                )
+                                              : Colors.white,
                                           size: 20,
                                         ),
                                       ),
@@ -824,7 +972,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     if (result != null) {
       final caption = result['caption'] ?? '';
-      final List<PlatformFile> finalFiles = List<PlatformFile>.from(result['files'] ?? dialogFiles);
+      final List<PlatformFile> finalFiles = List<PlatformFile>.from(
+        result['files'] ?? dialogFiles,
+      );
       await _uploadAndSendMultipleImages(finalFiles, caption);
     } else {
       setState(() {
@@ -833,19 +983,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-  Future<void> _uploadAndSendMultipleImages(List<PlatformFile> files, String caption) async {
+  Future<void> _uploadAndSendMultipleImages(
+    List<PlatformFile> files,
+    String caption,
+  ) async {
     try {
       for (int i = 0; i < files.length; i++) {
         final file = files[i];
         final bytes = file.bytes!;
-        
+
         final attachmentUrl = await TicketService.uploadChatAttachment(
           _effectiveTicketId,
           file.name,
           bytes,
         );
 
-        final msgText = (i == 0 && caption.isNotEmpty) ? caption : 'Envío de foto';
+        final msgText = (i == 0 && caption.isNotEmpty)
+            ? caption
+            : 'Envío de foto';
 
         await TicketService.sendTicketMessage(
           _effectiveTicketId,
@@ -856,7 +1011,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al subir imágenes: $e'), backgroundColor: _kRed),
+          SnackBar(
+            content: Text('Error al subir imágenes: $e'),
+            backgroundColor: _kRed,
+          ),
         );
       }
     } finally {
@@ -877,7 +1035,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       appBar: AppBar(
         title: Text(
           ticket != null ? ticket.ticketNumber : 'Detalle de Ticket',
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 18,
+          ),
         ),
         flexibleSpace: Container(
           decoration: const BoxDecoration(
@@ -892,116 +1054,119 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         elevation: 0,
       ),
       body: RefreshIndicator(
-          color: _kPrimary,
-          onRefresh: _loadTicket,
-          child: _loading
-              ? SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.5,
-                    child: const Center(child: CircularProgressIndicator(color: _kPrimary)),
+        color: _kPrimary,
+        onRefresh: _loadTicket,
+        child: _loading
+            ? SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.5,
+                  child: const Center(
+                    child: CircularProgressIndicator(color: _kPrimary),
                   ),
-                )
-              : _error != null
-                  ? SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: _buildErrorView(),
-                    )
-                  : ticket == null
-                      ? SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          child: _buildNotFoundView(),
-                        )
-                      : LayoutBuilder(
-                          builder: (context, constraints) {
-                            final isDesktop = constraints.maxWidth > 900;
+                ),
+              )
+            : _error != null
+            ? SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: _buildErrorView(),
+              )
+            : ticket == null
+            ? SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: _buildNotFoundView(),
+              )
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = constraints.maxWidth > 900;
 
-                            if (isDesktop) {
-                              return SingleChildScrollView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                  if (isDesktop) {
+                    return SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildHeaderCard(ticket),
+                                const SizedBox(height: 16),
+                                _buildInfoCard(
+                                  title: 'Información General',
+                                  icon: Icons.info_outline,
+                                  children: _buildGeneralInfoFields(ticket),
+                                ),
+                                const SizedBox(height: 16),
+                                _buildInfoCard(
+                                  title: 'Detalle del Reporte',
+                                  icon: Icons.description_outlined,
                                   children: [
-                                    Expanded(
-                                      flex: 5,
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          _buildHeaderCard(ticket),
-                                          const SizedBox(height: 16),
-                                          _buildInfoCard(
-                                            title: 'Información General',
-                                            icon: Icons.info_outline,
-                                            children: _buildGeneralInfoFields(ticket),
-                                          ),
-                                          const SizedBox(height: 16),
-                                          _buildInfoCard(
-                                            title: 'Detalle del Reporte',
-                                            icon: Icons.description_outlined,
-                                            children: [
-                                              _buildDetailSection(
-                                                label: 'Asunto / Título',
-                                                value: ticket.title,
-                                              ),
-                                              const SizedBox(height: 16),
-                                              _buildDetailSection(
-                                                label: 'Descripción de la Falla',
-                                                value: ticket.description ?? 'Sin descripción proporcionada.',
-                                                isDescription: true,
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
+                                    _buildDetailSection(
+                                      label: 'Asunto / Título',
+                                      value: ticket.title,
                                     ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      flex: 4,
-                                      child: _buildChatCard(ticket),
+                                    const SizedBox(height: 16),
+                                    _buildDetailSection(
+                                      label: 'Descripción de la Falla',
+                                      value:
+                                          ticket.description ??
+                                          'Sin descripción proporcionada.',
+                                      isDescription: true,
                                     ),
                                   ],
                                 ),
-                              );
-                            }
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(flex: 4, child: _buildChatCard(ticket)),
+                        ],
+                      ),
+                    );
+                  }
 
-                            return SingleChildScrollView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildHeaderCard(ticket),
-                                  const SizedBox(height: 16),
-                                  _buildInfoCard(
-                                    title: 'Información General',
-                                    icon: Icons.info_outline,
-                                    children: _buildGeneralInfoFields(ticket),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildInfoCard(
-                                    title: 'Detalle del Reporte',
-                                    icon: Icons.description_outlined,
-                                    children: [
-                                      _buildDetailSection(
-                                        label: 'Asunto / Título',
-                                        value: ticket.title,
-                                      ),
-                                      const SizedBox(height: 16),
-                                      _buildDetailSection(
-                                        label: 'Descripción de la Falla',
-                                        value: ticket.description ?? 'Sin descripción proporcionada.',
-                                        isDescription: true,
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildChatCard(ticket),
-                                ],
-                              ),
-                            );
-                          }
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeaderCard(ticket),
+                        const SizedBox(height: 16),
+                        _buildInfoCard(
+                          title: 'Información General',
+                          icon: Icons.info_outline,
+                          children: _buildGeneralInfoFields(ticket),
                         ),
+                        const SizedBox(height: 16),
+                        _buildInfoCard(
+                          title: 'Detalle del Reporte',
+                          icon: Icons.description_outlined,
+                          children: [
+                            _buildDetailSection(
+                              label: 'Asunto / Título',
+                              value: ticket.title,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildDetailSection(
+                              label: 'Descripción de la Falla',
+                              value:
+                                  ticket.description ??
+                                  'Sin descripción proporcionada.',
+                              isDescription: true,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _buildChatCard(ticket),
+                      ],
+                    ),
+                  );
+                },
+              ),
       ),
     );
   }
@@ -1039,7 +1204,10 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -1063,10 +1231,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             children: [
               const Text(
                 'Prioridad: ',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey,
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1088,10 +1253,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               const SizedBox(width: 4),
               Text(
                 _formatDate(ticket.createdAt).split(' - ').first,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
               ),
             ],
           ),
@@ -1101,8 +1263,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 
   List<Widget> _buildGeneralInfoFields(ServiceTicket ticket) {
-    final hasTechnician = ticket.assignedTechnicianCustomName != null && ticket.assignedTechnicianCustomName!.isNotEmpty;
-    final String techValue = hasTechnician ? ticket.assignedTechnicianCustomName! : 'Por asignar';
+    final hasTechnician =
+        ticket.assignedTechnicianCustomName != null &&
+        ticket.assignedTechnicianCustomName!.isNotEmpty;
+    final String techValue = hasTechnician
+        ? ticket.assignedTechnicianCustomName!
+        : 'Por asignar';
 
     final fields = <Widget>[
       _buildDetailRow(
@@ -1122,7 +1288,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       ),
       _buildDetailRow(
         label: 'Última Actualización',
-        value: ticket.updatedAt != null ? _formatDate(ticket.updatedAt!) : 'Sin actualizaciones',
+        value: ticket.updatedAt != null
+            ? _formatDate(ticket.updatedAt!)
+            : 'Sin actualizaciones',
         icon: Icons.update,
       ),
       _buildDetailRow(
@@ -1134,67 +1302,90 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     ];
 
     if (ticket.scheduledStartAt != null) {
-      fields.add(_buildDetailRow(
-        label: 'Fecha Programada',
-        value: _formatDate(ticket.scheduledStartAt!),
-        icon: Icons.alarm,
-        valueColor: const Color(0xFF16A34A),
-      ));
-    } else if (ticket.requestedServiceDate != null && ticket.requestedServiceDate!.isNotEmpty) {
-      fields.add(_buildDetailRow(
-        label: 'Fecha de Servicio Solicitada',
-        value: ticket.requestedServiceDate!,
-        icon: Icons.calendar_today,
-      ));
+      fields.add(
+        _buildDetailRow(
+          label: 'Fecha Programada',
+          value: _formatDate(ticket.scheduledStartAt!),
+          icon: Icons.alarm,
+          valueColor: const Color(0xFF16A34A),
+        ),
+      );
+    } else if (ticket.requestedServiceDate != null &&
+        ticket.requestedServiceDate!.isNotEmpty) {
+      fields.add(
+        _buildDetailRow(
+          label: 'Fecha de Servicio Solicitada',
+          value: ticket.requestedServiceDate!,
+          icon: Icons.calendar_today,
+        ),
+      );
     }
 
     if (ticket.serviceAddress != null && ticket.serviceAddress!.isNotEmpty) {
-      final cityPart = ticket.serviceCity != null && ticket.serviceCity!.isNotEmpty ? ', ${ticket.serviceCity}' : '';
-      final statePart = ticket.serviceState != null && ticket.serviceState!.isNotEmpty ? ', ${ticket.serviceState}' : '';
-      fields.add(_buildDetailRow(
-        label: 'Dirección del Servicio',
-        value: '${ticket.serviceAddress}$cityPart$statePart',
-        icon: Icons.location_on_outlined,
-      ));
+      final cityPart =
+          ticket.serviceCity != null && ticket.serviceCity!.isNotEmpty
+          ? ', ${ticket.serviceCity}'
+          : '';
+      final statePart =
+          ticket.serviceState != null && ticket.serviceState!.isNotEmpty
+          ? ', ${ticket.serviceState}'
+          : '';
+      fields.add(
+        _buildDetailRow(
+          label: 'Dirección del Servicio',
+          value: '${ticket.serviceAddress}$cityPart$statePart',
+          icon: Icons.location_on_outlined,
+        ),
+      );
     }
 
     if (ticket.serviceLocation != null && ticket.serviceLocation!.isNotEmpty) {
-      fields.add(_buildDetailRow(
-        label: 'Área / Ubicación',
-        value: ticket.serviceLocation!,
-        icon: Icons.place_outlined,
-      ));
+      fields.add(
+        _buildDetailRow(
+          label: 'Área / Ubicación',
+          value: ticket.serviceLocation!,
+          icon: Icons.place_outlined,
+        ),
+      );
     }
 
     if (ticket.contactName != null && ticket.contactName!.isNotEmpty) {
-      fields.add(_buildDetailRow(
-        label: 'Responsable',
-        value: ticket.contactName!,
-        icon: Icons.contacts_outlined,
-      ));
+      fields.add(
+        _buildDetailRow(
+          label: 'Responsable',
+          value: ticket.contactName!,
+          icon: Icons.contacts_outlined,
+        ),
+      );
     }
     if (ticket.contactPhone != null && ticket.contactPhone!.isNotEmpty) {
-      fields.add(_buildDetailRow(
-        label: 'Teléfono Contacto',
-        value: ticket.contactPhone!,
-        icon: Icons.phone_android_outlined,
-      ));
+      fields.add(
+        _buildDetailRow(
+          label: 'Teléfono Contacto',
+          value: ticket.contactPhone!,
+          icon: Icons.phone_android_outlined,
+        ),
+      );
     }
     if (ticket.contactEmail != null && ticket.contactEmail!.isNotEmpty) {
-      fields.add(_buildDetailRow(
-        label: 'Email Contacto',
-        value: ticket.contactEmail!,
-        icon: Icons.email_outlined,
-      ));
+      fields.add(
+        _buildDetailRow(
+          label: 'Email Contacto',
+          value: ticket.contactEmail!,
+          icon: Icons.email_outlined,
+        ),
+      );
     }
 
     if (ticket.errorCode != null && ticket.errorCode!.isNotEmpty) {
-      fields.add(_buildDetailRow(
-        label: 'Código de Error',
-        value: ticket.errorCode!,
-        icon: Icons.bug_report_outlined,
-        valueColor: const Color(0xFFEF4444),
-      ));
+      fields.add(
+        _buildDetailRow(
+          label: 'Código de Error',
+          value: ticket.errorCode!,
+          icon: Icons.bug_report_outlined,
+          valueColor: const Color(0xFFEF4444),
+        ),
+      );
     }
 
     return fields;
@@ -1262,10 +1453,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             flex: 2,
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
           ),
           Expanded(
@@ -1325,31 +1513,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 
   Widget _buildErrorView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 12),
-            Text(
-              _error ?? 'Error al cargar el detalle del ticket',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadTicket,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _kPrimary,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      ),
+    return LoadErrorState(
+      error: _error,
+      onRetry: _loadTicket,
+      genericTitle: 'Error al cargar el detalle del ticket',
+      genericMessage: 'No pudimos cargar esta conversación por el momento.',
     );
   }
 
@@ -1360,7 +1528,11 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off_outlined, size: 48, color: Colors.grey.shade400),
+            Icon(
+              Icons.search_off_outlined,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 12),
             const Text(
               'No se encontró el ticket',
@@ -1407,7 +1579,8 @@ class _ChatBubbleItem extends StatefulWidget {
   State<_ChatBubbleItem> createState() => _ChatBubbleItemState();
 }
 
-class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProviderStateMixin {
+class _ChatBubbleItemState extends State<_ChatBubbleItem>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _slideAnimation;
@@ -1421,20 +1594,16 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
     );
 
     // Spring scale effect (elastic out)
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.elasticOut,
-      ),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
     // Spring slide up effect
-    _slideAnimation = Tween<double>(begin: 30.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutBack,
-      ),
-    );
+    _slideAnimation = Tween<double>(
+      begin: 30.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
     _controller.forward();
   }
@@ -1452,10 +1621,7 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
       builder: (context, child) {
         return Transform.translate(
           offset: Offset(0.0, _slideAnimation.value),
-          child: Transform.scale(
-            scale: _scaleAnimation.value,
-            child: child,
-          ),
+          child: Transform.scale(scale: _scaleAnimation.value, child: child),
         );
       },
       child: _buildBubbleContent(),
@@ -1494,8 +1660,8 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
               color: msg.readAt != null
                   ? const Color(0xFF00E5FF)
                   : (msg.deliveredAt != null
-                      ? Colors.white.withValues(alpha: 0.65)
-                      : Colors.white.withValues(alpha: 0.4)),
+                        ? Colors.white.withValues(alpha: 0.65)
+                        : Colors.white.withValues(alpha: 0.4)),
             ),
           ],
         ],
@@ -1547,7 +1713,7 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
           boxShadow: hasCaption
               ? [
                   BoxShadow(
-                    color: isMe 
+                    color: isMe
                         ? _kPrimary.withValues(alpha: 0.15)
                         : Colors.black.withValues(alpha: 0.04),
                     blurRadius: 8,
@@ -1592,14 +1758,21 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
                               child: SizedBox(
                                 width: 24,
                                 height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: _kPrimary,
+                                ),
                               ),
                             ),
                           );
                         },
                         errorBuilder: (_, _, _) => Container(
                           color: const Color(0xFFF1F5F9),
-                          child: const Icon(Icons.broken_image_outlined, color: Colors.grey, size: 28),
+                          child: const Icon(
+                            Icons.broken_image_outlined,
+                            color: Colors.grey,
+                            size: 28,
+                          ),
                         ),
                       ),
                     ),
@@ -1608,7 +1781,10 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
                         bottom: 6,
                         right: 6,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(10),
@@ -1629,7 +1805,9 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
                         child: Text(
                           msg.message,
                           style: TextStyle(
-                            color: isMe ? Colors.white : const Color(0xFF0F172A),
+                            color: isMe
+                                ? Colors.white
+                                : const Color(0xFF0F172A),
                             fontSize: 12.5,
                             height: 1.3,
                           ),
@@ -1656,16 +1834,14 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
           borderRadius: bubbleRadius,
           boxShadow: [
             BoxShadow(
-              color: isMe 
+              color: isMe
                   ? _kPrimary.withValues(alpha: 0.15)
                   : Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
           ],
-          border: isMe
-              ? null
-              : Border.all(color: const Color(0xFFE2E8F0)),
+          border: isMe ? null : Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1715,7 +1891,11 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem> with SingleTickerProvi
           CircleAvatar(
             radius: 13,
             backgroundColor: const Color(0xFFF1F5F9),
-            child: const Icon(Icons.person_outline_rounded, size: 14, color: _kNavy),
+            child: const Icon(
+              Icons.person_outline_rounded,
+              size: 14,
+              color: _kNavy,
+            ),
           ),
         ],
       ],

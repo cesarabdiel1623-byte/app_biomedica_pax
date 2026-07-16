@@ -36,26 +36,47 @@ class ProductService {
     sales_count
   ''';
 
-  /// The select query that includes only public product data plus related media/specs/stock.
-  static const _fullSelect = '''
+  static const publicMediaColumns = '''
+    id,
+    product_id,
+    file_path,
+    file_name,
+    document_type,
+    is_primary,
+    sort_order
+  ''';
+
+  static const publicSpecColumns = '''
+    id,
+    product_id,
+    spec_group,
+    spec_key,
+    spec_value,
+    sort_order
+  ''';
+
+  static const publicPromotionColumns = '''
+    product_id,
+    discount_type,
+    discount_value,
+    campaign_name,
+    ends_at
+  ''';
+
+  /// Public product contract used by mobile screens.
+  /// Inventory internals are intentionally excluded; use availability_status.
+  static const publicProductSelect = '''
     $publicProductColumns,
-    product_media(*),
-    product_specs(*),
-    product_inventory(*),
-    active_product_promotions(
-      product_id,
-      discount_type,
-      discount_value,
-      campaign_name,
-      ends_at
-    )
+    product_media($publicMediaColumns),
+    product_specs($publicSpecColumns),
+    active_product_promotions($publicPromotionColumns)
   ''';
 
   /// Get all active products with their images and specs
   static Future<List<Product>> getAllProducts({String? category, String? application}) async {
     var query = _client
         .from('products')
-        .select(_fullSelect)
+        .select(publicProductSelect)
         .eq('is_active', true);
 
     if (category != null && category.isNotEmpty) {
@@ -73,7 +94,7 @@ class ProductService {
   static Future<Product?> getProductById(String productId) async {
     final response = await _client
         .from('products')
-        .select(_fullSelect)
+        .select(publicProductSelect)
         .eq('id', productId)
         .eq('is_active', true)
         .maybeSingle();
@@ -86,7 +107,7 @@ class ProductService {
   static Future<List<Product>> searchProducts(String query) async {
     final response = await _client
         .from('products')
-        .select(_fullSelect)
+        .select(publicProductSelect)
         .eq('is_active', true)
         .or('name.ilike.%$query%,description.ilike.%$query%,brand.ilike.%$query%,sku.ilike.%$query%,commercial_brand.ilike.%$query%')
         .order('name');
@@ -138,7 +159,7 @@ class ProductService {
       if (subcategory != null && subcategory.isNotEmpty) {
         final res = await _client
             .from('products')
-            .select(_fullSelect)
+            .select(publicProductSelect)
             .eq('is_active', true)
             .neq('id', productId)
             .eq('subcategory', subcategory)
@@ -151,7 +172,7 @@ class ProductService {
       // 2. Fallback: same category (excluding current product)
       final resCat = await _client
           .from('products')
-          .select(_fullSelect)
+          .select(publicProductSelect)
           .eq('is_active', true)
           .neq('id', productId)
           .eq('category', category)
@@ -163,7 +184,7 @@ class ProductService {
       // 3. Ultimate Fallback: any active products (excluding current product)
       final resAny = await _client
           .from('products')
-          .select(_fullSelect)
+          .select(publicProductSelect)
           .eq('is_active', true)
           .neq('id', productId)
           .limit(6);

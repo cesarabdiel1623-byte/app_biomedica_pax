@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/question_service.dart';
 import '../product/product_detail_screen.dart';
 import '../product/ask_question_screen.dart';
+import '../../utils/ui_helpers.dart';
 
 class QuestionsScreen extends StatefulWidget {
   const QuestionsScreen({super.key});
@@ -135,22 +136,12 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
         setState(() {
           _questions.removeWhere((item) => item.id == q.id);
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Pregunta eliminada exitosamente.'),
-            backgroundColor: _kPrimary,
-          ),
-        );
+        UiHelpers.showFloatingSuccessToast(context, 'Pregunta eliminada exitosamente.');
       }
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // pop loading overlay
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al eliminar la pregunta: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        UiHelpers.showFloatingDeleteToast(context, 'Error al eliminar la pregunta: $e');
       }
     }
   }
@@ -488,34 +479,27 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: _kPrimary.withValues(alpha: 0.06),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.question_answer_outlined,
-                color: _kPrimary,
-                size: 64,
-              ),
+            Icon(
+              Icons.question_answer_outlined,
+              color: Colors.grey.shade400,
+              size: 64,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             const Text(
               'No has realizado preguntas',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: _kNavy,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               'Las consultas que realices sobre nuestros equipos médicos aparecerán en esta sección.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
+                fontSize: 12,
+                color: Colors.grey.shade500,
               ),
             ),
           ],

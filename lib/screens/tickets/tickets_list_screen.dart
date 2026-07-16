@@ -4,6 +4,7 @@ import '../../services/ticket_service.dart';
 import 'ticket_detail_screen.dart';
 import '../home/widgets/staggered_fade_slide.dart';
 import '../home/home_screen.dart';
+import '../../widgets/load_error_state.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 
@@ -13,7 +14,8 @@ class TicketsListScreen extends StatefulWidget {
   State<TicketsListScreen> createState() => _TicketsListScreenState();
 }
 
-class _TicketsListScreenState extends State<TicketsListScreen> with SingleTickerProviderStateMixin {
+class _TicketsListScreenState extends State<TicketsListScreen>
+    with SingleTickerProviderStateMixin {
   List<ServiceTicket> _tickets = [];
   bool _loading = true;
   String? _error;
@@ -57,13 +59,21 @@ class _TicketsListScreenState extends State<TicketsListScreen> with SingleTicker
     try {
       final data = await TicketService.getMyTickets();
       if (mounted) {
-        setState(() { _tickets = data; _loading = false; });
+        setState(() {
+          _tickets = data;
+          _loading = false;
+        });
         for (final ticket in data) {
           TicketService.markMessagesAsDelivered(ticket.id);
         }
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -74,22 +84,33 @@ class _TicketsListScreenState extends State<TicketsListScreen> with SingleTicker
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'open': return const Color(0xFF3B82F6);
-      case 'in_progress': return const Color(0xFFF59E0B);
-      case 'resolved': return const Color(0xFF16A34A);
-      case 'closed': return Colors.grey;
-      case 'cancelled': return const Color(0xFFEF4444);
-      default: return Colors.grey;
+      case 'open':
+        return const Color(0xFF3B82F6);
+      case 'in_progress':
+        return const Color(0xFFF59E0B);
+      case 'resolved':
+        return const Color(0xFF16A34A);
+      case 'closed':
+        return Colors.grey;
+      case 'cancelled':
+        return const Color(0xFFEF4444);
+      default:
+        return Colors.grey;
     }
   }
 
   Color _priorityColor(String priority) {
     switch (priority) {
-      case 'critical': return const Color(0xFF7C3AED);
-      case 'high': return const Color(0xFFEF4444);
-      case 'medium': return const Color(0xFFF59E0B);
-      case 'low': return const Color(0xFF16A34A);
-      default: return Colors.grey;
+      case 'critical':
+        return const Color(0xFF7C3AED);
+      case 'high':
+        return const Color(0xFFEF4444);
+      case 'medium':
+        return const Color(0xFFF59E0B);
+      case 'low':
+        return const Color(0xFF16A34A);
+      default:
+        return Colors.grey;
     }
   }
 
@@ -111,7 +132,10 @@ class _TicketsListScreenState extends State<TicketsListScreen> with SingleTicker
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white,
+                          ),
                           onPressed: () {
                             if (Navigator.canPop(context)) {
                               Navigator.pop(context);
@@ -120,7 +144,11 @@ class _TicketsListScreenState extends State<TicketsListScreen> with SingleTicker
                             }
                           },
                         ),
-                        const Icon(Icons.support_agent, color: Colors.white, size: 22),
+                        const Icon(
+                          Icons.support_agent,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
@@ -158,11 +186,17 @@ class _TicketsListScreenState extends State<TicketsListScreen> with SingleTicker
                       indicatorColor: Colors.white,
                       indicatorWeight: 2.5,
                       labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white.withValues(alpha: 0.55),
-                      labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      unselectedLabelColor: Colors.white.withValues(
+                        alpha: 0.55,
+                      ),
+                      labelStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                       unselectedLabelStyle: const TextStyle(fontSize: 12),
                       tabAlignment: TabAlignment.start,
-                      dividerColor: Colors.transparent, // Quita la línea inferior
+                      dividerColor:
+                          Colors.transparent, // Quita la línea inferior
                       tabs: _statusFilters.map((f) => Tab(text: f.$2)).toList(),
                     ),
                   ],
@@ -206,32 +240,41 @@ class _TicketsListScreenState extends State<TicketsListScreen> with SingleTicker
                               child: _buildError(),
                             )
                           : _filtered.isEmpty
-                              ? SingleChildScrollView(
-                                  key: const ValueKey('empty'),
-                                  physics: const AlwaysScrollableScrollPhysics(),
-                                  child: SizedBox(
-                                    height: MediaQuery.of(context).size.height * 0.6,
-                                    child: _buildEmpty(),
-                                  ),
-                                )
-                              : ListView.builder(
-                                  key: ValueKey('list-$_filterStatus'),
-                                  physics: const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                                  itemCount: _filtered.length,
-                                  itemBuilder: (_, i) => StaggeredFadeSlide(
-                                    index: i,
-                                    child: _TicketCard(
-                                      ticket: _filtered[i],
-                                      color: _statusColor(_filtered[i].status),
-                                      priorityColor: _priorityColor(_filtered[i].priority),
-                                    ),
+                          ? SingleChildScrollView(
+                              key: const ValueKey('empty'),
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: SizedBox(
+                                height:
+                                    MediaQuery.of(context).size.height * 0.6,
+                                child: _buildEmpty(),
+                              ),
+                            )
+                          : ListView.builder(
+                              key: ValueKey('list-$_filterStatus'),
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(
+                                12,
+                                12,
+                                12,
+                                20,
+                              ),
+                              itemCount: _filtered.length,
+                              itemBuilder: (_, i) => StaggeredFadeSlide(
+                                index: i,
+                                child: _TicketCard(
+                                  ticket: _filtered[i],
+                                  color: _statusColor(_filtered[i].status),
+                                  priorityColor: _priorityColor(
+                                    _filtered[i].priority,
                                   ),
                                 ),
+                              ),
+                            ),
                     ),
-            ),
+                  ),
           ),
-        ]),
+        ],
+      ),
     );
   }
 
@@ -241,27 +284,24 @@ class _TicketsListScreenState extends State<TicketsListScreen> with SingleTicker
       children: [
         Icon(Icons.assignment_outlined, size: 52, color: Colors.grey.shade400),
         const SizedBox(height: 12),
-        const Text('Sin tickets en este estado', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        const Text(
+          'Sin tickets en este estado',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
         const SizedBox(height: 4),
-        Text('Tus reportes de servicio aparecerán aquí.', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+        Text(
+          'Tus reportes de servicio aparecerán aquí.',
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+        ),
       ],
     ),
   );
 
-  Widget _buildError() => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.red),
-          const SizedBox(height: 12),
-          Text(_error ?? 'Error al cargar tickets', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-          const SizedBox(height: 12),
-          ElevatedButton(onPressed: _load, child: const Text('Reintentar')),
-        ],
-      ),
-    ),
+  Widget _buildError() => LoadErrorState(
+    error: _error,
+    onRetry: _load,
+    genericTitle: 'Error al cargar tickets',
+    genericMessage: 'No pudimos obtener tus tickets por el momento.',
   );
 }
 
@@ -300,18 +340,33 @@ class _TicketCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(ticket.ticketNumber,
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F), fontSize: 13.5)),
+                  Text(
+                    ticket.ticketNumber,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E3A5F),
+                      fontSize: 13.5,
+                    ),
+                  ),
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(ticket.statusLabel,
-                          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+                        child: Text(
+                          ticket.statusLabel,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 8),
                       // Badge circular translúcido de prioridad
@@ -320,16 +375,19 @@ class _TicketCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: priorityColor.withValues(alpha: 0.15),
                           shape: BoxShape.circle,
-                          border: Border.all(color: priorityColor.withValues(alpha: 0.25), width: 1),
+                          border: Border.all(
+                            color: priorityColor.withValues(alpha: 0.25),
+                            width: 1,
+                          ),
                         ),
                         child: Icon(
                           ticket.priority == 'critical'
                               ? Icons.gavel_rounded
                               : ticket.priority == 'high'
-                                  ? Icons.warning_amber_rounded
-                                  : ticket.priority == 'medium'
-                                      ? Icons.flag_rounded
-                                      : Icons.info_outline_rounded,
+                              ? Icons.warning_amber_rounded
+                              : ticket.priority == 'medium'
+                              ? Icons.flag_rounded
+                              : Icons.info_outline_rounded,
                           color: priorityColor,
                           size: 11,
                         ),
@@ -339,14 +397,28 @@ class _TicketCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              Text(ticket.title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(
+                ticket.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.black87,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               const SizedBox(height: 4),
               if (ticket.description != null && ticket.description!.isNotEmpty)
-                Text(ticket.description!,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12, height: 1.3),
-                  maxLines: 2, overflow: TextOverflow.ellipsis),
+                Text(
+                  ticket.description!,
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               const Divider(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -355,19 +427,28 @@ class _TicketCard extends StatelessWidget {
                     ticket.priority == 'critical'
                         ? Icons.gavel_rounded
                         : ticket.priority == 'high'
-                            ? Icons.warning_amber_rounded
-                            : ticket.priority == 'medium'
-                                ? Icons.flag_rounded
-                                : Icons.info_outline_rounded,
+                        ? Icons.warning_amber_rounded
+                        : ticket.priority == 'medium'
+                        ? Icons.flag_rounded
+                        : Icons.info_outline_rounded,
                     'Prioridad: ${ticket.priorityLabel}',
                     priorityColor,
                   ),
                   Row(
                     children: [
-                      Icon(Icons.access_time, size: 12, color: Colors.grey.shade400),
+                      Icon(
+                        Icons.access_time,
+                        size: 12,
+                        color: Colors.grey.shade400,
+                      ),
                       const SizedBox(width: 4),
-                      Text(_formatDate(ticket.createdAt),
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                      Text(
+                        _formatDate(ticket.createdAt),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -386,15 +467,38 @@ class _TicketCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: color.withValues(alpha: 0.2)),
     ),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 11, color: color),
-      const SizedBox(width: 4),
-      Text(label, style: TextStyle(fontSize: 10.5, color: color, fontWeight: FontWeight.w600)),
-    ]),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ),
   );
 
   String _formatDate(DateTime d) {
-    final months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    final months = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
     return '${d.day} ${months[d.month - 1]} ${d.year}';
   }
 }

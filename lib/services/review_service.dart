@@ -2,7 +2,9 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
+import 'auth_identity_service.dart';
 import 'product_service.dart';
+import '../utils/ui_helpers.dart';
 
 /// Product Review model containing rating, comment and images.
 class ProductReview {
@@ -31,10 +33,15 @@ class ProductReview {
   factory ProductReview.fromJson(Map<String, dynamic> json) {
     // Joins with profiles table to get full_name
     final profileData = json['profiles'] as Map<String, dynamic>?;
-    final clientName = profileData != null ? (profileData['full_name'] as String? ?? 'Usuario') : 'Usuario';
-    
+    final clientName = profileData != null
+        ? (profileData['full_name'] as String? ?? 'Usuario')
+        : 'Usuario';
+
     final rawImgs = json['images'] as List? ?? [];
-    final images = List<String>.from(rawImgs.map((i) => i.toString()));
+    final images = rawImgs
+        .map((i) => UiHelpers.sanitizeTrustedRemoteUrl(i.toString()))
+        .whereType<String>()
+        .toList();
 
     final productData = json['products'] as Map<String, dynamic>?;
     final product = productData != null ? Product.fromJson(productData) : null;
@@ -47,7 +54,9 @@ class ProductReview {
       rating: json['rating'] as int? ?? 5,
       comment: json['comment'] as String?,
       images: images,
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
       product: product,
     );
   }
@@ -65,22 +74,26 @@ class ReviewService {
         .eq('product_id', productId)
         .order('created_at', ascending: false);
 
-    return (response as List).map((j) => ProductReview.fromJson(j as Map<String, dynamic>)).toList();
+    return (response as List)
+        .map((j) => ProductReview.fromJson(j as Map<String, dynamic>))
+        .toList();
   }
 
   /// Get all reviews written by the current client.
   static Future<List<ProductReview>> getClientReviews() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return [];
+    final clientId = await AuthIdentityService.getEffectiveClientId();
+    if (clientId == null) return [];
 
     try {
       final response = await _client
           .from('product_reviews')
-          .select('*, products(${ProductService.publicProductColumns}, product_media(*), product_specs(*), product_inventory(*), active_product_promotions(*))')
-          .eq('client_id', userId)
+          .select('*, products(${ProductService.publicProductSelect})')
+          .eq('client_id', clientId)
           .order('created_at', ascending: false);
 
-      return (response as List).map((j) => ProductReview.fromJson(j as Map<String, dynamic>)).toList();
+      return (response as List)
+          .map((j) => ProductReview.fromJson(j as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       print('Error al obtener opiniones: $e');
       return [];
@@ -94,12 +107,12 @@ class ReviewService {
     required String comment,
     required List<String> imageUrls,
   }) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw Exception('Usuario no autenticado');
+    final clientId = await AuthIdentityService.getEffectiveClientId();
+    if (clientId == null) throw Exception('Usuario no autenticado');
 
     await _client.from('product_reviews').insert({
       'product_id': productId,
-      'client_id': userId,
+      'client_id': clientId,
       'rating': rating,
       'comment': comment,
       'images': imageUrls,
@@ -107,21 +120,35 @@ class ReviewService {
   }
 
   /// Upload review photo and return public url.
-  static Future<String> uploadReviewPhoto(String productId, Uint8List fileBytes, String fileName) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw Exception('Usuario no autenticado');
+  static Future<String> uploadReviewPhoto(
+    String productId,
+    Uint8List fileBytes,
+    String fileName,
+  ) async {
+    final clientId = await AuthIdentityService.getEffectiveClientId();
+    if (clientId == null) throw Exception('Usuario no autenticado');
 
-    final extension = fileName.split('.').last;
-    final uniqueName = '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(10000)}.$extension';
-    final filePath = '$productId/$userId/$uniqueName';
+    UiHelpers.validateImageUpload(fileBytes, fileName);
+    final extension = UiHelpers.requireAllowedImageExtension(fileName);
+    final uniqueName =
+        '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(10000)}.$extension';
+    final filePath = '$productId/$clientId/$uniqueName';
 
-    await _client.storage.from('review-assets').uploadBinary(
+    await _client.storage
+        .from('review-assets')
+        .uploadBinary(
           filePath,
           fileBytes,
           fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
         );
 
-    final publicUrl = _client.storage.from('review-assets').getPublicUrl(filePath);
-    return publicUrl;
+    final publicUrl = _client.storage
+        .from('review-assets')
+        .getPublicUrl(filePath);
+    final trustedUrl = UiHelpers.sanitizeTrustedRemoteUrl(publicUrl);
+    if (trustedUrl == null) {
+      throw Exception('No se pudo generar una URL segura para la imagen.');
+    }
+    return trustedUrl;
   }
 }

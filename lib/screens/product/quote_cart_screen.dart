@@ -169,38 +169,30 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: _kPrimary.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.request_quote_outlined,
-                size: 64,
-                color: _kPrimary,
-              ),
+            Icon(
+              Icons.request_quote_outlined,
+              size: 64,
+              color: Colors.grey.shade400,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             const Text(
               'Tu bolsa de cotizaciones está vacía',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: _kNavy,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               'Agrega equipos médicos o consumibles desde el catálogo para solicitar una cotización formal.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-                height: 1.4,
+                fontSize: 12,
+                color: Colors.grey.shade500,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
             SizedBox(
               height: 42,
               child: ElevatedButton(

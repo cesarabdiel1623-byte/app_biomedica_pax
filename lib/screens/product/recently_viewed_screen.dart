@@ -3,6 +3,7 @@ import '../../services/search_service.dart';
 import '../../models/product.dart';
 import 'product_detail_screen.dart';
 import 'manage_history_screen.dart';
+import '../../utils/ui_helpers.dart';
 
 class RecentlyViewedScreen extends StatefulWidget {
   const RecentlyViewedScreen({super.key});
@@ -39,8 +40,6 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
     }
   }
 
-
-
   Future<void> _removeItemFromHistory(Product product) async {
     try {
       await SearchService.removeFromRecentlyViewed(product.id);
@@ -48,15 +47,11 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
         _historyList.removeWhere((p) => p.id == product.id);
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${product.name} eliminado del historial.')),
-        );
+        UiHelpers.showFloatingDeleteToast(context, '${product.name} eliminado del historial.');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al eliminar del historial.')),
-        );
+        UiHelpers.showFloatingDeleteToast(context, 'Error al eliminar del historial.');
       }
     }
   }
@@ -68,7 +63,11 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
       appBar: AppBar(
         title: const Text(
           'Mi Historial',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 18,
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -86,11 +85,13 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const ManageHistoryScreen(),
-                ),
-              ).then((_) => _loadHistory()); // Refresh list when returning
+              Navigator.of(context)
+                  .push(
+                    MaterialPageRoute(
+                      builder: (context) => const ManageHistoryScreen(),
+                    ),
+                  )
+                  .then((_) => _loadHistory()); // Refresh list when returning
             },
           ),
         ],
@@ -98,30 +99,44 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _kPrimary))
           : _historyList.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _historyList.length,
-                  itemBuilder: (context, index) {
-                    final product = _historyList[index];
-                    return _buildHistoryCard(product);
-                  },
-                ),
+          ? _buildEmptyState()
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _historyList.length,
+              itemBuilder: (context, index) {
+                final product = _historyList[index];
+                return _buildHistoryCard(product);
+              },
+            ),
     );
   }
 
   Widget _buildHistoryCard(Product product) {
-    final String photoUrl = product.mainImageUrl ?? (product.images.isNotEmpty ? product.images.first.filePath : '');
+    final String photoUrl =
+        product.mainImageUrl ??
+        (product.images.isNotEmpty ? product.images.first.filePath : '');
     final hasDiscount = product.hasDiscount;
     final oldPrice = product.oldPrice;
+    final isUnavailable = _isUnavailable(product);
+    final availabilityLabel = _availabilityLabel(product);
+    final availabilityColor = isUnavailable
+        ? const Color(0xFFEF4444)
+        : availabilityLabel == 'Por confirmar'
+        ? const Color(0xFFD97706)
+        : product.stockStatusColor;
 
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ProductDetailScreen(productId: product.id),
-          ),
-        ).then((_) => _loadHistory()); // Refresh list in case they navigate back
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (context) =>
+                    ProductDetailScreen(productId: product.id),
+              ),
+            )
+            .then(
+              (_) => _loadHistory(),
+            ); // Refresh list in case they navigate back
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
@@ -158,7 +173,8 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
                                 ? Image.network(
                                     photoUrl,
                                     fit: BoxFit.contain,
-                                    errorBuilder: (_, _, _) => _buildPlaceholderImage(),
+                                    errorBuilder: (_, _, _) =>
+                                        _buildPlaceholderImage(),
                                   )
                                 : _buildPlaceholderImage(),
                           ),
@@ -276,53 +292,59 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
                             ],
                           ),
                         ),
-                      // Stock info
+                      // Availability info
                       Row(
                         children: [
                           Icon(
-                            (product.stock ?? 0) > 0
-                                ? Icons.check_circle_outline_rounded
-                                : Icons.highlight_off_rounded,
+                            isUnavailable
+                                ? Icons.highlight_off_rounded
+                                : availabilityLabel == 'Por confirmar'
+                                ? Icons.info_outline_rounded
+                                : Icons.check_circle_outline_rounded,
                             size: 10,
-                            color: (product.stock ?? 0) > 0
-                                ? const Color(0xFF16A34A)
-                                : const Color(0xFFEF4444),
+                            color: availabilityColor,
                           ),
                           const SizedBox(width: 3),
                           Expanded(
                             child: Text(
-                              (product.stock ?? 0) > 0 ? 'Producto disponible' : 'Agotado',
+                              availabilityLabel,
                               style: TextStyle(
                                 fontSize: 10,
-                                color: (product.stock ?? 0) > 0
-                                    ? const Color(0xFF16A34A)
-                                    : const Color(0xFFEF4444),
+                                color: availabilityColor,
                                 fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
                               ),
-                            ],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _removeItemFromHistory(product),
-                                  child: Container(
-                                    alignment: Alignment.center,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFEF2F2),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: const Color(0xFFFEE2E2)),
-                                    ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => _removeItemFromHistory(product),
+                              child: Container(
+                                alignment: Alignment.center,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: const Color(0xFFFEE2E2),
+                                  ),
+                                ),
                                 child: const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 12),
+                                    Icon(
+                                      Icons.delete_outline,
+                                      color: Color(0xFFEF4444),
+                                      size: 12,
+                                    ),
                                     SizedBox(width: 4),
                                     Text(
                                       'Eliminar',
@@ -353,8 +375,26 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
   Widget _buildPlaceholderImage() {
     return Container(
       color: Colors.grey.shade100,
-      child: Icon(Icons.image_not_supported_outlined, color: Colors.grey.shade400, size: 32),
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        color: Colors.grey.shade400,
+        size: 32,
+      ),
     );
+  }
+
+  bool _isUnavailable(Product product) {
+    final status = product.stockStatusLabel.toLowerCase();
+    return status.contains('sin stock') || status.contains('agotado');
+  }
+
+  String _availabilityLabel(Product product) {
+    final rawStatus = product.availabilityStatus?.trim();
+    if (rawStatus == null || rawStatus.isEmpty) {
+      return product.stock == null ? 'Por confirmar' : product.stockStatusLabel;
+    }
+    if (_isUnavailable(product)) return 'Agotado';
+    return product.stockStatusLabel;
   }
 
   Widget _buildEmptyState() {
@@ -364,35 +404,25 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.history_rounded,
-                color: Colors.grey.shade400,
-                size: 64,
-              ),
+            Icon(
+              Icons.history_rounded,
+              color: Colors.grey.shade400,
+              size: 64,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             const Text(
               'Historial vacío',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: _kNavy,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               'Aquí aparecerán los equipos médicos que visites en la aplicación.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
           ],
         ),

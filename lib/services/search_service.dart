@@ -27,16 +27,16 @@ class SearchService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final history = prefs.getStringList(_keyHistory) ?? [];
-      
+
       // Remove duplicate if it exists to place it at the top
       history.remove(cleanQuery);
       history.insert(0, cleanQuery);
-      
+
       // Limit to 10 elements
       if (history.length > 10) {
         history.removeRange(10, history.length);
       }
-      
+
       await prefs.setStringList(_keyHistory, history);
     } catch (e) {
       print('Error saving search query: $e');
@@ -63,34 +63,41 @@ class SearchService {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_keyRecentlyViewed) ?? [];
       final products = <Product>[];
-      
+
       for (final item in list) {
         try {
           final Map<String, dynamic> json = jsonDecode(item);
-          products.add(Product(
-            id: json['id'] as String? ?? '',
-            sku: (json['id'] as String? ?? '00000000').substring(0, 8).toUpperCase(),
-            name: json['name'] as String? ?? '',
-            category: json['category'] as String? ?? '',
-            application: 'general',
-            brand: json['brand'] as String?,
-            commercialBrand: json['brand'] as String?,
-            model: json['model'] as String?,
-            unitPriceMxn: (json['unitPriceMxn'] as num? ?? 0.0).toDouble(),
-            costPriceMxn: (json['unitPriceMxn'] as num? ?? 0.0).toDouble() * 0.7,
-            oldPrice: json['oldPrice'] != null ? (json['oldPrice'] as num).toDouble() : null,
-            currency: 'MXN',
-            unit: 'pieza',
-            isActive: true,
-            requiresSerial: false,
-            trackInventory: true,
-            currentStock: json['stock'] as int? ?? 1,
-            mainImageUrl: json['mainImageUrl'] as String?,
-            shippingInfo: json['shippingInfo'] as String? ?? 'Envío nacional',
-            availabilityStatus: 'Disponible',
-            subcategory: json['subcategory'] as String?,
-            createdAt: DateTime.now(),
-          ));
+          products.add(
+            Product(
+              id: json['id'] as String? ?? '',
+              sku: (json['id'] as String? ?? '00000000')
+                  .substring(0, 8)
+                  .toUpperCase(),
+              name: json['name'] as String? ?? '',
+              category: json['category'] as String? ?? '',
+              application: 'general',
+              brand: json['brand'] as String?,
+              commercialBrand: json['brand'] as String?,
+              model: json['model'] as String?,
+              unitPriceMxn: (json['unitPriceMxn'] as num? ?? 0.0).toDouble(),
+              costPriceMxn:
+                  (json['unitPriceMxn'] as num? ?? 0.0).toDouble() * 0.7,
+              oldPrice: json['oldPrice'] != null
+                  ? (json['oldPrice'] as num).toDouble()
+                  : null,
+              currency: 'MXN',
+              unit: 'pieza',
+              isActive: true,
+              requiresSerial: false,
+              trackInventory: true,
+              currentStock: json['stock'] as int?,
+              mainImageUrl: json['mainImageUrl'] as String?,
+              shippingInfo: json['shippingInfo'] as String? ?? 'Envío nacional',
+              availabilityStatus: json['availabilityStatus'] as String?,
+              subcategory: json['subcategory'] as String?,
+              createdAt: DateTime.now(),
+            ),
+          );
         } catch (e) {
           print('Error deserializing recently viewed item: $e');
         }
@@ -110,7 +117,7 @@ class SearchService {
       if (!enabled) return;
 
       final list = prefs.getStringList(_keyRecentlyViewed) ?? [];
-      
+
       final itemMap = {
         'id': product.id,
         'name': product.name,
@@ -122,11 +129,12 @@ class SearchService {
         'oldPrice': product.oldPrice,
         'mainImageUrl': product.mainImageUrl,
         'stock': product.stock,
+        'availabilityStatus': product.availabilityStatus,
         'shippingInfo': product.shippingInfo,
       };
-      
+
       final serialized = jsonEncode(itemMap);
-      
+
       // Remove duplicate if same ID already exists
       list.removeWhere((item) {
         try {
@@ -136,14 +144,14 @@ class SearchService {
           return false;
         }
       });
-      
+
       list.insert(0, serialized);
-      
+
       // Limit to 10 elements
       if (list.length > 10) {
         list.removeRange(10, list.length);
       }
-      
+
       await prefs.setStringList(_keyRecentlyViewed, list);
     } catch (e) {
       print('Error saving recently viewed item: $e');

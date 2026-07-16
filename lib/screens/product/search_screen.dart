@@ -546,18 +546,10 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSearchOffIcon() {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        color: _kPrimary.withValues(alpha: 0.08),
-        shape: BoxShape.circle,
-      ),
-      child: const Icon(
-        Icons.search_rounded,
-        size: 38,
-        color: _kPrimary,
-      ),
+    return Icon(
+      Icons.search_rounded,
+      size: 64,
+      color: Colors.grey.shade400,
     );
   }
 
@@ -571,24 +563,23 @@ class _SearchScreenState extends State<SearchScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildSearchOffIcon(),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               Text(
                 'Sin resultados para "$_currentQuery"',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: _kNavy,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 4),
               Text(
                 'No encontramos coincidencias para esta búsqueda.\nIntenta con otros términos o verifica la ortografía.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
+                  fontSize: 12,
+                  color: Colors.grey.shade500,
                 ),
               ),
             ],

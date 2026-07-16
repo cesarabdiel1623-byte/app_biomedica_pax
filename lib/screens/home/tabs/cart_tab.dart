@@ -21,10 +21,6 @@ class CartTabState extends State<CartTab> {
   Set<String> _selectedItemIds = {};
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
-  String? _couponCode;
-  double _couponDiscountAmount = 0.0;
-  bool _isCouponApplied = false;
-
   void _removeItem(int index, CartItem item, {bool fromSwipe = false}) async {
     final removedItem = item;
     final int originalIndex = index;
@@ -61,13 +57,19 @@ class CartTabState extends State<CartTab> {
       });
       _listKey.currentState?.insertItem(originalIndex);
       if (context.mounted) {
-        UiHelpers.showErrorToast(context, 'Error al eliminar: ${e.toString().replaceAll('Exception: ', '')}');
+        UiHelpers.showErrorToast(
+          context,
+          'Error al eliminar: ${e.toString().replaceAll('Exception: ', '')}',
+        );
       }
     }
   }
 
   @override
-  void initState() { super.initState(); load(); }
+  void initState() {
+    super.initState();
+    load();
+  }
 
   Future<void> _loadLocation() async {
     try {
@@ -117,12 +119,19 @@ class CartTabState extends State<CartTab> {
         }
       }
     }
-    return s + _couponDiscountAmount;
+    return s;
   }
 
   double get _originalSubtotal => _items
       .where((i) => _selectedItemIds.contains(i.id))
-      .fold(0, (s, i) => s + (i.product != null ? (i.product!.oldPrice ?? i.product!.unitPriceMxn) * i.quantity : i.subtotal));
+      .fold(
+        0,
+        (s, i) =>
+            s +
+            (i.product != null
+                ? (i.product!.oldPrice ?? i.product!.unitPriceMxn) * i.quantity
+                : i.subtotal),
+      );
 
   double get _originalTotal => _originalSubtotal + _shippingFee;
 
@@ -139,11 +148,20 @@ class CartTabState extends State<CartTab> {
     return d;
   }
 
-  double get _total => (_subtotal + _shippingFee - _couponDiscountAmount).clamp(0.0, double.infinity);
+  double get _total => (_subtotal + _shippingFee).clamp(0.0, double.infinity);
 
   int get _totalQty => _items
       .where((i) => _selectedItemIds.contains(i.id))
       .fold(0, (s, i) => s + i.quantity);
+
+  bool _isUnavailable(CartItem item) {
+    final status = item.product?.stockStatusLabel.toLowerCase() ?? '';
+    return status.contains('sin stock') || status.contains('agotado');
+  }
+
+  bool get _hasUnavailableSelected => _items.any(
+    (item) => _selectedItemIds.contains(item.id) && _isUnavailable(item),
+  );
 
   String _fmt(double v) {
     final parts = v.toStringAsFixed(2).split('.');
@@ -155,28 +173,7 @@ class CartTabState extends State<CartTab> {
     return '\$$buf.${parts[1]}';
   }
 
-  void _applyCoupon(String code) {
-    final cleanCode = code.trim().toUpperCase();
-    if (cleanCode.isEmpty) return;
-
-    setState(() {
-      _couponCode = cleanCode;
-      _isCouponApplied = true;
-      // 10% discount on subtotal
-      _couponDiscountAmount = _subtotal * 0.10;
-    });
-  }
-
-  void _removeCoupon() {
-    setState(() {
-      _couponCode = null;
-      _isCouponApplied = false;
-      _couponDiscountAmount = 0.0;
-    });
-  }
-
   void _showCouponDialog() {
-    final controller = TextEditingController(text: _couponCode);
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -212,49 +209,57 @@ class CartTabState extends State<CartTab> {
                         color: Colors.grey.shade600,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: controller,
-                      autofocus: true,
-                      style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15),
-                      decoration: InputDecoration(
-                        hintText: 'Ingresa tu cupón',
-                        hintStyle: TextStyle(color: Colors.grey.shade400),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: const BorderSide(color: _kPrimary, width: 2),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Escribe tu cupón al finalizar la compra para que el equipo lo valide antes de confirmar la orden.',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: Colors.grey.shade600,
+                        height: 1.45,
                       ),
-                      textCapitalization: TextCapitalization.characters,
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2F1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            color: _kPrimary,
+                            size: 18,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Los descuentos se aplican después de validar el cupón.',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: Color(0xFF0F766E),
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        if (_isCouponApplied)
-                          TextButton(
-                            onPressed: () {
-                              _removeCoupon();
-                              Navigator.pop(context);
-                            },
-                            child: const Text('Eliminar', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-                          ),
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: Text('Cancelar', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: () {
-                            final code = controller.text.trim();
-                            if (code.isNotEmpty) {
-                              _applyCoupon(code);
-                            }
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Aplicar', style: TextStyle(color: _kPrimary, fontWeight: FontWeight.bold)),
+                          child: const Text(
+                            'Entendido',
+                            style: TextStyle(
+                              color: _kPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -282,14 +287,17 @@ class CartTabState extends State<CartTab> {
             final double subtotal = _subtotal;
             final double shipping = _shippingFee;
             final double prodDiscount = _productDiscountAmount;
-            final double couponDiscount = _couponDiscountAmount;
             final double total = _total;
             final double savings = _savings;
             final int qty = _totalQty;
+            final bool hasUnavailableSelected = _hasUnavailableSelected;
 
             return SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,13 +314,16 @@ class CartTabState extends State<CartTab> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.grey),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.grey,
+                          ),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    
+
                     if (subtotal > 0 && subtotal < 2000) ...[
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -327,7 +338,10 @@ class CartTabState extends State<CartTab> {
                           const SizedBox(height: 6),
                           Text(
                             'Agrega ${_fmt(2000 - subtotal)} más para tener envío gratis',
-                            style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
                           const SizedBox(height: 16),
                         ],
@@ -349,7 +363,10 @@ class CartTabState extends State<CartTab> {
                         children: [
                           Text(
                             'Descuento de productos',
-                            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                            ),
                           ),
                           Text(
                             '-${_fmt(prodDiscount)}',
@@ -362,28 +379,7 @@ class CartTabState extends State<CartTab> {
                         ],
                       ),
                     ],
-                    
-                    if (_isCouponApplied) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Cupón (-10%)',
-                            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                          ),
-                          Text(
-                            '-${_fmt(couponDiscount)}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF16A34A),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    
+
                     const SizedBox(height: 16),
                     InkWell(
                       onTap: () {
@@ -392,7 +388,10 @@ class CartTabState extends State<CartTab> {
                       },
                       borderRadius: BorderRadius.circular(24),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           border: Border.all(color: _kPrimary, width: 1.5),
                           borderRadius: BorderRadius.circular(24),
@@ -400,20 +399,32 @@ class CartTabState extends State<CartTab> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.confirmation_number_outlined, color: _kPrimary, size: 16),
+                            const Icon(
+                              Icons.confirmation_number_outlined,
+                              color: _kPrimary,
+                              size: 16,
+                            ),
                             const SizedBox(width: 8),
-                            Text(
-                              _isCouponApplied ? 'Cupón aplicado: $_couponCode' : 'Ingresar cupón de descuento',
-                              style: const TextStyle(
-                                color: _kPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                            const Flexible(
+                              child: Text(
+                                'Ingresar cupón de descuento',
+                                style: TextStyle(
+                                  color: _kPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
+
+                    if (hasUnavailableSelected) ...[
+                      const SizedBox(height: 14),
+                      _availabilityWarning(),
+                    ],
 
                     const SizedBox(height: 20),
                     CustomPaint(
@@ -491,7 +502,7 @@ class CartTabState extends State<CartTab> {
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: qty <= 0
+                        onPressed: qty <= 0 || hasUnavailableSelected
                             ? null
                             : () {
                                 Navigator.pop(context);
@@ -507,7 +518,10 @@ class CartTabState extends State<CartTab> {
                         ),
                         child: const Text(
                           'Comprar',
-                          style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -526,7 +540,9 @@ class CartTabState extends State<CartTab> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => CheckoutSheet(
         total: _total,
         onSuccess: () {
@@ -538,6 +554,7 @@ class CartTabState extends State<CartTab> {
 
   Widget _buildStickyFooter() {
     final qty = _totalQty;
+    final hasUnavailableSelected = _hasUnavailableSelected;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -557,32 +574,32 @@ class CartTabState extends State<CartTab> {
             InkWell(
               onTap: _showCouponDialog,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.shade100),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.confirmation_number_outlined, color: _kPrimary, size: 18),
+                    const Icon(
+                      Icons.confirmation_number_outlined,
+                      color: _kPrimary,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _isCouponApplied
-                          ? Text(
-                              'Cupón aplicado: $_couponCode (-10%)',
-                              style: const TextStyle(
-                                color: _kPrimary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : Text(
-                              'Ingresar cupón de descuento',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
+                      child: Text(
+                        'Ingresar cupón de descuento',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
                     Icon(
                       Icons.keyboard_arrow_right_rounded,
@@ -593,6 +610,11 @@ class CartTabState extends State<CartTab> {
                 ),
               ),
             ),
+            if (hasUnavailableSelected)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: _availabilityWarning(),
+              ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
@@ -670,7 +692,9 @@ class CartTabState extends State<CartTab> {
                     height: 48,
                     width: 180,
                     child: ElevatedButton(
-                      onPressed: qty <= 0 ? null : _showCheckoutBottomSheet,
+                      onPressed: qty <= 0 || hasUnavailableSelected
+                          ? null
+                          : _showCheckoutBottomSheet,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _kPrimary,
                         foregroundColor: Colors.white,
@@ -681,7 +705,10 @@ class CartTabState extends State<CartTab> {
                       ),
                       child: const Text(
                         'Comprar',
-                        style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -706,7 +733,10 @@ class CartTabState extends State<CartTab> {
               children: [
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: [
                       IconButton(
@@ -737,7 +767,10 @@ class CartTabState extends State<CartTab> {
                           const SizedBox(height: 2),
                           const Text(
                             'Finaliza tu orden de compra',
-                            style: TextStyle(fontSize: 11, color: Colors.white70),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white70,
+                            ),
                           ),
                         ],
                       ),
@@ -746,20 +779,30 @@ class CartTabState extends State<CartTab> {
                 ),
                 GestureDetector(
                   onTap: () async {
-                    final result = await Navigator.of(context).push<ClientAddress>(
-                      MaterialPageRoute(builder: (_) => const AddressPickerScreen()),
-                    );
+                    final result = await Navigator.of(context)
+                        .push<ClientAddress>(
+                          MaterialPageRoute(
+                            builder: (_) => const AddressPickerScreen(),
+                          ),
+                        );
                     if (result != null && mounted) {
                       setState(() => _currentLocation = result.displayText);
                     }
                   },
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      bottom: 8,
+                    ),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
@@ -767,7 +810,11 @@ class CartTabState extends State<CartTab> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.location_on, color: Colors.white, size: 13),
+                            const Icon(
+                              Icons.location_on,
+                              color: Colors.white,
+                              size: 13,
+                            ),
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
@@ -801,8 +848,8 @@ class CartTabState extends State<CartTab> {
         ),
         Expanded(
           child: _loading
-            ? const Center(child: CircularProgressIndicator(color: _kPrimary))
-            : _items.isEmpty
+              ? const Center(child: CircularProgressIndicator(color: _kPrimary))
+              : _items.isEmpty
               ? RefreshIndicator(
                   color: _kPrimary,
                   onRefresh: load,
@@ -815,11 +862,27 @@ class CartTabState extends State<CartTab> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.shopping_cart_outlined, size: 56, color: Colors.grey.shade400),
+                              Icon(
+                                Icons.shopping_cart_outlined,
+                                size: 56,
+                                color: Colors.grey.shade400,
+                              ),
                               const SizedBox(height: 12),
-                              const Text('Tu carrito está vacío', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                              const Text(
+                                'Tu carrito está vacío',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                               const SizedBox(height: 4),
-                              Text('Explora nuestro catálogo médico', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                              Text(
+                                'Explora nuestro catálogo médico',
+                                style: TextStyle(
+                                  color: Colors.grey.shade500,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -831,19 +894,27 @@ class CartTabState extends State<CartTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(left: 12, top: 8, bottom: 4),
+                      padding: const EdgeInsets.only(
+                        left: 12,
+                        top: 8,
+                        bottom: 4,
+                      ),
                       child: Row(
                         children: [
                           SizedBox(
                             height: 24,
                             width: 24,
                             child: Checkbox(
-                              value: _selectedItemIds.length == _items.length && _items.isNotEmpty,
+                              value:
+                                  _selectedItemIds.length == _items.length &&
+                                  _items.isNotEmpty,
                               activeColor: _kPrimary,
                               onChanged: (val) {
                                 setState(() {
                                   if (val == true) {
-                                    _selectedItemIds = _items.map((i) => i.id).toSet();
+                                    _selectedItemIds = _items
+                                        .map((i) => i.id)
+                                        .toSet();
                                   } else {
                                     _selectedItemIds.clear();
                                   }
@@ -853,7 +924,8 @@ class CartTabState extends State<CartTab> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            _selectedItemIds.length == _items.length && _items.isNotEmpty
+                            _selectedItemIds.length == _items.length &&
+                                    _items.isNotEmpty
                                 ? 'Deseleccionar todos'
                                 : 'Seleccionar todos',
                             style: const TextStyle(
@@ -874,14 +946,23 @@ class CartTabState extends State<CartTab> {
                           physics: const AlwaysScrollableScrollPhysics(),
                           slivers: [
                             SliverPadding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
                               sliver: SliverAnimatedList(
                                 key: _listKey,
                                 initialItemCount: _items.length,
                                 itemBuilder: (context, index, animation) {
-                                  if (index >= _items.length) return const SizedBox.shrink();
+                                  if (index >= _items.length) {
+                                    return const SizedBox.shrink();
+                                  }
                                   final item = _items[index];
-                                  return _buildAnimatedItem(item, animation, index);
+                                  return _buildAnimatedItem(
+                                    item,
+                                    animation,
+                                    index,
+                                  );
                                 },
                               ),
                             ),
@@ -893,10 +974,15 @@ class CartTabState extends State<CartTab> {
                   ],
                 ),
         ),
-      ]);
+      ],
+    );
   }
 
-  Widget _buildAnimatedItem(CartItem item, Animation<double> animation, int index) {
+  Widget _buildAnimatedItem(
+    CartItem item,
+    Animation<double> animation,
+    int index,
+  ) {
     return SizeTransition(
       sizeFactor: animation,
       child: FadeTransition(
@@ -912,7 +998,11 @@ class CartTabState extends State<CartTab> {
               color: const Color(0xFFEF4444),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.delete_outline, color: Colors.white, size: 22),
+            child: const Icon(
+              Icons.delete_outline,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
           secondaryBackground: Container(
             alignment: Alignment.centerRight,
@@ -922,7 +1012,11 @@ class CartTabState extends State<CartTab> {
               color: const Color(0xFFEF4444),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.delete_outline, color: Colors.white, size: 22),
+            child: const Icon(
+              Icons.delete_outline,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
           onDismissed: (direction) {
             _removeItem(index, item, fromSwipe: true);
@@ -955,7 +1049,7 @@ class CartTabState extends State<CartTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'RESUMEN DE PAGO',
+                'RESUMEN DE SOLICITUD',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -963,7 +1057,11 @@ class CartTabState extends State<CartTab> {
                   letterSpacing: 0.8,
                 ),
               ),
-              Icon(Icons.receipt_long_outlined, color: Colors.grey.shade400, size: 18),
+              Icon(
+                Icons.receipt_long_outlined,
+                color: Colors.grey.shade400,
+                size: 18,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -976,7 +1074,43 @@ class CartTabState extends State<CartTab> {
             painter: DashedLinePainter(color: Colors.grey.shade200),
           ),
           const SizedBox(height: 16),
-          _summaryRow('Total a Pagar', _fmt(_total), bold: true, size: 18, color: const Color(0xFF0F172A)),
+          _summaryRow(
+            'Total a Pagar',
+            _fmt(_total),
+            bold: true,
+            size: 18,
+            color: const Color(0xFF0F172A),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _availabilityWarning() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFED7AA)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Hay productos seleccionados sin disponibilidad. Deseleccionalos o quitalos para continuar.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF9A3412),
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -985,6 +1119,7 @@ class CartTabState extends State<CartTab> {
   Widget _cartItemCard(CartItem item, int index) {
     final p = item.product;
     final isSelected = _selectedItemIds.contains(item.id);
+    final isUnavailable = _isUnavailable(item);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -1013,7 +1148,9 @@ class CartTabState extends State<CartTab> {
                     child: Checkbox(
                       value: isSelected,
                       activeColor: _kPrimary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                       onChanged: (val) {
                         setState(() {
                           if (val == true) {
@@ -1032,10 +1169,18 @@ class CartTabState extends State<CartTab> {
                       width: 72,
                       height: 72,
                       child: p?.mainImageUrl != null
-                          ? UiHelpers.networkImage(p!.mainImageUrl!, fit: BoxFit.contain, iconSize: 28)
+                          ? UiHelpers.networkImage(
+                              p!.mainImageUrl!,
+                              fit: BoxFit.contain,
+                              iconSize: 28,
+                            )
                           : Container(
                               color: const Color(0xFFF8FAFC),
-                              child: const Icon(Icons.medical_services_outlined, color: Colors.grey, size: 28),
+                              child: const Icon(
+                                Icons.medical_services_outlined,
+                                color: Colors.grey,
+                                size: 28,
+                              ),
                             ),
                     ),
                   ),
@@ -1048,14 +1193,22 @@ class CartTabState extends State<CartTab> {
                           p?.name ?? 'Producto',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
                             Text(
                               p?.formattedPrice ?? '',
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
                             ),
                             if (p != null && p.hasDiscount) ...[
                               const SizedBox(width: 6),
@@ -1070,6 +1223,33 @@ class CartTabState extends State<CartTab> {
                             ],
                           ],
                         ),
+                        if (p != null) ...[
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Icon(
+                                isUnavailable
+                                    ? Icons.error_outline_rounded
+                                    : Icons.check_circle_outline_rounded,
+                                size: 13,
+                                color: p.stockStatusColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  p.stockStatusLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: p.stockStatusColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1094,19 +1274,28 @@ class CartTabState extends State<CartTab> {
                                   item.quantity--;
                                 });
                                 try {
-                                  await CartService.updateQuantity(item.id, item.quantity);
+                                  await CartService.updateQuantity(
+                                    item.id,
+                                    item.quantity,
+                                  );
                                   load(showSpinner: false);
                                 } catch (e) {
                                   setState(() {
                                     item.quantity++;
                                   });
                                   if (context.mounted) {
-                                    UiHelpers.showErrorToast(context, 'Error al actualizar: ${e.toString().replaceAll('Exception: ', '')}');
+                                    UiHelpers.showErrorToast(
+                                      context,
+                                      'Error al actualizar: ${e.toString().replaceAll('Exception: ', '')}',
+                                    );
                                   }
                                 }
                               },
                               child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 4,
+                                ),
                                 child: Icon(
                                   Icons.remove,
                                   size: 13,
@@ -1115,14 +1304,23 @@ class CartTabState extends State<CartTab> {
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                               child: Text(
                                 '${item.quantity}',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
                               ),
                             ),
                             GestureDetector(
-                              onTap: (p != null && p.stock != null && item.quantity >= p.stock!)
+                              onTap:
+                                  (p != null &&
+                                      p.stock != null &&
+                                      item.quantity >= p.stock!)
                                   ? null
                                   : () async {
                                       final stock = p?.stock ?? 999;
@@ -1131,7 +1329,10 @@ class CartTabState extends State<CartTab> {
                                         item.quantity++;
                                       });
                                       try {
-                                        await CartService.updateQuantity(item.id, item.quantity);
+                                        await CartService.updateQuantity(
+                                          item.id,
+                                          item.quantity,
+                                        );
                                         load(showSpinner: false);
                                       } catch (e) {
                                         setState(() {
@@ -1139,21 +1340,39 @@ class CartTabState extends State<CartTab> {
                                         });
                                         if (context.mounted) {
                                           final errStr = e.toString();
-                                          if (errStr.contains('stock_limit_reached')) {
-                                            final limit = int.tryParse(errStr.split(':').last) ?? stock;
-                                            UiHelpers.showStockLimitToast(context, limit);
+                                          if (errStr.contains(
+                                            'stock_limit_reached',
+                                          )) {
+                                            final limit =
+                                                int.tryParse(
+                                                  errStr.split(':').last,
+                                                ) ??
+                                                stock;
+                                            UiHelpers.showStockLimitToast(
+                                              context,
+                                              limit,
+                                            );
                                           } else {
-                                            UiHelpers.showErrorToast(context, 'Error al actualizar: ${errStr.replaceAll('Exception: ', '')}');
+                                            UiHelpers.showErrorToast(
+                                              context,
+                                              'Error al actualizar: ${errStr.replaceAll('Exception: ', '')}',
+                                            );
                                           }
                                         }
                                       }
                                     },
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 4,
+                                ),
                                 child: Icon(
                                   Icons.add,
                                   size: 13,
-                                  color: (p != null && p.stock != null && item.quantity >= p.stock!)
+                                  color:
+                                      (p != null &&
+                                          p.stock != null &&
+                                          item.quantity >= p.stock!)
                                       ? Colors.grey.shade300
                                       : const Color(0xFF64748B),
                                 ),
@@ -1188,25 +1407,38 @@ class CartTabState extends State<CartTab> {
     );
   }
 
-  Widget _summaryRow(String label, String value, {bool bold = false, double size = 14, Color? color}) {
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      Text(
-        label, 
-        style: TextStyle(
-          fontSize: size, 
-          color: color ?? (bold ? const Color(0xFF0F172A) : Colors.grey.shade600), 
-          fontWeight: bold ? FontWeight.bold : FontWeight.normal
-        )
-      ),
-      Text(
-        value, 
-        style: TextStyle(
-          fontSize: size, 
-          color: color ?? (bold ? const Color(0xFF0F172A) : const Color(0xFF334155)), 
-          fontWeight: bold ? FontWeight.bold : FontWeight.w600
-        )
-      ),
-    ]);
+  Widget _summaryRow(
+    String label,
+    String value, {
+    bool bold = false,
+    double size = 14,
+    Color? color,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: size,
+            color:
+                color ??
+                (bold ? const Color(0xFF0F172A) : Colors.grey.shade600),
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: size,
+            color:
+                color ??
+                (bold ? const Color(0xFF0F172A) : const Color(0xFF334155)),
+            fontWeight: bold ? FontWeight.bold : FontWeight.w600,
+          ),
+        ),
+      ],
+    );
   }
 }
 

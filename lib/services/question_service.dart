@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
+import 'auth_identity_service.dart';
 import 'product_service.dart';
 
 class ProductAnswer {
@@ -85,14 +86,14 @@ class QuestionService {
 
   /// Fetches all questions asked by the current client.
   static Future<List<ProductQuestion>> getClientQuestions() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return [];
+    final clientId = await AuthIdentityService.getEffectiveClientId();
+    if (clientId == null) return [];
 
     try {
       final res = await _client
           .from('product_questions')
-          .select('*, product_answers(*), products(${ProductService.publicProductColumns}, product_media(*), product_specs(*), product_inventory(*), active_product_promotions(*))')
-          .eq('client_id', userId)
+          .select('*, product_answers(*), products(${ProductService.publicProductSelect})')
+          .eq('client_id', clientId)
           .order('created_at', ascending: false);
 
       return (res as List)

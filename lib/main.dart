@@ -76,15 +76,48 @@ class GoMedicalApp extends StatelessWidget {
           ),
         ),
         textTheme: const TextTheme(
-          displayLarge: TextStyle(fontFamily: 'Inter', color: Color(0xFF0F172A)),
-          displayMedium: TextStyle(fontFamily: 'Inter', color: Color(0xFF0F172A)),
-          displaySmall: TextStyle(fontFamily: 'Inter', color: Color(0xFF0F172A)),
-          headlineLarge: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-          headlineMedium: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-          headlineSmall: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-          titleLarge: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-          titleMedium: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-          titleSmall: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+          displayLarge: TextStyle(
+            fontFamily: 'Inter',
+            color: Color(0xFF0F172A),
+          ),
+          displayMedium: TextStyle(
+            fontFamily: 'Inter',
+            color: Color(0xFF0F172A),
+          ),
+          displaySmall: TextStyle(
+            fontFamily: 'Inter',
+            color: Color(0xFF0F172A),
+          ),
+          headlineLarge: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+          headlineMedium: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+          headlineSmall: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0F172A),
+          ),
+          titleLarge: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+          ),
+          titleMedium: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+          ),
+          titleSmall: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+          ),
           bodyLarge: TextStyle(fontFamily: 'Inter', color: Color(0xFF1E293B)),
           bodyMedium: TextStyle(fontFamily: 'Inter', color: Color(0xFF334155)),
           bodySmall: TextStyle(fontFamily: 'Inter', color: Color(0xFF64748B)),
@@ -154,11 +187,11 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-
   /// Checks if user has completed all registration steps
   bool _isRegistrationComplete(User user) {
     final metadata = user.userMetadata ?? {};
-    final hasName = metadata['full_name'] != null &&
+    final hasName =
+        metadata['full_name'] != null &&
         (metadata['full_name'] as String).isNotEmpty;
     final hasPhone = user.phone != null && user.phone!.isNotEmpty;
     final phoneSkipped = metadata['phone_skipped'] == true;
@@ -179,7 +212,8 @@ class _AuthGateState extends State<AuthGate> {
         // The stream is only used to trigger rebuilds
         final session = Supabase.instance.client.auth.currentSession;
 
-        if (snapshot.connectionState == ConnectionState.waiting && session == null) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            session == null) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );

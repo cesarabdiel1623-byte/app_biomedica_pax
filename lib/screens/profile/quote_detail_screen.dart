@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/product_service.dart';
 import 'profile_helpers.dart';
 
 class QuoteDetailScreen extends StatefulWidget {
@@ -52,7 +53,7 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
     try {
       final response = await Supabase.instance.client
           .from('quote_items')
-          .select('*, products(brand, product_media(*))')
+          .select('*, products(brand, product_media(${ProductService.publicMediaColumns}))')
           .eq('quote_id', widget.quote['id']);
       if (mounted) {
         setState(() {

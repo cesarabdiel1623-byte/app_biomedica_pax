@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
+import 'auth_identity_service.dart';
 import 'product_service.dart';
 
 /// Service for managing user favorites in `client_favorites` table.
@@ -8,14 +9,14 @@ class FavoriteService {
 
   /// Fetches all favorites for the current client, including product details.
   static Future<List<Product>> getFavorites() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return [];
+    final clientId = await AuthIdentityService.getEffectiveClientId();
+    if (clientId == null) return [];
 
     try {
       final res = await _client
           .from('client_favorites')
-          .select('product_id, products(${ProductService.publicProductColumns}, product_media(*), product_specs(*), product_inventory(*), active_product_promotions(*))')
-          .eq('client_id', userId);
+          .select('product_id, products(${ProductService.publicProductSelect})')
+          .eq('client_id', clientId);
 
       final list = <Product>[];
       for (final row in res as List) {
@@ -32,14 +33,14 @@ class FavoriteService {
 
   /// Checks if a product is in the user's favorites list.
   static Future<bool> isFavorite(String productId) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) return false;
+    final clientId = await AuthIdentityService.getEffectiveClientId();
+    if (clientId == null) return false;
 
     try {
       final existing = await _client
           .from('client_favorites')
           .select('id')
-          .eq('client_id', userId)
+          .eq('client_id', clientId)
           .eq('product_id', productId)
           .maybeSingle();
 
@@ -52,13 +53,13 @@ class FavoriteService {
   /// Toggles favorite status for a product.
   /// Returns `true` if added, `false` if removed.
   static Future<bool> toggleFavorite(String productId) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw Exception('Usuario no autenticado');
+    final clientId = await AuthIdentityService.getEffectiveClientId();
+    if (clientId == null) throw Exception('Usuario no autenticado');
 
     final existing = await _client
         .from('client_favorites')
         .select('id')
-        .eq('client_id', userId)
+        .eq('client_id', clientId)
         .eq('product_id', productId)
         .maybeSingle();
 
@@ -72,7 +73,7 @@ class FavoriteService {
       await _client
           .from('client_favorites')
           .insert({
-            'client_id': userId,
+            'client_id': clientId,
             'product_id': productId,
           });
       return true;
