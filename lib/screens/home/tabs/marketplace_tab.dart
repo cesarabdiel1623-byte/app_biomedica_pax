@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../models/catalog_category.dart';
 import '../../../models/product.dart';
+import '../../../services/catalog_service.dart';
 import '../../../services/product_service.dart';
 import '../../../services/address_service.dart';
+import '../../../services/auth_identity_service.dart';
 import '../../../services/quote_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../utils/ui_helpers.dart';
+import '../../product/category_products_screen.dart';
+import '../../product/category_catalog_screen.dart';
 import '../../product/search_screen.dart';
 import '../../product/quote_cart_screen.dart';
 import '../../profile/notifications_screen.dart';
@@ -13,6 +19,7 @@ import '../address_picker_screen.dart';
 import '../home_screen.dart';
 import '../widgets/banner_carousel.dart';
 import '../widgets/product_card.dart';
+import '../widgets/promotion_cards_section.dart';
 import '../widgets/abandoned_cart_dialog.dart';
 import '../widgets/shimmer_card.dart';
 import '../../../widgets/load_error_state.dart';
@@ -30,17 +37,28 @@ class MouseDragScrollBehavior extends MaterialScrollBehavior {
 }
 
 class MarketplaceTab extends StatefulWidget {
-  const MarketplaceTab({super.key});
+  const MarketplaceTab({super.key, this.onInitialLoadComplete});
+
+  final VoidCallback? onInitialLoadComplete;
+
   @override
   State<MarketplaceTab> createState() => MarketplaceTabState();
 }
 
 class MarketplaceTabState extends State<MarketplaceTab> {
   List<Product> _products = [];
+  List<CatalogCategory> _catalogCategories = const [];
   bool _loading = true;
   String? _error;
   String? _activeCategory;
   String _currentLocation = 'Selecciona tu ubicación';
+  int _bannerRefreshToken = 0;
+  bool _productsInitialLoadDone = false;
+  bool _categoriesInitialLoadDone = false;
+  bool _locationInitialLoadDone = false;
+  bool _bannerInitialLoadDone = false;
+  bool _cardsInitialLoadDone = false;
+  bool _initialLoadReported = false;
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -51,19 +69,21 @@ class MarketplaceTabState extends State<MarketplaceTab> {
       if (mounted) setState(() {});
     });
     load();
+    _loadCatalogCategories();
     _loadLocation();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAbandonedCart());
   }
 
   Future<void> _checkAbandonedCart() async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) return;
+      final clientId =
+          await AuthIdentityService.getEffectiveClientId() ?? userId;
 
       final result = await Supabase.instance.client
           .from('carts')
           .select('id, updated_at, followup_status')
-          .eq('client_id', userId)
+          .eq('client_id', clientId)
           .eq('status', 'active')
           .maybeSingle();
 
@@ -106,9 +126,65 @@ class MarketplaceTabState extends State<MarketplaceTab> {
     try {
       final addr = await AddressService.getDefaultAddress();
       if (addr != null && mounted) {
-        setState(() => _currentLocation = addr.displayText);
+        setState(() => _currentLocation = addr.deliveryLabel);
       }
-    } catch (_) {}
+    } catch (_) {
+      // La ubicación no debe bloquear el inicio.
+    } finally {
+      _locationInitialLoadDone = true;
+      _reportInitialLoadIfReady();
+    }
+  }
+
+  Future<void> _loadCatalogCategories() async {
+    try {
+      final categories = await CatalogService.getCategories();
+      if (mounted) {
+        setState(() => _catalogCategories = categories);
+      }
+    } catch (error) {
+      debugPrint('Error al cargar categorías del inicio: $error');
+      if (mounted && UiHelpers.isNetworkError(error)) {
+        setState(() => _error = error.toString());
+      }
+    } finally {
+      _categoriesInitialLoadDone = true;
+      _reportInitialLoadIfReady();
+    }
+  }
+
+  void _reportInitialLoadIfReady() {
+    if (!mounted ||
+        _initialLoadReported ||
+        !_productsInitialLoadDone ||
+        !_categoriesInitialLoadDone ||
+        !_locationInitialLoadDone ||
+        !_bannerInitialLoadDone ||
+        !_cardsInitialLoadDone) {
+      return;
+    }
+    _initialLoadReported = true;
+    widget.onInitialLoadComplete?.call();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkAbandonedCart());
+  }
+
+  void _markBannerInitialLoadDone() {
+    if (_bannerInitialLoadDone) return;
+    _bannerInitialLoadDone = true;
+    _reportInitialLoadIfReady();
+  }
+
+  void _markCardsInitialLoadDone() {
+    if (_cardsInitialLoadDone) return;
+    _cardsInitialLoadDone = true;
+    _reportInitialLoadIfReady();
+  }
+
+  Future<void> _refreshHome() async {
+    await Future.wait([load(), _loadCatalogCategories()]);
+    if (mounted) {
+      setState(() => _bannerRefreshToken++);
+    }
   }
 
   Future<void> load({bool isLiveSearch = false}) async {
@@ -119,14 +195,34 @@ class MarketplaceTabState extends State<MarketplaceTab> {
           _error = null;
         });
       }
+      CatalogCategory? selectedCategory;
+      for (final category in _catalogCategories) {
+        if (category.productCategoryKey == _activeCategory) {
+          selectedCategory = category;
+          break;
+        }
+      }
+
       List<Product> p;
       if (_searchQuery.isNotEmpty) {
         p = await ProductService.searchProducts(_searchQuery);
         if (_activeCategory != null) {
-          p = p.where((item) => item.category == _activeCategory).toList();
+          p = p.where((item) {
+            if (selectedCategory != null) {
+              return item.categoryId == selectedCategory.id ||
+                  (item.categoryId == null &&
+                      item.category == selectedCategory.productCategoryKey);
+            }
+            return item.category == _activeCategory;
+          }).toList();
         }
       } else {
-        p = await ProductService.getAllProducts(category: _activeCategory);
+        p = selectedCategory != null
+            ? await ProductService.getProductsByCatalogCategory(
+                categoryId: selectedCategory.id,
+                legacyCategory: selectedCategory.productCategoryKey,
+              )
+            : await ProductService.getAllProducts(category: _activeCategory);
       }
       if (mounted) {
         setState(() {
@@ -141,6 +237,9 @@ class MarketplaceTabState extends State<MarketplaceTab> {
           _loading = false;
         });
       }
+    } finally {
+      _productsInitialLoadDone = true;
+      _reportInitialLoadIfReady();
     }
   }
 
@@ -232,163 +331,165 @@ class MarketplaceTabState extends State<MarketplaceTab> {
     final isHomeLanding = _searchQuery.isEmpty && _activeCategory == null;
 
     final promoProducts = _products.where((p) => p.hasDiscount).toList();
-    final equiposProducts = _products
-        .where((p) => p.category == 'equipo_medico')
-        .toList();
-    final ultrasoundProducts = _products
-        .where(
-          (p) =>
-              p.category == 'ultrasonido_humano' ||
-              p.category == 'ultrasonido_veterinario',
+    final categorySections = _catalogCategories
+        .map(
+          (category) => (
+            category: category,
+            products: _products
+                .where(
+                  (product) =>
+                      product.categoryId == category.id ||
+                      (product.categoryId == null &&
+                          product.category == category.productCategoryKey),
+                )
+                .toList(),
+          ),
         )
-        .toList();
-    final consumiblesProducts = _products
-        .where((p) => p.category == 'consumible' || p.category == 'refaccion')
-        .toList();
-    final serviciosProducts = _products
-        .where((p) => p.category == 'servicio')
+        .where((section) => section.products.isNotEmpty)
         .toList();
     final topPadding = MediaQuery.of(context).padding.top;
-    return RefreshIndicator(
-      color: _kPrimary,
-      edgeOffset: topPadding + 90, // Emerge justo debajo de la barra verde
-      onRefresh: load,
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(child: _header()),
-          SliverToBoxAdapter(child: _banner()),
-          SliverToBoxAdapter(child: _quickCats()),
-
-          if (_loading)
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisExtent: 230,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => const ShimmerCard(),
-                  childCount: 4,
-                ),
-              ),
-            )
-          else if (_error != null)
-            SliverFillRemaining(
-              child: LoadErrorState(
-                error: _error,
-                onRetry: load,
-                genericTitle: 'Error al cargar productos',
-                genericMessage: 'No pudimos cargar el catálogo por el momento.',
-              ),
-            )
-          else if (_products.isEmpty)
-            const SliverFillRemaining(
-              child: Center(child: Text('No hay productos en esta categoría')),
-            )
-          else ...[
-            if (isHomeLanding) ...[
-              if (promoProducts.isNotEmpty) ...[
-                _sectionHeader(
-                  Icons.local_offer,
-                  'Promociones del Día',
-                  const Color(0xFFEF4444),
-                  () {
-                    setState(() {
-                      _activeCategory = null;
-                      _searchQuery = '';
-                    });
-                  },
-                ),
-                _horizontalProductList(promoProducts),
-              ],
-
-              if (equiposProducts.isNotEmpty) ...[
-                _sectionHeader(
-                  Icons.medical_services,
-                  'Equipos Médicos',
-                  const Color(0xFF0D9488),
-                  () {
-                    _setCategory('equipo_medico');
-                  },
-                ),
-                _horizontalProductList(equiposProducts),
-              ],
-
-              if (ultrasoundProducts.isNotEmpty) ...[
-                _sectionHeader(
-                  Icons.monitor_heart,
-                  'Ultrasonido y Diagnóstico',
-                  const Color(0xFF3B82F6),
-                  () {
-                    _setCategory('ultrasonido_humano');
-                  },
-                ),
-                _horizontalProductList(ultrasoundProducts),
-              ],
-
-              if (consumiblesProducts.isNotEmpty) ...[
-                _sectionHeader(
-                  Icons.water_drop,
-                  'Consumibles y Refacciones',
-                  const Color(0xFF0EA5E9),
-                  () {
-                    _setCategory('consumible');
-                  },
-                ),
-                _horizontalProductList(consumiblesProducts),
-              ],
-
-              if (serviciosProducts.isNotEmpty) ...[
-                _sectionHeader(
-                  Icons.settings_suggest,
-                  'Servicios de Mantenimiento',
-                  const Color(0xFF8B5CF6),
-                  () {
-                    _setCategory('servicio');
-                  },
-                ),
-                _horizontalProductList(serviciosProducts),
-              ],
-
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            ] else ...[
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  child: Text(
-                    _activeCategory != null
-                        ? _catLabel(_activeCategory!)
-                        : 'Resultados de búsqueda',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: _kNavy,
-                    ),
+    final showHomeModules = !_loading && _error == null;
+    return ColoredBox(
+      color: Colors.white,
+      child: RefreshIndicator(
+        color: _kPrimary,
+        edgeOffset: topPadding + 90,
+        onRefresh: _refreshHome,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _header()),
+            SliverToBoxAdapter(
+              child: Offstage(
+                offstage: !showHomeModules,
+                child: ColoredBox(
+                  color: Colors.white,
+                  child: BannerCarousel(
+                    refreshToken: _bannerRefreshToken,
+                    onInitialLoadComplete: _markBannerInitialLoadDone,
                   ),
                 ),
               ),
+            ),
+            SliverToBoxAdapter(
+              child: Offstage(
+                offstage: !showHomeModules,
+                child: ColoredBox(
+                  color: Colors.white,
+                  child: PromotionCardsSection(
+                    refreshToken: _bannerRefreshToken,
+                    onInitialLoadComplete: _markCardsInitialLoadDone,
+                  ),
+                ),
+              ),
+            ),
+            if (showHomeModules && _hasQuickCategories())
+              SliverToBoxAdapter(child: _quickCats()),
+
+            if (_loading)
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisExtent: 315,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
+                    mainAxisExtent: 230,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
                   ),
                   delegate: SliverChildBuilderDelegate(
-                    (ctx, i) => ProductCard(product: _products[i]),
-                    childCount: _products.length,
+                    (context, index) => const ShimmerCard(),
+                    childCount: 4,
                   ),
                 ),
-              ),
+              )
+            else if (_error != null)
+              SliverFillRemaining(
+                child: LoadErrorState(
+                  error: _error,
+                  onRetry: _refreshHome,
+                  genericTitle: 'Error al cargar productos',
+                  genericMessage:
+                      'No pudimos cargar el catálogo por el momento.',
+                ),
+              )
+            else if (_products.isEmpty)
+              const SliverFillRemaining(
+                child: Center(
+                  child: Text('No hay productos en esta categoría'),
+                ),
+              )
+            else ...[
+              if (isHomeLanding) ...[
+                if (promoProducts.isNotEmpty) ...[
+                  _sectionHeader(
+                    Icons.local_offer,
+                    'Promociones del Día',
+                    const Color(0xFFEF4444),
+                    () {
+                      setState(() {
+                        _activeCategory = null;
+                        _searchQuery = '';
+                      });
+                    },
+                  ),
+                  _horizontalProductList(promoProducts),
+                ],
+
+                for (
+                  var index = 0;
+                  index < categorySections.length;
+                  index++
+                ) ...[
+                  _sectionHeader(
+                    _categoryIcon(categorySections[index].category.slug),
+                    categorySections[index].category.name,
+                    _categoryColor(index),
+                    () =>
+                        _openCategoryProducts(categorySections[index].category),
+                  ),
+                  _horizontalProductList(categorySections[index].products),
+                ],
+
+                const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              ] else ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: Text(
+                      _activeCategory != null
+                          ? _catLabel(_activeCategory!)
+                          : 'Resultados de búsqueda',
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  sliver: SliverGrid(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisExtent: 315,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                        ),
+                    delegate: SliverChildBuilderDelegate(
+                      (ctx, i) => ProductCard(product: _products[i]),
+                      childCount: _products.length,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -513,7 +614,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                   ),
                 );
                 if (result != null && mounted) {
-                  setState(() => _currentLocation = result.displayText);
+                  setState(() => _currentLocation = result.deliveryLabel);
                 }
               },
               child: Container(
@@ -565,97 +666,144 @@ class MarketplaceTabState extends State<MarketplaceTab> {
     ),
   );
 
-  Widget _banner() => const BannerCarousel();
+  bool _hasQuickCategories() {
+    return _catalogCategories.isNotEmpty;
+  }
+
+  List<CatalogCategory> _quickCategories() {
+    return _catalogCategories;
+  }
+
+  Color _categoryColor(int index) {
+    const colors = [
+      Color(0xFF0D9488),
+      Color(0xFF2563EB),
+      Color(0xFF0891B2),
+      Color(0xFFDB2777),
+      Color(0xFF7C3AED),
+      Color(0xFF16A34A),
+      Color(0xFFEA580C),
+    ];
+    return colors[index % colors.length];
+  }
+
+  void _openCategoryProducts(CatalogCategory category) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CategoryProductsScreen(
+          categoryId: category.id,
+          categoryKey: category.productCategoryKey,
+          categoryLabel: category.name,
+          subcategoryLabel: category.name,
+        ),
+      ),
+    );
+  }
+
+  void _openCategoryOverview(CatalogCategory category) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CategoryCatalogScreen(category: category),
+      ),
+    );
+  }
+
+  IconData _categoryIcon(String value) {
+    final key = value.toLowerCase();
+    if (key.contains('ultrason') || key.contains('monitor')) {
+      return Icons.monitor_heart_outlined;
+    }
+    if (key.contains('consum')) return Icons.water_drop_outlined;
+    if (key.contains('refacc')) return Icons.build_outlined;
+    if (key.contains('accesor')) return Icons.extension_outlined;
+    if (key.contains('servic')) return Icons.settings_suggest_outlined;
+    if (key.contains('equipo') || key.contains('medic')) {
+      return Icons.medical_services_outlined;
+    }
+    return Icons.category_outlined;
+  }
 
   Widget _quickCats() {
-    final cats = [
-      {
-        'icon': Icons.medical_services,
-        'label': 'Equipos',
-        'cat': 'equipo_medico',
-        'color': const Color(0xFF0D9488),
-      },
-      {
-        'icon': Icons.monitor_heart,
-        'label': 'Ultrasonido',
-        'cat': 'ultrasonido_humano',
-        'color': const Color(0xFF3B82F6),
-      },
-      {
-        'icon': Icons.water_drop,
-        'label': 'Consumibles',
-        'cat': 'consumible',
-        'color': const Color(0xFF0EA5E9),
-      },
-      {
-        'icon': Icons.build,
-        'label': 'Refacciones',
-        'cat': 'refaccion',
-        'color': const Color(0xFFEC4899),
-      },
-      {
-        'icon': Icons.settings_suggest,
-        'label': 'Servicios',
-        'cat': 'servicio',
-        'color': const Color(0xFF8B5CF6),
-      },
-    ];
-    return SizedBox(
-      height: 90,
+    final categories = _quickCategories();
+    return Container(
+      height: 84,
+      color: Colors.white,
       child: ScrollConfiguration(
         behavior: MouseDragScrollBehavior(),
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          itemCount: cats.length,
-          itemBuilder: (_, i) {
-            final c = cats[i];
-            final catKey = c['cat'] as String?;
-            final active = catKey != null && _activeCategory == catKey;
-            final color = c['color'] as Color;
-            return GestureDetector(
-              onTap: () {
-                if (catKey != null) _setCategory(catKey);
-              },
-              child: Container(
-                width: 68,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: active ? color : color.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(14),
-                        border: active
-                            ? null
-                            : Border.all(
-                                color: color.withValues(alpha: 0.25),
-                                width: 1,
-                              ),
+          clipBehavior: Clip.none,
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 5),
+          itemCount: categories.length,
+          itemBuilder: (_, index) {
+            final category = categories[index];
+            final categoryKey = category.productCategoryKey;
+            final active = _activeCategory == categoryKey;
+            final color = _categoryColor(_catalogCategories.indexOf(category));
+            final label = category.name;
+            return Padding(
+              padding: EdgeInsets.only(
+                right: index == categories.length - 1 ? 0 : 6,
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => _openCategoryOverview(category),
+                child: SizedBox(
+                  width: 74,
+                  height: 72,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOut,
+                        width: active ? 44 : 42,
+                        height: active ? 44 : 42,
+                        decoration: BoxDecoration(
+                          color: active
+                              ? _kPrimary
+                              : color.withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(12),
+                          border: active
+                              ? null
+                              : Border.all(
+                                  color: color.withValues(alpha: 0.22),
+                                ),
+                        ),
+                        child: Icon(
+                          _categoryIcon(category.slug),
+                          color: active ? Colors.white : color,
+                          size: 22,
+                        ),
                       ),
-                      child: Icon(
-                        c['icon'] as IconData,
-                        color: active ? Colors.white : color,
-                        size: 22,
+                      const SizedBox(height: 6),
+                      Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: active ? _kPrimary : const Color(0xFF374151),
+                          fontSize: 10.5,
+                          fontWeight: active
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      c['label'] as String,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        color: active ? color : Colors.grey.shade700,
-                        fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                      const SizedBox(height: 3),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        curve: Curves.easeOut,
+                        width: active ? 24 : 0,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: active ? _kPrimary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
@@ -666,21 +814,11 @@ class MarketplaceTabState extends State<MarketplaceTab> {
   }
 
   String _catLabel(String cat) {
-    switch (cat) {
-      case 'equipo_medico':
-        return 'Equipos Médicos';
-      case 'ultrasonido_humano':
-        return 'Ultrasonido Humano';
-      case 'ultrasonido_veterinario':
-        return 'Ultrasonido Veterinario';
-      case 'consumible':
-        return 'Consumibles';
-      case 'refaccion':
-        return 'Refacciones';
-      case 'servicio':
-        return 'Servicios Técnicos';
-      default:
-        return cat;
+    for (final category in _catalogCategories) {
+      if (category.productCategoryKey == cat) {
+        return category.name;
+      }
     }
+    return cat.replaceAll('_', ' ');
   }
 }

@@ -9,6 +9,7 @@ class Product {
   final String sku;
   final String name;
   final String category;
+  final String? categoryId;
   final String application;
   final String? commercialBrand;
   final String? description;
@@ -28,6 +29,7 @@ class Product {
   final String? shippingInfo;
   final String? availabilityStatus;
   final String? subcategory;
+  final String? subcategoryId;
   final String? productCondition;
   final DateTime createdAt;
   final int salesCount;
@@ -45,6 +47,7 @@ class Product {
     required this.sku,
     required this.name,
     required this.category,
+    this.categoryId,
     required this.application,
     this.commercialBrand,
     this.description,
@@ -64,6 +67,7 @@ class Product {
     this.shippingInfo,
     this.availabilityStatus,
     this.subcategory,
+    this.subcategoryId,
     this.productCondition,
     required this.createdAt,
     this.mainImageUrl,
@@ -136,7 +140,10 @@ class Product {
 
     String? primaryImage;
     for (final m in mediaList) {
-      if (m.isPrimary) { primaryImage = m.filePath; break; }
+      if (m.isPrimary) {
+        primaryImage = m.filePath;
+        break;
+      }
     }
     if (primaryImage == null && mediaList.isNotEmpty) {
       primaryImage = mediaList.first.filePath;
@@ -159,29 +166,28 @@ class Product {
       }
     }
 
-    // Parse active promotion if present
+    // Supabase is authoritative: this relation must contain active promotions
+    // filtered with the database clock.
     final promoList = json['active_product_promotions'] as List?;
     ActiveProductPromotion? activePromo;
     double calculatedUnitPrice = _toDouble(json['unit_price_mxn']);
-    double? calculatedOldPrice; // Only show discount if an active promotion exists
+    double? calculatedOldPrice;
 
     if (promoList != null && promoList.isNotEmpty) {
-      final parsedPromo = ActiveProductPromotion.fromJson(promoList.first as Map<String, dynamic>);
-      final now = DateTime.now();
-      if (parsedPromo.endsAt == null || !now.isAfter(parsedPromo.endsAt!)) {
-        activePromo = parsedPromo;
-        calculatedOldPrice = calculatedUnitPrice; // the original price becomes the old price to cross out
-        
-        final val = activePromo.discountValue;
-        if (activePromo.discountType == 'percentage') {
-          calculatedUnitPrice = calculatedUnitPrice * (1 - val / 100);
-        } else if (activePromo.discountType == 'fixed_amount') {
-          calculatedUnitPrice = calculatedUnitPrice - val;
-        } else if (activePromo.discountType == 'promotional_price') {
-          calculatedUnitPrice = val;
-        }
-        if (calculatedUnitPrice < 0) calculatedUnitPrice = 0.0;
+      activePromo = ActiveProductPromotion.fromJson(
+        promoList.first as Map<String, dynamic>,
+      );
+      calculatedOldPrice = calculatedUnitPrice;
+
+      final val = activePromo.discountValue;
+      if (activePromo.discountType == 'percentage') {
+        calculatedUnitPrice = calculatedUnitPrice * (1 - val / 100);
+      } else if (activePromo.discountType == 'fixed_amount') {
+        calculatedUnitPrice = calculatedUnitPrice - val;
+      } else if (activePromo.discountType == 'promotional_price') {
+        calculatedUnitPrice = val;
       }
+      if (calculatedUnitPrice < 0) calculatedUnitPrice = 0.0;
     }
 
     final int parsedSalesCount = _toInt(json['sales_count']) ?? 0;
@@ -191,13 +197,16 @@ class Product {
       sku: json['sku'] as String,
       name: json['name'] as String,
       category: json['category'] as String,
+      categoryId: json['category_id'] as String?,
       application: json['application'] as String? ?? 'general',
       commercialBrand: json['commercial_brand'] as String?,
       description: json['description'] as String?,
       brand: json['brand'] as String?,
       model: json['model'] as String?,
       unitPriceMxn: calculatedUnitPrice,
-      referencePriceUsd: json['reference_price_usd'] != null ? _toDouble(json['reference_price_usd']) : null,
+      referencePriceUsd: json['reference_price_usd'] != null
+          ? _toDouble(json['reference_price_usd'])
+          : null,
       costPriceMxn: _toDouble(json['cost_price_mxn']),
       oldPrice: calculatedOldPrice,
       currency: json['currency'] as String? ?? 'MXN',
@@ -210,6 +219,7 @@ class Product {
       shippingInfo: json['shipping_info'] as String?,
       availabilityStatus: json['availability_status'] as String?,
       subcategory: json['subcategory'] as String?,
+      subcategoryId: json['subcategory_id'] as String?,
       productCondition: json['product_condition'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       mainImageUrl: primaryImage,
@@ -240,26 +250,26 @@ class Product {
 
   /// Human-readable category label
   String get categoryLabel {
-    switch (category) {
-      case 'equipo_medico': return 'Equipos Médicos';
-      case 'ultrasonido_humano': return 'Ultrasonido Humano';
-      case 'ultrasonido_veterinario': return 'Ultrasonido Veterinario';
-      case 'consumible': return 'Consumibles';
-      case 'refaccion': return 'Refacciones';
-      case 'servicio': return 'Mantenimiento';
-      case 'accesorio': return 'Accesorios';
-      default: return category;
-    }
+    return category
+        .split('_')
+        .where((word) => word.isNotEmpty)
+        .map(
+          (word) =>
+              '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
+        )
+        .join(' ');
   }
 
   /// Formatted price
   String get formattedPrice => '\$${_formatMoney(unitPriceMxn)}';
 
   /// Formatted old price
-  String get formattedOldPrice => oldPrice != null ? '\$${_formatMoney(oldPrice!)}' : '';
+  String get formattedOldPrice =>
+      oldPrice != null ? '\$${_formatMoney(oldPrice!)}' : '';
 
   /// Shipping text with icon
-  bool get hasFreeShipping => shippingInfo?.toLowerCase().contains('gratis') ?? false;
+  bool get hasFreeShipping =>
+      shippingInfo?.toLowerCase().contains('gratis') ?? false;
 
   static double _toDouble(dynamic value) {
     if (value is double) return value;
@@ -302,8 +312,13 @@ class ProductMedia {
   final int sortOrder;
 
   ProductMedia({
-    required this.id, required this.productId, required this.filePath,
-    this.fileName, required this.documentType, required this.isPrimary, required this.sortOrder,
+    required this.id,
+    required this.productId,
+    required this.filePath,
+    this.fileName,
+    required this.documentType,
+    required this.isPrimary,
+    required this.sortOrder,
   });
 
   factory ProductMedia.fromJson(Map<String, dynamic> json) => ProductMedia(
@@ -326,8 +341,12 @@ class ProductSpec {
   final int sortOrder;
 
   ProductSpec({
-    required this.id, required this.productId, this.specGroup,
-    required this.specKey, required this.specValue, required this.sortOrder,
+    required this.id,
+    required this.productId,
+    this.specGroup,
+    required this.specKey,
+    required this.specValue,
+    required this.sortOrder,
   });
 
   factory ProductSpec.fromJson(Map<String, dynamic> json) => ProductSpec(
@@ -364,7 +383,9 @@ class ActiveProductPromotion {
       discountValue: _toDouble(json['discount_value']),
       campaignName: json['campaign_name'] as String?,
       promotionName: json['promotion_name'] as String?,
-      endsAt: json['ends_at'] != null ? DateTime.parse(json['ends_at'] as String) : null,
+      endsAt: json['ends_at'] != null
+          ? DateTime.parse(json['ends_at'] as String)
+          : null,
     );
   }
 

@@ -44,7 +44,10 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al enviar código: $e'), backgroundColor: Colors.red.shade600),
+          SnackBar(
+            content: Text('Error al enviar código: $e'),
+            backgroundColor: Colors.red.shade600,
+          ),
         );
       }
     } finally {
@@ -63,7 +66,10 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
     return Theme(
       data: ThemeData(
         brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: _primaryColor, brightness: Brightness.light),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _primaryColor,
+          brightness: Brightness.light,
+        ),
         scaffoldBackgroundColor: _greyBg,
       ),
       child: Scaffold(
@@ -77,13 +83,20 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.black87,
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     const Expanded(
                       child: Text(
                         'Validar E-mail',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -124,18 +137,29 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                                 color: _primaryColor.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.email_outlined, color: _primaryColor, size: 32),
+                              child: const Icon(
+                                Icons.email_outlined,
+                                color: _primaryColor,
+                                size: 32,
+                              ),
                             ),
                             const SizedBox(height: 24),
                             const Text(
                               'Ingresa tu e-mail',
-                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Te enviaremos un código de 6 dígitos para confirmarlo.',
-                              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 32),
@@ -144,11 +168,19 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                               keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
                                 labelText: 'Correo electrónico',
-                                prefixIcon: const Icon(Icons.alternate_email, color: _primaryColor),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                prefixIcon: const Icon(
+                                  Icons.alternate_email,
+                                  color: _primaryColor,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: _primaryColor, width: 2),
+                                  borderSide: const BorderSide(
+                                    color: _primaryColor,
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                             ),
@@ -160,19 +192,28 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _primaryColor,
                                   foregroundColor: Colors.white,
-                                  disabledBackgroundColor: _primaryColor.withValues(alpha: 0.6),
+                                  disabledBackgroundColor: _primaryColor
+                                      .withValues(alpha: 0.6),
                                   elevation: 0,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
                                 ),
                                 child: _isLoading
                                     ? const SizedBox(
                                         width: 20,
                                         height: 20,
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
                                       )
                                     : const Text(
                                         'Enviar código de confirmación',
-                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                               ),
                             ),

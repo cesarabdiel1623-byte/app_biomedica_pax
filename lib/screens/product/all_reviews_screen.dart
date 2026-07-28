@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/review_service.dart';
+import '../../widgets/review_video_tile.dart';
 
 class AllProductReviewsScreen extends StatefulWidget {
   final String productId;
@@ -12,7 +13,8 @@ class AllProductReviewsScreen extends StatefulWidget {
   });
 
   @override
-  State<AllProductReviewsScreen> createState() => _AllProductReviewsScreenState();
+  State<AllProductReviewsScreen> createState() =>
+      _AllProductReviewsScreenState();
 }
 
 class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
@@ -79,7 +81,11 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
       appBar: AppBar(
         title: const Text(
           'Opiniones del producto',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 18,
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -106,7 +112,11 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
                     color: Colors.white,
                     child: Row(
                       children: [
-                        const Icon(Icons.shopping_bag_outlined, color: _kPrimary, size: 18),
+                        const Icon(
+                          Icons.shopping_bag_outlined,
+                          color: _kPrimary,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -140,14 +150,15 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
                             _buildFilterBar(),
                             const SizedBox(height: 16),
                           ],
-                          
+
                           _filteredReviews.isEmpty
                               ? _buildEmptyState()
                               : ListView.separated(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
                                   itemCount: _filteredReviews.length,
-                                  separatorBuilder: (_, _) => const SizedBox(height: 16),
+                                  separatorBuilder: (_, _) =>
+                                      const SizedBox(height: 16),
                                   itemBuilder: (context, index) {
                                     final rev = _filteredReviews[index];
                                     return _buildReviewCard(rev);
@@ -186,14 +197,20 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
                   children: [
                     Text(
                       avg.toStringAsFixed(1),
-                      style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: _kNavy),
+                      style: const TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(5, (starIdx) {
                         return Icon(
-                          starIdx < avg.round() ? Icons.star_rounded : Icons.star_border_rounded,
+                          starIdx < avg.round()
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
                           color: const Color(0xFFFBBF24),
                           size: 16,
                         );
@@ -201,19 +218,20 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      totalReviews == 1 ? '1 opinión' : '$totalReviews opiniones',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      totalReviews == 1
+                          ? '1 opinión'
+                          : '$totalReviews opiniones',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
               // Vertical divider
-              Container(
-                height: 100,
-                width: 1,
-                color: Colors.grey.shade200,
-              ),
+              Container(height: 100, width: 1, color: Colors.grey.shade200),
               const SizedBox(width: 16),
               // Stars progress bars
               Expanded(
@@ -227,9 +245,20 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 2),
                       child: Row(
                         children: [
-                          Text('$stars', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _kNavy)),
+                          Text(
+                            '$stars',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _kNavy,
+                            ),
+                          ),
                           const SizedBox(width: 4),
-                          const Icon(Icons.star_rounded, color: Color(0xFFFBBF24), size: 12),
+                          const Icon(
+                            Icons.star_rounded,
+                            color: Color(0xFFFBBF24),
+                            size: 12,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: ClipRRect(
@@ -237,7 +266,9 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
                               child: LinearProgressIndicator(
                                 value: pct,
                                 backgroundColor: Colors.grey.shade100,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFBBF24)),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Color(0xFFFBBF24),
+                                ),
                                 minHeight: 6,
                               ),
                             ),
@@ -248,7 +279,10 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
                             child: Text(
                               '$count',
                               textAlign: TextAlign.end,
-                              style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                              ),
                             ),
                           ),
                         ],
@@ -299,7 +333,9 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
-                side: BorderSide(color: isSelected ? _kPrimary : Colors.grey.shade300),
+                side: BorderSide(
+                  color: isSelected ? _kPrimary : Colors.grey.shade300,
+                ),
               ),
               onSelected: (val) {
                 if (val) {
@@ -316,7 +352,8 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
   }
 
   Widget _buildReviewCard(ProductReview rev) {
-    final dateStr = '${rev.createdAt.day.toString().padLeft(2, '0')}/${rev.createdAt.month.toString().padLeft(2, '0')}/${rev.createdAt.year}';
+    final dateStr =
+        '${rev.createdAt.day.toString().padLeft(2, '0')}/${rev.createdAt.month.toString().padLeft(2, '0')}/${rev.createdAt.year}';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -334,7 +371,9 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
               Row(
                 children: List.generate(5, (starIdx) {
                   return Icon(
-                    starIdx < rev.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                    starIdx < rev.rating
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
                     color: const Color(0xFFFBBF24),
                     size: 18,
                   );
@@ -349,23 +388,39 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
           const SizedBox(height: 8),
           Text(
             rev.clientName,
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.black87),
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
           if (rev.comment != null && rev.comment!.trim().isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
               rev.comment!,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+                height: 1.4,
+              ),
             ),
           ],
-          if (rev.images.isNotEmpty) ...[
+          if (rev.images.isNotEmpty || rev.videos.isNotEmpty) ...[
             const SizedBox(height: 10),
             SizedBox(
               height: 56,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                itemCount: rev.images.length,
+                itemCount: rev.images.length + rev.videos.length,
                 itemBuilder: (_, i) {
+                  if (i >= rev.images.length) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ReviewVideoTile(
+                        url: rev.videos[i - rev.images.length],
+                      ),
+                    );
+                  }
                   return GestureDetector(
                     onTap: () {
                       showDialog(
@@ -389,7 +444,11 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
                                 top: 8,
                                 right: 8,
                                 child: IconButton(
-                                  icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                                  icon: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
                                   onPressed: () => Navigator.of(context).pop(),
                                 ),
                               ),
@@ -405,7 +464,10 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey.shade100),
-                        image: DecorationImage(image: NetworkImage(rev.images[i]), fit: BoxFit.cover),
+                        image: DecorationImage(
+                          image: NetworkImage(rev.images[i]),
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   );
@@ -425,12 +487,20 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey.shade400),
+            Icon(
+              Icons.rate_review_outlined,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 12),
             const Text(
               'No hay opiniones para este filtro.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey,
+              ),
             ),
           ],
         ),

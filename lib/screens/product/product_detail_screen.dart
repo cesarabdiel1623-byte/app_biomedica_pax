@@ -2,7 +2,7 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../home/widgets/staggered_fade_slide.dart';
 import '../home/home_screen.dart';
 import '../../models/product.dart';
@@ -12,15 +12,18 @@ import '../../services/search_service.dart';
 import '../../services/quote_service.dart';
 import '../../services/favorite_service.dart';
 import '../../services/review_service.dart';
+import '../../widgets/review_video_tile.dart';
 import '../../services/question_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../utils/ui_helpers.dart';
+import '../../widgets/standard_section_header.dart';
 import '../home/widgets/checkout_sheet.dart';
 import 'search_screen.dart';
 import '../auth/login_screen.dart';
 import 'ask_question_screen.dart';
 import 'all_questions_screen.dart';
 import 'all_reviews_screen.dart';
+import 'write_review_screen.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
@@ -56,6 +59,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _loadingDirectBuy = false;
   bool _loadingAddToCart = false;
   bool _addedToCartSuccess = false;
+  bool _hasPurchased = false;
+  ProductReview? _userReview;
 
   @override
   void initState() {
@@ -89,7 +94,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           similar = await ProductService.getSimilarProducts(
             widget.productId,
             p.category,
+            categoryId: p.categoryId,
             subcategory: p.subcategory,
+            subcategoryId: p.subcategoryId,
           );
         } catch (e) {
           print('Error loading similar products: $e');
@@ -111,6 +118,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           print('Error loading product questions: $e');
         }
 
+        bool hasPurchased = false;
+        ProductReview? userReview;
+        try {
+          hasPurchased = await ReviewService.hasPurchasedProduct(
+            widget.productId,
+          );
+          userReview = await ReviewService.getProductReviewByClient(
+            widget.productId,
+          );
+        } catch (e) {
+          print('Error loading purchase/review status: $e');
+        }
+
         if (mounted) {
           setState(() {
             _product = p;
@@ -118,6 +138,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             _similarProducts = similar;
             _reviews = reviewsList;
             _questions = questionsList;
+            _hasPurchased = hasPurchased;
+            _userReview = userReview;
             _loadingQuestions = false;
             _loading = false;
           });
@@ -133,9 +155,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _loadReviewsSilently() async {
     try {
       final reviewsList = await ReviewService.getReviews(widget.productId);
+      final userReview = await ReviewService.getProductReviewByClient(
+        widget.productId,
+      );
       if (mounted) {
         setState(() {
           _reviews = reviewsList;
+          _userReview = userReview;
         });
       }
     } catch (_) {}
@@ -420,85 +446,186 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void _showPaymentMethodsSheet() {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: false,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       backgroundColor: Colors.white,
       builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Medios de pago',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _kNavy,
-                      ),
-                    ),
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      icon: const Icon(
-                        Icons.close,
-                        color: Colors.grey,
-                        size: 24,
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, color: Color(0xFFE2E8F0)),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey.shade100),
-                      ),
-                      padding: const EdgeInsets.all(8),
-                      child: const Icon(
-                        Icons.account_balance_wallet_outlined,
-                        color: _kPrimary,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Text(
-                        'Elige la forma de pago disponible al finalizar tu compra.',
+        return FractionallySizedBox(
+          heightFactor: 0.78,
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Medios de pago',
                         style: TextStyle(
-                          fontSize: 13.5,
-                          color: Colors.black87,
-                          height: 1.45,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: _kNavy,
                         ),
                       ),
-                    ),
-                  ],
+                      IconButton(
+                        tooltip: 'Cerrar',
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Color(0xFF6B7280),
+                          size: 26,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _mercadoPagoBadge(size: 60, padding: 9),
+                            const SizedBox(width: 18),
+                            const Expanded(
+                              child: Text.rich(
+                                TextSpan(
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: Color(0xFF1F2937),
+                                    height: 1.45,
+                                  ),
+                                  children: [
+                                    TextSpan(text: 'Paga con '),
+                                    TextSpan(
+                                      text: 'Mercado Pago',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text:
+                                          ' y elige una de las opciones disponibles al finalizar tu compra.',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 26),
+                        const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Tarjetas de crédito y débito',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Paga de forma segura con las tarjetas disponibles en Mercado Pago.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            _paymentAsset(
+                              'assets/images/payments/visa_v3.svg',
+                              width: 62,
+                            ),
+                            const SizedBox(width: 18),
+                            _paymentAsset(
+                              'assets/images/payments/mastercard_v3.svg',
+                              width: 58,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 26),
+                        const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Pago en efectivo',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Si está disponible para tu compra, Mercado Pago generará las instrucciones para pagar en OXXO.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF6B7280),
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _paymentAsset(
+                          'assets/images/payments/oxxo_v3.svg',
+                          width: 74,
+                          height: 42,
+                        ),
+                        const SizedBox(height: 26),
+                        const Text(
+                          'Las opciones finales pueden variar según el monto y la disponibilidad de Mercado Pago.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF9CA3AF),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _paymentAsset(
+    String assetPath, {
+    required double width,
+    double height = 36,
+  }) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: SvgPicture.asset(assetPath, fit: BoxFit.contain),
+    );
+  }
+
+  Widget _mercadoPagoBadge({double size = 28, double padding = 4}) {
+    return Container(
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(padding),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF3F4F6),
+        shape: BoxShape.circle,
+      ),
+      child: SvgPicture.asset(
+        'assets/images/payments/mercadopago_v3.svg',
+        fit: BoxFit.contain,
+      ),
     );
   }
 
@@ -507,65 +634,58 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       backgroundColor: _kPrimary,
       elevation: 0,
       scrolledUnderElevation: 0,
-      automaticallyImplyLeading: false,
-      titleSpacing: 0,
-      toolbarHeight: 64,
-      title: Padding(
-        padding: const EdgeInsets.only(left: 12, right: 12),
-        child: Row(
-          children: [
-            IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              icon: const Icon(Icons.arrow_back, size: 24, color: Colors.white),
-              onPressed: () => Navigator.of(context).pop(),
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      leading: StandardBackButton(onPressed: () => Navigator.of(context).pop()),
+      titleSpacing: 4,
+      toolbarHeight: 56,
+      title: GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SearchScreen(initialQuery: widget.searchQuery),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          SearchScreen(initialQuery: widget.searchQuery),
-                    ),
-                  );
-                },
-                child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
+          );
+        },
+        child: Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.search, color: Colors.grey.shade500, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  widget.searchQuery ?? 'Buscar equipo médico',
+                  style: TextStyle(
+                    color: widget.searchQuery != null
+                        ? const Color(0xFF1E3A5F)
+                        : Colors.grey.shade500,
+                    fontSize: 14,
+                    fontWeight: widget.searchQuery != null
+                        ? FontWeight.w500
+                        : FontWeight.normal,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.search, color: Colors.grey.shade500, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          widget.searchQuery ?? 'Buscar equipo médico',
-                          style: TextStyle(
-                            color: widget.searchQuery != null
-                                ? const Color(0xFF1E3A5F)
-                                : Colors.grey.shade500,
-                            fontSize: 14,
-                            fontWeight: widget.searchQuery != null
-                                ? FontWeight.w500
-                                : FontWeight.normal,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+      actions: const [SizedBox(width: 16)],
     );
   }
 
@@ -894,12 +1014,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.chevron_right_rounded,
-                            color: Color(0xFF3483FA),
-                            size: 16,
-                          ),
+                          const SizedBox(width: 10),
+                          _mercadoPagoBadge(),
                         ],
                       ),
                     ),
@@ -1478,7 +1594,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
           ),
           const SizedBox(height: 12),
-          ElevatedButton.icon(
+          ElevatedButton(
             onPressed: () {
               if (!isLoggedIn) {
                 Navigator.of(context)
@@ -1505,24 +1621,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     });
               }
             },
-            icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
-            label: const Text(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kPrimary,
+              minimumSize: const Size(double.infinity, 52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
               'Preguntar',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
               ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(
-                0xFF3483FA,
-              ), // Mercado Libre style blue
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
             ),
           ),
           const SizedBox(height: 12),
@@ -1587,17 +1700,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   color: Colors.black,
                 ),
               ),
-              TextButton(
-                onPressed: _showAddReviewModal,
-                child: const Text(
-                  'Escribir opinión',
-                  style: TextStyle(
-                    color: _kPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+              if (_hasPurchased)
+                TextButton(
+                  onPressed: () {
+                    if (_product != null) {
+                      Navigator.of(context)
+                          .push(
+                            MaterialPageRoute(
+                              builder: (context) => WriteReviewScreen(
+                                product: _product!,
+                                existingReview: _userReview,
+                              ),
+                            ),
+                          )
+                          .then((_) {
+                            _loadReviewsSilently();
+                          });
+                    }
+                  },
+                  child: Text(
+                    _userReview != null ? 'Editar opinión' : 'Escribir opinión',
+                    style: const TextStyle(
+                      color: _kPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
           if (_reviews.isEmpty)
@@ -1736,14 +1865,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                         ),
                       ],
-                      if (rev.images.isNotEmpty) ...[
+                      if (rev.images.isNotEmpty || rev.videos.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         SizedBox(
                           height: 48,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
-                            itemCount: rev.images.length,
+                            itemCount: rev.images.length + rev.videos.length,
                             itemBuilder: (_, i) {
+                              if (i >= rev.images.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: ReviewVideoTile(
+                                    url: rev.videos[i - rev.images.length],
+                                    width: 48,
+                                    height: 48,
+                                  ),
+                                );
+                              }
                               return GestureDetector(
                                 onTap: () {
                                   showDialog(
@@ -1839,250 +1978,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ],
         ],
       ),
-    );
-  }
-
-  void _showAddReviewModal() {
-    int localRating = 5;
-    final commentController = TextEditingController();
-    bool isUploadingPhoto = false;
-    final uploadedPhotos = <String>[];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (modalCtx, modalSetState) {
-            Future<void> pickImage() async {
-              final picker = ImagePicker();
-              final picked = await picker.pickImage(
-                source: ImageSource.gallery,
-                imageQuality: 80,
-              );
-              if (picked != null) {
-                modalSetState(() => isUploadingPhoto = true);
-                try {
-                  final Uint8List bytes = await picked.readAsBytes();
-                  final url = await ReviewService.uploadReviewPhoto(
-                    widget.productId,
-                    bytes,
-                    picked.name,
-                  );
-                  modalSetState(() {
-                    uploadedPhotos.add(url);
-                    isUploadingPhoto = false;
-                  });
-                } catch (e) {
-                  modalSetState(() => isUploadingPhoto = false);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error al subir imagen: $e'),
-                      backgroundColor: _kRed,
-                    ),
-                  );
-                }
-              }
-            }
-
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                MediaQuery.of(modalCtx).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Escribir opinión',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.of(modalCtx).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Califica este producto:',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      final starNum = index + 1;
-                      return IconButton(
-                        icon: Icon(
-                          starNum <= localRating
-                              ? Icons.star
-                              : Icons.star_border,
-                          color: _kAmber,
-                          size: 32,
-                        ),
-                        onPressed: () =>
-                            modalSetState(() => localRating = starNum),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Tu comentario:',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: commentController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'Cuéntanos qué te pareció el producto...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Agregar fotos:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.add_a_photo_outlined, size: 16),
-                        label: const Text('Subir foto'),
-                        onPressed: isUploadingPhoto ? null : pickImage,
-                      ),
-                    ],
-                  ),
-                  if (isUploadingPhoto)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Center(
-                        child: CircularProgressIndicator(color: _kPrimary),
-                      ),
-                    ),
-                  if (uploadedPhotos.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 56,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: uploadedPhotos.length,
-                        itemBuilder: (_, idx) {
-                          return Stack(
-                            children: [
-                              Container(
-                                margin: const EdgeInsets.only(right: 8),
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                  image: DecorationImage(
-                                    image: NetworkImage(uploadedPhotos[idx]),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                top: 2,
-                                right: 10,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    modalSetState(() {
-                                      uploadedPhotos.removeAt(idx);
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.black54,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.close,
-                                      size: 10,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        try {
-                          await ReviewService.addReview(
-                            productId: widget.productId,
-                            rating: localRating,
-                            comment: commentController.text,
-                            imageUrls: uploadedPhotos,
-                          );
-                          Navigator.of(modalCtx).pop();
-                          _loadReviewsSilently();
-                          UiHelpers.showQuestionSubmittedToast(
-                            context,
-                            '✓ ¡Gracias por tu opinión!',
-                          );
-                        } catch (e) {
-                          UiHelpers.showErrorToast(
-                            context,
-                            'Error al enviar opinión: $e',
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _kBlue,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text(
-                        'Enviar opinión',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -2387,26 +2282,22 @@ class _ProductDetailsSheetContentState extends State<ProductDetailsSheetContent>
           ),
 
           // Pestañas
-          Container(
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+          TabBar(
+            controller: _tabController,
+            labelColor: const Color(0xFF0D9488), // _kPrimary
+            unselectedLabelColor: Colors.grey,
+            indicatorColor: const Color(0xFF0D9488), // _kPrimary
+            indicatorWeight: 2.5,
+            dividerColor: Colors.transparent,
+            labelStyle: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.bold,
             ),
-            child: TabBar(
-              controller: _tabController,
-              labelColor: const Color(0xFF0D9488), // _kPrimary
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: const Color(0xFF0D9488), // _kPrimary
-              indicatorWeight: 2.5,
-              labelStyle: const TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.bold,
-              ),
-              onTap: _scrollToSection,
-              tabs: const [
-                Tab(text: 'Descripción'),
-                Tab(text: 'Características'),
-              ],
-            ),
+            onTap: _scrollToSection,
+            tabs: const [
+              Tab(text: 'Descripción'),
+              Tab(text: 'Características'),
+            ],
           ),
 
           // Contenido de la misma hoja (Scroll único)

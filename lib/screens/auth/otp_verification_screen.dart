@@ -12,7 +12,10 @@ class OTPVerificationScreen extends StatefulWidget {
 }
 
 class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _controllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
 
@@ -20,8 +23,12 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
 
   @override
   void dispose() {
-    for (var c in _controllers) { c.dispose(); }
-    for (var f in _focusNodes) { f.dispose(); }
+    for (var c in _controllers) {
+      c.dispose();
+    }
+    for (var f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -61,20 +68,30 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Código verificado, pero no se pudo iniciar sesión.')),
+            const SnackBar(
+              content: Text(
+                'Código verificado, pero no se pudo iniciar sesión.',
+              ),
+            ),
           );
         }
       }
     } on AuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.message}'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error: ${e.message}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Código incorrecto o expirado: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Código incorrecto o expirado: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -104,7 +121,13 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 24, offset: const Offset(0, 8))],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -112,7 +135,11 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                 children: [
                   const Text(
                     'Ingresa el código',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -122,7 +149,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Cajitas de OTP
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -136,18 +163,26 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                           keyboardType: TextInputType.number,
                           textAlign: TextAlign.center,
                           maxLength: 1,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
                           decoration: InputDecoration(
                             counterText: '',
                             filled: true,
                             fillColor: const Color(0xFFFAFAFA),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                              borderSide: const BorderSide(
+                                color: Color(0xFFE0E0E0),
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: _primaryColor, width: 2),
+                              borderSide: const BorderSide(
+                                color: _primaryColor,
+                                width: 2,
+                              ),
                             ),
                           ),
                           onChanged: (value) => _onChanged(value, index),
@@ -155,9 +190,9 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                       );
                     }),
                   ),
-                  
+
                   const SizedBox(height: 32),
-                  
+
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
@@ -165,22 +200,33 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primaryColor,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         elevation: 0,
                       ),
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Confirmar código', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : const Text(
+                              'Confirmar código',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {
                       Navigator.of(context).pop();
                     },
-                    child: const Text('Cambiar e-mail', style: TextStyle(color: _primaryColor)),
-                  )
+                    child: const Text(
+                      'Cambiar e-mail',
+                      style: TextStyle(color: _primaryColor),
+                    ),
+                  ),
                 ],
               ),
             ),

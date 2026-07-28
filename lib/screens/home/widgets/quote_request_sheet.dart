@@ -8,7 +8,11 @@ const _kBg = Color(0xFFF8FAFC);
 class QuoteRequestSheet extends StatefulWidget {
   final double total;
   final VoidCallback onSuccess;
-  const QuoteRequestSheet({super.key, required this.total, required this.onSuccess});
+  const QuoteRequestSheet({
+    super.key,
+    required this.total,
+    required this.onSuccess,
+  });
 
   @override
   State<QuoteRequestSheet> createState() => _QuoteRequestSheetState();
@@ -27,9 +31,7 @@ class _QuoteRequestSheetState extends State<QuoteRequestSheet> {
   Future<void> _submit() async {
     setState(() => _loading = true);
     try {
-      await CartService.requestQuote(
-        notes: _notesController.text.trim(),
-      );
+      await CartService.requestQuote(notes: _notesController.text.trim());
 
       if (mounted) {
         Navigator.pop(context);
@@ -38,12 +40,17 @@ class _QuoteRequestSheetState extends State<QuoteRequestSheet> {
         showDialog(
           context: context,
           builder: (dialogCtx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: const Row(
               children: [
                 Icon(Icons.check_circle, color: _kPrimary, size: 28),
                 SizedBox(width: 10),
-                Text('¡Solicitud Enviada!', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  '¡Solicitud Enviada!',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ],
             ),
             content: const Text(
@@ -55,7 +62,13 @@ class _QuoteRequestSheetState extends State<QuoteRequestSheet> {
                 onPressed: () {
                   Navigator.pop(dialogCtx);
                 },
-                child: const Text('Aceptar', style: TextStyle(color: _kPrimary, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Aceptar',
+                  style: TextStyle(
+                    color: _kPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -101,7 +114,12 @@ class _QuoteRequestSheetState extends State<QuoteRequestSheet> {
           const SizedBox(height: 8),
           Flexible(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                0,
+                20,
+                MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -111,9 +129,22 @@ class _QuoteRequestSheetState extends State<QuoteRequestSheet> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Solicitar Cotización', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _kNavy)),
+                          const Text(
+                            'Solicitar Cotización',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _kNavy,
+                            ),
+                          ),
                           const SizedBox(height: 2),
-                          Text('Envía tu solicitud y un ejecutivo se pondrá en contacto contigo.', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                          Text(
+                            'Envía tu solicitud y un ejecutivo se pondrá en contacto contigo.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
                         ],
                       ),
                       IconButton(
@@ -141,26 +172,50 @@ class _QuoteRequestSheetState extends State<QuoteRequestSheet> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Importe Estimado:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _kNavy)),
+                        const Text(
+                          'Importe Estimado:',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: _kNavy,
+                          ),
+                        ),
                         Text(
                           _formatCurrency(widget.total),
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _kPrimary),
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: _kPrimary,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  const Text('Notas / Instrucciones Especiales', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _kNavy)),
+                  const Text(
+                    'Notas / Instrucciones Especiales',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: _kNavy,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _notesController,
                     maxLines: 4,
                     enabled: !_loading,
                     decoration: InputDecoration(
-                      hintText: 'Ej. Solicito descuento por volumen, o requiero entrega en cierta fecha.',
-                      hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      hintText:
+                          'Ej. Solicito descuento por volumen, o requiero entrega en cierta fecha.',
+                      hintStyle: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade400,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       fillColor: Colors.white,
                       filled: true,
                     ),
@@ -175,12 +230,20 @@ class _QuoteRequestSheetState extends State<QuoteRequestSheet> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _kPrimary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         elevation: 2,
                       ),
                       child: _loading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Confirmar y Solicitar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : const Text(
+                              'Confirmar y Solicitar',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 12),

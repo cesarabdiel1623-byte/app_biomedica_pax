@@ -38,11 +38,7 @@ class LoadErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
+            Icon(icon, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 12),
             Text(
               title,
@@ -57,10 +53,7 @@ class LoadErrorState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 16),
             TextButton(
@@ -74,10 +67,7 @@ class LoadErrorState extends StatelessWidget {
               ),
               child: const Text(
                 'Reintentar',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
             ),
           ],

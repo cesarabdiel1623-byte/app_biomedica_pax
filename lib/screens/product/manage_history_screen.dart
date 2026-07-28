@@ -85,11 +85,16 @@ class _ManageHistoryScreenState extends State<ManageHistoryScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: _kPrimary,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text(
               'Borrar todo',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -122,7 +127,11 @@ class _ManageHistoryScreenState extends State<ManageHistoryScreen> {
       appBar: AppBar(
         title: const Text(
           'Historial',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 18,
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -164,7 +173,10 @@ class _ManageHistoryScreenState extends State<ManageHistoryScreen> {
                   const SizedBox(height: 32),
                   // Toggle Card
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
@@ -175,10 +187,7 @@ class _ManageHistoryScreenState extends State<ManageHistoryScreen> {
                           offset: const Offset(0, 4),
                         ),
                       ],
-                      border: Border.all(
-                        color: Colors.grey.shade100,
-                        width: 1,
-                      ),
+                      border: Border.all(color: Colors.grey.shade100, width: 1),
                     ),
                     child: ListTile(
                       contentPadding: EdgeInsets.zero,

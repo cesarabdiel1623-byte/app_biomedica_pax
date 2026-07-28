@@ -47,11 +47,17 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
         _historyList.removeWhere((p) => p.id == product.id);
       });
       if (mounted) {
-        UiHelpers.showFloatingDeleteToast(context, '${product.name} eliminado del historial.');
+        UiHelpers.showFloatingDeleteToast(
+          context,
+          '${product.name} eliminado del historial.',
+        );
       }
     } catch (e) {
       if (mounted) {
-        UiHelpers.showFloatingDeleteToast(context, 'Error al eliminar del historial.');
+        UiHelpers.showFloatingDeleteToast(
+          context,
+          'Error al eliminar del historial.',
+        );
       }
     }
   }
@@ -404,11 +410,7 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.history_rounded,
-              color: Colors.grey.shade400,
-              size: 64,
-            ),
+            Icon(Icons.history_rounded, color: Colors.grey.shade400, size: 64),
             const SizedBox(height: 12),
             const Text(
               'Historial vacío',

@@ -296,234 +296,242 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ),
                       ),
-                    const SizedBox(height: 36),
+                      const SizedBox(height: 36),
 
-                    SlideTransition(
-                      position: _slideUpAnim,
-                      child: FadeTransition(
-                        opacity: _fadeAnim,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 24,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildInput(
-                                controller: _emailController,
-                                focusNode: _emailFocus,
-                                isFocused: _emailFocused,
-                                hint: 'Correo electrónico',
-                                icon: Icons.email_outlined,
-                                keyboardType: TextInputType.emailAddress,
-                                onSubmit: () => FocusScope.of(
-                                  context,
-                                ).requestFocus(_passwordFocus),
-                              ),
-                              const SizedBox(height: 16),
-                              _buildInput(
-                                controller: _passwordController,
-                                focusNode: _passwordFocus,
-                                isFocused: _passwordFocused,
-                                hint: 'Contraseña',
-                                icon: Icons.lock_outline,
-                                obscure: _obscurePassword,
-                                suffix: IconButton(
-                                  onPressed: () => setState(
-                                    () => _obscurePassword = !_obscurePassword,
-                                  ),
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_off_outlined
-                                        : Icons.visibility_outlined,
-                                    color: Colors.grey,
-                                    size: 20,
-                                  ),
+                      SlideTransition(
+                        position: _slideUpAnim,
+                        child: FadeTransition(
+                          opacity: _fadeAnim,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 24,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 8),
                                 ),
-                                onSubmit: _isLoading ? null : _signIn,
-                              ),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () {
-                                    // Reset password logic
-                                  },
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: _primaryColor,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 0,
-                                      vertical: 8,
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    '¿Olvidaste tu contraseña?',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildInput(
+                                  controller: _emailController,
+                                  focusNode: _emailFocus,
+                                  isFocused: _emailFocused,
+                                  hint: 'Correo electrónico',
+                                  icon: Icons.email_outlined,
+                                  keyboardType: TextInputType.emailAddress,
+                                  onSubmit: () => FocusScope.of(
+                                    context,
+                                  ).requestFocus(_passwordFocus),
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                height: 52,
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _signIn,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _primaryColor,
-                                    foregroundColor: Colors.white,
-                                    disabledBackgroundColor: _primaryColor
-                                        .withValues(alpha: 0.6),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
+                                const SizedBox(height: 16),
+                                _buildInput(
+                                  controller: _passwordController,
+                                  focusNode: _passwordFocus,
+                                  isFocused: _passwordFocused,
+                                  hint: 'Contraseña',
+                                  icon: Icons.lock_outline,
+                                  obscure: _obscurePassword,
+                                  suffix: IconButton(
+                                    onPressed: () => setState(
+                                      () =>
+                                          _obscurePassword = !_obscurePassword,
                                     ),
-                                    elevation: 0,
+                                    icon: Icon(
+                                      _obscurePassword
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                      color: Colors.grey,
+                                      size: 20,
+                                    ),
                                   ),
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : const Text(
-                                          'INICIAR SESIÓN',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                            letterSpacing: 1,
-                                          ),
-                                        ),
+                                  onSubmit: _isLoading ? null : _signIn,
                                 ),
-                              ),
-                              const SizedBox(height: 20),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Divider(
-                                      color: Colors.grey.withValues(alpha: 0.3),
-                                      thickness: 1,
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    child: Text(
-                                      'O',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade400,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Divider(
-                                      color: Colors.grey.withValues(alpha: 0.3),
-                                      thickness: 1,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 20),
-                              SizedBox(
-                                height: 52,
-                                child: OutlinedButton(
-                                  onPressed: _isLoading ? null : _googleSignIn,
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF424242),
-                                    side: BorderSide(
-                                      color: Colors.grey.withValues(
-                                        alpha: 0.35,
-                                      ),
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CustomPaint(
-                                          painter: _ExactGoogleLogoPainter(),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      const Flexible(
-                                        child: Text(
-                                          'Iniciar sesión con Google',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 14,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              Wrap(
-                                alignment: WrapAlignment.center,
-                                children: [
-                                  const Text(
-                                    '¿No tienes cuenta? ',
-                                    style: TextStyle(
-                                      color: Color(0xFF757575),
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  GestureDetector(
-                                    onTap: () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const RegistrationChecklistScreen(),
-                                        ),
-                                      );
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () {
+                                      // Reset password logic
                                     },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: _primaryColor,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 0,
+                                        vertical: 8,
+                                      ),
+                                    ),
                                     child: const Text(
-                                      'Regístrate aquí',
+                                      '¿Olvidaste tu contraseña?',
                                       style: TextStyle(
-                                        color: _primaryColor,
-                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  height: 52,
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _signIn,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _primaryColor,
+                                      foregroundColor: Colors.white,
+                                      disabledBackgroundColor: _primaryColor
+                                          .withValues(alpha: 0.6),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'INICIAR SESIÓN',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                              letterSpacing: 1,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Divider(
+                                        color: Colors.grey.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                        thickness: 1,
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                      ),
+                                      child: Text(
+                                        'O',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade400,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Divider(
+                                        color: Colors.grey.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                        thickness: 1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                SizedBox(
+                                  height: 52,
+                                  child: OutlinedButton(
+                                    onPressed: _isLoading
+                                        ? null
+                                        : _googleSignIn,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF424242),
+                                      side: BorderSide(
+                                        color: Colors.grey.withValues(
+                                          alpha: 0.35,
+                                        ),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CustomPaint(
+                                            painter: _ExactGoogleLogoPainter(),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        const Flexible(
+                                          child: Text(
+                                            'Iniciar sesión con Google',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 14,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  children: [
+                                    const Text(
+                                      '¿No tienes cuenta? ',
+                                      style: TextStyle(
+                                        color: Color(0xFF757575),
                                         fontSize: 14,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const RegistrationChecklistScreen(),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text(
+                                        'Regístrate aquí',
+                                        style: TextStyle(
+                                          color: _primaryColor,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }

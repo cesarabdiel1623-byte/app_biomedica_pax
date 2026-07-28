@@ -5,6 +5,7 @@ import 'ticket_detail_screen.dart';
 import '../home/widgets/staggered_fade_slide.dart';
 import '../home/home_screen.dart';
 import '../../widgets/load_error_state.dart';
+import '../../widgets/standard_section_header.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 
@@ -120,88 +121,37 @@ class _TicketsListScreenState extends State<TicketsListScreen>
       backgroundColor: const Color(0xFFF8FAFC),
       body: Column(
         children: [
-          Container(
+          StandardSectionHeader(
+            title: 'Mis Tickets de Servicio',
+            subtitle: !_loading && _error == null
+                ? '${_tickets.length} ticket${_tickets.length != 1 ? 's' : ''} encontrado${_tickets.length != 1 ? 's' : ''}'
+                : null,
+            backgroundColor: _kPrimary,
+            onBack: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              } else {
+                HomeScreen.showTab(0);
+              }
+            },
+          ),
+          ColoredBox(
             color: _kPrimary,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
-                          ),
-                          onPressed: () {
-                            if (Navigator.canPop(context)) {
-                              Navigator.pop(context);
-                            } else {
-                              HomeScreen.showTab(0); // Regresa al inicio
-                            }
-                          },
-                        ),
-                        const Icon(
-                          Icons.support_agent,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'Mis Tickets de Servicio',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              if (!_loading && _error == null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                  "${_tickets.length} ticket${_tickets.length != 1 ? 's' : ''} encontrado${_tickets.length != 1 ? 's' : ''}",
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      indicatorColor: Colors.white,
-                      indicatorWeight: 2.5,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white.withValues(
-                        alpha: 0.55,
-                      ),
-                      labelStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      unselectedLabelStyle: const TextStyle(fontSize: 12),
-                      tabAlignment: TabAlignment.start,
-                      dividerColor:
-                          Colors.transparent, // Quita la línea inferior
-                      tabs: _statusFilters.map((f) => Tab(text: f.$2)).toList(),
-                    ),
-                  ],
-                ),
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: true,
+              indicatorColor: Colors.white,
+              indicatorWeight: 2.5,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white.withValues(alpha: 0.55),
+              labelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
+              unselectedLabelStyle: const TextStyle(fontSize: 12),
+              tabAlignment: TabAlignment.start,
+              dividerColor: Colors.transparent,
+              tabs: _statusFilters.map((f) => Tab(text: f.$2)).toList(),
             ),
           ),
           Expanded(
@@ -431,7 +381,7 @@ class _TicketCard extends StatelessWidget {
                         : ticket.priority == 'medium'
                         ? Icons.flag_rounded
                         : Icons.info_outline_rounded,
-                    'Prioridad: ${ticket.priorityLabel}',
+                    'Urgencia: ${ticket.priorityLabel}',
                     priorityColor,
                   ),
                   Row(

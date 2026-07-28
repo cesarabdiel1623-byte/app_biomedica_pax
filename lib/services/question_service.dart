@@ -21,7 +21,9 @@ class ProductAnswer {
       id: json['id'] as String,
       answerText: json['answer_text'] as String? ?? '',
       isPublic: json['is_public'] as bool? ?? true,
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -50,7 +52,8 @@ class ProductQuestion {
   });
 
   /// Getter for backward compatibility with existing screens accessing answerText directly.
-  String? get answerText => answers.isNotEmpty ? answers.first.answerText : null;
+  String? get answerText =>
+      answers.isNotEmpty ? answers.first.answerText : null;
 
   factory ProductQuestion.fromJson(Map<String, dynamic> json) {
     final productData = json['products'] as Map<String, dynamic>?;
@@ -63,7 +66,11 @@ class ProductQuestion {
           answersList.add(ProductAnswer.fromJson(a as Map<String, dynamic>));
         }
       } else if (json['product_answers'] is Map) {
-        answersList.add(ProductAnswer.fromJson(json['product_answers'] as Map<String, dynamic>));
+        answersList.add(
+          ProductAnswer.fromJson(
+            json['product_answers'] as Map<String, dynamic>,
+          ),
+        );
       }
     }
 
@@ -74,7 +81,9 @@ class ProductQuestion {
       questionText: json['question_text'] as String,
       status: json['status'] as String? ?? 'pending',
       isPublic: json['is_public'] as bool? ?? false,
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
       product: product,
       answers: answersList,
     );
@@ -92,7 +101,9 @@ class QuestionService {
     try {
       final res = await _client
           .from('product_questions')
-          .select('*, product_answers(*), products(${ProductService.publicProductSelect})')
+          .select(
+            '*, product_answers(*), products(${ProductService.publicProductSelect})',
+          )
           .eq('client_id', clientId)
           .order('created_at', ascending: false);
 
@@ -105,18 +116,26 @@ class QuestionService {
     }
   }
 
-  static Future<List<ProductQuestion>> getProductQuestions(String productId) async {
+  static Future<List<ProductQuestion>> getProductQuestions(
+    String productId,
+  ) async {
     try {
       final res = await _client
           .from('product_questions')
-          .select('*, product_answers(*), products(${ProductService.publicProductColumns})')
+          .select(
+            '*, product_answers(*), products(${ProductService.publicProductColumns})',
+          )
           .eq('product_id', productId)
           .eq('is_public', true)
           .order('created_at', ascending: false);
 
       return (res as List)
           .map((e) => ProductQuestion.fromJson(e as Map<String, dynamic>))
-          .where((q) => (q.status == 'answered' || q.status == 'pending') && q.isPublic == true)
+          .where(
+            (q) =>
+                (q.status == 'answered' || q.status == 'pending') &&
+                q.isPublic == true,
+          )
           .toList();
     } catch (e) {
       print('Error al obtener preguntas de producto: $e');
@@ -134,18 +153,12 @@ class QuestionService {
 
     await _client.rpc(
       'submit_product_question',
-      params: {
-        'p_product_id': productId,
-        'p_question_text': trimmed,
-      },
+      params: {'p_product_id': productId, 'p_question_text': trimmed},
     );
   }
 
   /// Deletes a question by its ID.
   static Future<void> deleteQuestion(String questionId) async {
-    await _client
-        .from('product_questions')
-        .delete()
-        .eq('id', questionId);
+    await _client.from('product_questions').delete().eq('id', questionId);
   }
 }

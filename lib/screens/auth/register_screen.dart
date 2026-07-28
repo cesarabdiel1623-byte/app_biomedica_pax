@@ -39,7 +39,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // 1. Normalizar teléfono
       final normalized = phone.replaceAll(RegExp(r'[^0-9]'), '');
       if (normalized.length < 10) {
-        throw Exception('Ingresa un número de teléfono válido (mínimo 10 dígitos).');
+        throw Exception(
+          'Ingresa un número de teléfono válido (mínimo 10 dígitos).',
+        );
       }
 
       // 2. Validar teléfono contra Supabase antes de signUp (primera capa en Flutter)
@@ -48,7 +50,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Este número ya está registrado en una cuenta de la app. Inicia sesión o recupera tu cuenta.'),
+              content: Text(
+                'Este número ya está registrado en una cuenta de la app. Inicia sesión o recupera tu cuenta.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -57,7 +61,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      final fullPhone = normalized.startsWith('+') ? normalized : '+52$normalized';
+      final fullPhone = normalized.startsWith('+')
+          ? normalized
+          : '+52$normalized';
 
       await Supabase.instance.client.auth.signUp(
         email: email,
@@ -76,20 +82,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     } on AuthException catch (e) {
       String message = e.message;
-      if (e.code == 'user_already_exists' || message.toLowerCase().contains('user already exists')) {
+      if (e.code == 'user_already_exists' ||
+          message.toLowerCase().contains('user already exists')) {
         message = 'Esta dirección de correo electrónico ya está registrada.';
       } else if (message.contains('El número de teléfono ya está registrado')) {
-        message = 'Este número ya está registrado en una cuenta de la app. Inicia sesión o recupera tu cuenta.';
+        message =
+            'Este número ya está registrado en una cuenta de la app. Inicia sesión o recupera tu cuenta.';
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al registrar: $message'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error al registrar: $message'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error inesperado: ${e.toString().replaceAll('Exception: ', '')}'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(
+              'Error inesperado: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -119,7 +135,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 24, offset: const Offset(0, 8))],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,7 +149,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   const Text(
                     'Tus datos',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
@@ -137,22 +163,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Campo Nombre
                   TextField(
                     controller: _nameController,
                     decoration: InputDecoration(
                       labelText: 'Nombre Completo',
                       prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: _primaryColor, width: 2),
+                        borderSide: const BorderSide(
+                          color: _primaryColor,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Campo Email
                   TextField(
                     controller: _emailController,
@@ -160,10 +191,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     decoration: InputDecoration(
                       labelText: 'Correo Electrónico',
                       prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: _primaryColor, width: 2),
+                        borderSide: const BorderSide(
+                          color: _primaryColor,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
@@ -176,15 +212,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     decoration: InputDecoration(
                       labelText: 'Número de Teléfono',
                       prefixIcon: const Icon(Icons.phone_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: _primaryColor, width: 2),
+                        borderSide: const BorderSide(
+                          color: _primaryColor,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Campo Password
                   TextField(
                     controller: _passwordController,
@@ -193,18 +234,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       labelText: 'Crear contraseña',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
                       ),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: _primaryColor, width: 2),
+                        borderSide: const BorderSide(
+                          color: _primaryColor,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 32),
-                  
+
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
@@ -212,12 +264,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _primaryColor,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         elevation: 0,
                       ),
                       child: _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Registrarse', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : const Text(
+                              'Registrarse',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                 ],

@@ -6,6 +6,10 @@ import '../utils/ui_helpers.dart';
 
 class TicketService {
   static final _db = Supabase.instance.client;
+  static const _attachmentBucket = 'ticket-attachments';
+  static const _storageReferencePrefix = 'storage://';
+  static const _maxVideoBytes = 40 * 1024 * 1024;
+  static const _allowedVideoExtensions = {'mp4', 'mov', 'm4v', 'webm'};
 
   // Solo join a 'clients' (columnas confirmadas). El join a equipment_units
   // se omite porque las columnas varían según el schema.
@@ -74,9 +78,15 @@ class TicketService {
         .eq('is_internal', false)
         .order('created_at', ascending: true);
 
-    return (res as List)
-        .map((e) => TicketMessage.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return Future.wait(
+      (res as List).map((entry) async {
+        final json = Map<String, dynamic>.from(entry as Map);
+        json['attachment_url'] = await resolveAttachmentUrl(
+          json['attachment_url'] as String?,
+        );
+        return TicketMessage.fromJson(json);
+      }),
+    );
   }
 
   /// Enviar un mensaje de chat desde la app móvil (siempre sender_type = 'client')
@@ -86,10 +96,8 @@ class TicketService {
     String? attachmentUrl,
   }) async {
     final userId = _db.auth.currentUser?.id;
-    final trustedAttachmentUrl = UiHelpers.sanitizeTrustedRemoteUrl(
-      attachmentUrl,
-    );
-    if (attachmentUrl != null && trustedAttachmentUrl == null) {
+    final normalizedAttachment = _normalizeAttachmentReference(attachmentUrl);
+    if (attachmentUrl != null && normalizedAttachment == null) {
       throw Exception('URL de adjunto no permitida.');
     }
     await _db.from('service_ticket_messages').insert({
@@ -97,30 +105,120 @@ class TicketService {
       'sender_type': 'client',
       'sender_profile_id': userId,
       'message': message,
-      'attachment_url': trustedAttachmentUrl,
+      'attachment_url': normalizedAttachment,
       'is_internal': false,
     });
   }
 
-  /// Subir archivo adjunto de chat a Supabase Storage y retornar su URL pública
+  /// Sube una imagen y retorna una referencia interna para generar URL firmada.
   static Future<String> uploadChatAttachment(
     String ticketId,
     String fileName,
     Uint8List bytes,
   ) async {
     UiHelpers.validateImageUpload(bytes, fileName);
+    return uploadTicketAttachment(
+      ticketId: ticketId,
+      fileName: fileName,
+      bytes: bytes,
+      contentType: _imageContentType(fileName),
+      isVideo: false,
+    );
+  }
+
+  static Future<String> uploadTicketAttachment({
+    required String ticketId,
+    required String fileName,
+    required Uint8List bytes,
+    required String contentType,
+    required bool isVideo,
+  }) async {
+    if (isVideo) {
+      _validateVideoUpload(bytes, fileName);
+    } else {
+      UiHelpers.validateImageUpload(bytes, fileName);
+    }
+
     final cleanName = UiHelpers.sanitizeStorageFileName(fileName);
-    final cleanFileName = '${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+    final cleanFileName = '${DateTime.now().microsecondsSinceEpoch}_$cleanName';
     final path = '$ticketId/$cleanFileName';
 
-    await _db.storage.from('ticket-attachments').uploadBinary(path, bytes);
+    await _db.storage
+        .from(_attachmentBucket)
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: contentType, upsert: false),
+        );
 
-    final url = _db.storage.from('ticket-attachments').getPublicUrl(path);
-    final trustedUrl = UiHelpers.sanitizeTrustedRemoteUrl(url);
-    if (trustedUrl == null) {
-      throw Exception('No se pudo generar una URL segura para el adjunto.');
+    return '$_storageReferencePrefix$_attachmentBucket/$path';
+  }
+
+  static Future<String?> resolveAttachmentUrl(String? reference) async {
+    if (reference == null || reference.trim().isEmpty) return null;
+    final value = reference.trim();
+    final trustedUrl = UiHelpers.sanitizeTrustedRemoteUrl(value);
+    if (trustedUrl != null) return trustedUrl;
+
+    final storageReference = _parseStorageReference(value);
+    if (storageReference == null) return null;
+
+    try {
+      return await _db.storage
+          .from(storageReference.bucket)
+          .createSignedUrl(storageReference.path, 60 * 60);
+    } catch (_) {
+      return null;
     }
-    return trustedUrl;
+  }
+
+  static String? _normalizeAttachmentReference(String? reference) {
+    if (reference == null) return null;
+    final value = reference.trim();
+    if (value.isEmpty) return null;
+
+    if (_parseStorageReference(value) != null) return value;
+    return UiHelpers.sanitizeTrustedRemoteUrl(value);
+  }
+
+  static _StorageAttachment? _parseStorageReference(String reference) {
+    final uri = Uri.tryParse(reference);
+    if (uri == null ||
+        uri.scheme != 'storage' ||
+        uri.host != _attachmentBucket) {
+      return null;
+    }
+
+    final path = uri.path.replaceFirst(RegExp(r'^/+'), '');
+    if (path.isEmpty || path.contains('..')) return null;
+    return _StorageAttachment(bucket: uri.host, path: path);
+  }
+
+  static void _validateVideoUpload(Uint8List bytes, String fileName) {
+    if (bytes.isEmpty) {
+      throw Exception('El video está vacío.');
+    }
+    if (bytes.length > _maxVideoBytes) {
+      throw Exception('El video excede 40 MB.');
+    }
+
+    final cleanName = UiHelpers.sanitizeStorageFileName(fileName);
+    final dotIndex = cleanName.lastIndexOf('.');
+    if (dotIndex <= 0 || dotIndex == cleanName.length - 1) {
+      throw Exception('El video debe tener una extensión válida.');
+    }
+    final extension = cleanName.substring(dotIndex + 1).toLowerCase();
+    if (!_allowedVideoExtensions.contains(extension)) {
+      throw Exception('Formato de video no permitido.');
+    }
+  }
+
+  static String _imageContentType(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.heic')) return 'image/heic';
+    return 'image/jpeg';
   }
 
   /// Marcar todos los mensajes del soporte como leídos (implica entregados)
@@ -157,4 +255,11 @@ class TicketService {
       // Ignorar errores silenciosamente
     }
   }
+}
+
+class _StorageAttachment {
+  final String bucket;
+  final String path;
+
+  const _StorageAttachment({required this.bucket, required this.path});
 }

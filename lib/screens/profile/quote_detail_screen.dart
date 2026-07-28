@@ -53,7 +53,9 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
     try {
       final response = await Supabase.instance.client
           .from('quote_items')
-          .select('*, products(brand, product_media(${ProductService.publicMediaColumns}))')
+          .select(
+            '*, products(brand, product_media(${ProductService.publicMediaColumns}))',
+          )
           .eq('quote_id', widget.quote['id']);
       if (mounted) {
         setState(() {
@@ -73,25 +75,37 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
 
   String _statusLabel(String status) {
     switch (status) {
-      case 'draft': return 'Borrador';
-      case 'sent': return 'Enviado';
-      case 'approved': return 'Aprobado';
-      case 'rejected': return 'Rechazado';
-      case 'expired': return 'Vencido';
-      case 'converted': return 'Convertido';
-      default: return status;
+      case 'draft':
+        return 'Borrador';
+      case 'sent':
+        return 'Enviado';
+      case 'approved':
+        return 'Aprobado';
+      case 'rejected':
+        return 'Rechazado';
+      case 'expired':
+        return 'Vencido';
+      case 'converted':
+        return 'Convertido';
+      default:
+        return status;
     }
   }
 
   Color _statusColor(String status) {
     switch (status) {
       case 'approved':
-      case 'converted': return kGreen;
-      case 'sent': return const Color(0xFF0284C7);
-      case 'draft': return Colors.grey;
+      case 'converted':
+        return kGreen;
+      case 'sent':
+        return const Color(0xFF0284C7);
+      case 'draft':
+        return Colors.grey;
       case 'rejected':
-      case 'expired': return kRed;
-      default: return Colors.grey;
+      case 'expired':
+        return kRed;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -102,16 +116,23 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
     final subtotal = (q['subtotal'] as num?)?.toDouble() ?? 0.0;
     final tax = (q['tax'] as num?)?.toDouble() ?? 0.0;
     final date = DateTime.tryParse(q['created_at'] ?? '')?.toLocal();
-    final dateStr = date != null ? '${date.day}/${date.month}/${date.year}' : '-';
-    
+    final dateStr = date != null
+        ? '${date.day}/${date.month}/${date.year}'
+        : '-';
+
     final validDate = DateTime.tryParse(q['valid_until'] ?? '')?.toLocal();
-    final validStr = validDate != null ? '${validDate.day}/${validDate.month}/${validDate.year}' : '15 días a partir de la creación';
+    final validStr = validDate != null
+        ? '${validDate.day}/${validDate.month}/${validDate.year}'
+        : '15 días a partir de la creación';
     final effectiveStatus = getEffectiveStatus(q);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(q['quote_number'] ?? 'Detalle de Cotización', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: Text(
+          q['quote_number'] ?? 'Detalle de Cotización',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: kPrimary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -149,9 +170,14 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: _statusColor(effectiveStatus).withValues(alpha: 0.12),
+                          color: _statusColor(
+                            effectiveStatus,
+                          ).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -189,22 +215,37 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey.shade600),
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 14,
+                            color: Colors.grey.shade600,
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             'Fecha de Emisión: $dateStr',
-                            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Colors.grey.shade700,
+                            ),
                           ),
                         ],
                       ),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.event_busy_outlined, size: 14, color: kRed.withValues(alpha: 0.8)),
+                          Icon(
+                            Icons.event_busy_outlined,
+                            size: 14,
+                            color: kRed.withValues(alpha: 0.8),
+                          ),
                           const SizedBox(width: 6),
                           Text(
                             'Válida hasta: $validStr',
-                            style: TextStyle(fontSize: 12.5, color: kRed, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: kRed,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
                       ),
@@ -254,17 +295,18 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.grey.shade200,
-                    width: 1,
-                  ),
+                  border: Border.all(color: Colors.grey.shade200, width: 1),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.notes_outlined, color: kNavy, size: 18),
+                        const Icon(
+                          Icons.notes_outlined,
+                          color: kNavy,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Notas / Instrucciones del Cliente',
@@ -278,10 +320,15 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      q['notes'] != null && q['notes'].toString().trim().isNotEmpty
+                      q['notes'] != null &&
+                              q['notes'].toString().trim().isNotEmpty
                           ? q['notes']
                           : 'Sin observaciones adicionales.',
-                      style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.45),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black87,
+                        height: 1.45,
+                      ),
                     ),
                   ],
                 ),
@@ -303,79 +350,139 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
             ),
 
             _loading
-                ? const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(color: kPrimary)))
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: CircularProgressIndicator(color: kPrimary),
+                    ),
+                  )
                 : _error != null
-                    ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('Error al cargar productos: $_error')))
-                    : _items.isEmpty
-                        ? const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No hay productos vinculados.')))
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: _items.length,
-                            itemBuilder: (ctx, i) {
-                              final item = _items[i];
-                              final p = item['products'] as Map?;
-                              String? img;
-                              if (p != null) {
-                                final media = p['product_media'] as List?;
-                                if (media != null && media.isNotEmpty) {
-                                  final primary = media.firstWhere(
-                                    (m) => m['is_primary'] == true,
-                                    orElse: () => media.first,
-                                  );
-                                  img = primary['file_path'] as String?;
-                                }
-                              }
-                              final qty = (item['quantity'] as num?)?.toInt() ?? 1;
-                              final price = (item['unit_price'] as num?)?.toDouble() ?? 0.0;
-                              final subtotalLine = (item['total_line_price'] as num?)?.toDouble() ?? (qty * price);
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text('Error al cargar productos: $_error'),
+                    ),
+                  )
+                : _items.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('No hay productos vinculados.'),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _items.length,
+                    itemBuilder: (ctx, i) {
+                      final item = _items[i];
+                      final p = item['products'] as Map?;
+                      String? img;
+                      if (p != null) {
+                        final media = p['product_media'] as List?;
+                        if (media != null && media.isNotEmpty) {
+                          final primary = media.firstWhere(
+                            (m) => m['is_primary'] == true,
+                            orElse: () => media.first,
+                          );
+                          img = primary['file_path'] as String?;
+                        }
+                      }
+                      final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+                      final price =
+                          (item['unit_price'] as num?)?.toDouble() ?? 0.0;
+                      final subtotalLine =
+                          (item['total_line_price'] as num?)?.toDouble() ??
+                          (qty * price);
 
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.grey.shade200, width: 1),
-                                ),
-                                child: Row(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: img != null
-                                          ? Image.network(
-                                              img,
-                                              width: 60,
-                                              height: 60,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, _, _) => Container(width: 60, height: 60, color: Colors.grey.shade100, child: const Icon(Icons.broken_image, size: 24, color: Colors.grey)),
-                                            )
-                                          : Container(
-                                              width: 60,
-                                              height: 60,
-                                              decoration: BoxDecoration(color: kPrimary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
-                                              child: const Icon(Icons.medical_services, color: kPrimary, size: 24),
-                                            ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(item['product_name_snapshot'] ?? 'Producto biomédico', style: const TextStyle(fontWeight: FontWeight.bold, color: kNavy, fontSize: 13.5), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                          const SizedBox(height: 4),
-                                          Text('Cantidad: $qty x ${formatCurrency(price)}', style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
-                                        ],
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade200,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: img != null
+                                  ? Image.network(
+                                      img,
+                                      width: 60,
+                                      height: 60,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, _, _) => Container(
+                                        width: 60,
+                                        height: 60,
+                                        color: Colors.grey.shade100,
+                                        child: const Icon(
+                                          Icons.broken_image,
+                                          size: 24,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      width: 60,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        color: kPrimary.withValues(alpha: 0.08),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.medical_services,
+                                        color: kPrimary,
+                                        size: 24,
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Text(formatCurrency(subtotalLine), style: const TextStyle(fontWeight: FontWeight.bold, color: kNavy, fontSize: 14)),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item['product_name_snapshot'] ??
+                                        'Producto biomédico',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: kNavy,
+                                      fontSize: 13.5,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Cantidad: $qty x ${formatCurrency(price)}',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              formatCurrency(subtotalLine),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: kNavy,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
             const SizedBox(height: 16),
 
             Padding(
@@ -390,13 +497,28 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Resumen de Totales', style: TextStyle(fontWeight: FontWeight.bold, color: kNavy, fontSize: 14)),
+                    const Text(
+                      'Resumen de Totales',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: kNavy,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     _summaryRow('Subtotal', formatCurrency(subtotal)),
                     const SizedBox(height: 8),
                     _summaryRow('IVA (16%)', formatCurrency(tax)),
-                    const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1, thickness: 1)),
-                    _summaryRow('Total Cotizado', formatCurrency(total), bold: true, size: 16.5),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Divider(height: 1, thickness: 1),
+                    ),
+                    _summaryRow(
+                      'Total Cotizado',
+                      formatCurrency(total),
+                      bold: true,
+                      size: 16.5,
+                    ),
                   ],
                 ),
               ),
@@ -441,7 +563,11 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
-                  BoxShadow(color: Colors.black12.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, -4)),
+                  BoxShadow(
+                    color: Colors.black12.withValues(alpha: 0.06),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
                 ],
               ),
               child: SizedBox(
@@ -451,7 +577,9 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kPrimary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     elevation: 0,
                   ),
                   onPressed: _requestingFollowUp ? null : _requestQuoteFollowUp,
@@ -459,11 +587,17 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
                       ? const SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Colors.white), strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Text(
                           'Solicitar Seguimiento',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                 ),
               ),
@@ -472,12 +606,31 @@ class _QuoteDetailScreenState extends State<QuoteDetailScreen> {
     );
   }
 
-  Widget _summaryRow(String label, String value, {bool bold = false, double size = 13}) {
+  Widget _summaryRow(
+    String label,
+    String value, {
+    bool bold = false,
+    double size = 13,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(fontSize: size, color: bold ? kNavy : Colors.grey.shade600, fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
-        Text(value, style: TextStyle(fontSize: size, color: bold ? kPrimary : kNavy, fontWeight: bold ? FontWeight.bold : FontWeight.w500)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: size,
+            color: bold ? kNavy : Colors.grey.shade600,
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: size,
+            color: bold ? kPrimary : kNavy,
+            fontWeight: bold ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
       ],
     );
   }

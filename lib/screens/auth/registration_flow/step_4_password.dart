@@ -25,7 +25,8 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
   bool get _hasLetterAndNumber =>
       RegExp(r'[a-zA-Z]').hasMatch(_passwordController.text) &&
       RegExp(r'[0-9]').hasMatch(_passwordController.text);
-  bool get _hasSymbol => RegExp(r'[!@#\$%\^&\*\?\-_\.,:;]').hasMatch(_passwordController.text);
+  bool get _hasSymbol =>
+      RegExp(r'[!@#\$%\^&\*\?\-_\.,:;]').hasMatch(_passwordController.text);
   bool get _noName {
     final pw = _passwordController.text.toLowerCase();
     final parts = widget.userName.toLowerCase().split(' ');
@@ -34,18 +35,38 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
     }
     return true;
   }
+
   bool get _noSequence {
     final pw = _passwordController.text.toLowerCase();
-    const sequences = ['1234', '2345', '3456', '4567', '5678', '6789', 'abcd', 'bcde', 'cdef', 'qwer', 'asdf'];
+    const sequences = [
+      '1234',
+      '2345',
+      '3456',
+      '4567',
+      '5678',
+      '6789',
+      'abcd',
+      'bcde',
+      'cdef',
+      'qwer',
+      'asdf',
+    ];
     for (final seq in sequences) {
       if (pw.contains(seq)) return false;
     }
     return true;
   }
+
   bool get _passwordsMatch =>
       _confirmController.text.isNotEmpty &&
       _passwordController.text == _confirmController.text;
-  bool get _allValid => _hasMinLength && _hasLetterAndNumber && _hasSymbol && _noName && _noSequence && _passwordsMatch;
+  bool get _allValid =>
+      _hasMinLength &&
+      _hasLetterAndNumber &&
+      _hasSymbol &&
+      _noName &&
+      _noSequence &&
+      _passwordsMatch;
 
   Future<void> _savePassword() async {
     if (!_allValid) return;
@@ -63,7 +84,10 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red.shade600),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red.shade600,
+          ),
         );
       }
       if (mounted) setState(() => _isLoading = false);
@@ -108,7 +132,10 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
     return Theme(
       data: ThemeData(
         brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: _primaryColor, brightness: Brightness.light),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _primaryColor,
+          brightness: Brightness.light,
+        ),
         scaffoldBackgroundColor: _greyBg,
       ),
       child: Scaffold(
@@ -121,11 +148,22 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.black87,
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     const Expanded(
-                      child: Text('Crear Contraseña', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
+                      child: Text(
+                        'Crear Contraseña',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                     const SizedBox(width: 48),
                   ],
@@ -142,9 +180,17 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 24, offset: const Offset(0, 8))],
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                        child: _passwordSaved ? _buildSuccessView() : _buildPasswordForm(),
+                        child: _passwordSaved
+                            ? _buildSuccessView()
+                            : _buildPasswordForm(),
                       ),
                     ),
                   ),
@@ -163,14 +209,22 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 64, height: 64,
-          decoration: BoxDecoration(color: _primaryColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: _primaryColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
           child: const Icon(Icons.lock_outline, color: _primaryColor, size: 32),
         ),
         const SizedBox(height: 24),
         const Text(
           'Crea tu contraseña',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
@@ -190,7 +244,12 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
             labelText: 'Ingresa tu contraseña',
             prefixIcon: const Icon(Icons.lock_outline, color: _primaryColor),
             suffixIcon: IconButton(
-              icon: Icon(_obscure1 ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.grey),
+              icon: Icon(
+                _obscure1
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                color: Colors.grey,
+              ),
               onPressed: () => setState(() => _obscure1 = !_obscure1),
             ),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -212,7 +271,10 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildRule('Mínimo 8 caracteres con letras y números', _hasMinLength && _hasLetterAndNumber),
+              _buildRule(
+                'Mínimo 8 caracteres con letras y números',
+                _hasMinLength && _hasLetterAndNumber,
+              ),
               _buildRule('Mínimo 1 signo o símbolo (?-!*\$#)', _hasSymbol),
               _buildRule('No incluyas tu nombre o apellido', _noName),
               _buildRule('Sin secuencias como 1234 o ABCD', _noSequence),
@@ -233,7 +295,12 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
               color: _passwordsMatch ? _primaryColor : Colors.grey,
             ),
             suffixIcon: IconButton(
-              icon: Icon(_obscure2 ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.grey),
+              icon: Icon(
+                _obscure2
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+                color: Colors.grey,
+              ),
               onPressed: () => setState(() => _obscure2 = !_obscure2),
             ),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -255,11 +322,23 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
               disabledBackgroundColor: Colors.grey.shade300,
               disabledForegroundColor: Colors.grey.shade500,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
             ),
             child: _isLoading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Text('Crear contraseña', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Crear contraseña',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
           ),
         ),
       ],
@@ -272,14 +351,22 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 80, height: 80,
-          decoration: BoxDecoration(color: _primaryColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: _primaryColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
           child: const Icon(Icons.check_circle, color: _primaryColor, size: 48),
         ),
         const SizedBox(height: 24),
         const Text(
           'Creaste tu contraseña',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 12),
@@ -297,9 +384,14 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
               backgroundColor: _primaryColor,
               foregroundColor: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
             ),
-            child: const Text('Continuar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Continuar',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
       ],

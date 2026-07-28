@@ -3,7 +3,6 @@ import '../models/product.dart';
 import 'product_service.dart';
 import 'quote_service.dart';
 
-
 /// Cart item model combining cart_items data with product info
 class CartItem {
   final String id;
@@ -107,7 +106,7 @@ class CartService {
 
     // 2. Si no tiene client_id o el cliente no existe, buscamos por correo normalizado
     String? clientIdToLink = linkedClientId;
-    
+
     if (email.isNotEmpty) {
       try {
         final existingClient = await _client
@@ -115,15 +114,18 @@ class CartService {
             .select('id')
             .eq('email', email)
             .maybeSingle();
-            
+
         if (existingClient != null) {
           clientIdToLink = existingClient['id'] as String;
           // Actualizar acceso a la app del cliente existente
-          await _client.from('clients').update({
-            'has_app_access': true,
-            'app_registered_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          }).eq('id', clientIdToLink);
+          await _client
+              .from('clients')
+              .update({
+                'has_app_access': true,
+                'app_registered_at': DateTime.now().toIso8601String(),
+                'updated_at': DateTime.now().toIso8601String(),
+              })
+              .eq('id', clientIdToLink);
         }
       } catch (_) {
         // Ignorar error al buscar cliente existente
@@ -132,29 +134,34 @@ class CartService {
 
     // 3. Si no se encontró cliente por correo, creamos uno nuevo
     if (clientIdToLink == null || clientIdToLink.isEmpty) {
-      final name = user.userMetadata?['full_name'] as String? ??
+      final name =
+          user.userMetadata?['full_name'] as String? ??
           user.userMetadata?['name'] as String? ??
           email;
       final phone = user.phone ?? '';
 
       try {
         // Insertamos un nuevo cliente y dejamos que la base genere el UUID
-        final newClient = await _client.from('clients').insert({
-          'client_type': 'otro',
-          'status': 'active',
-          'business_name': name.isNotEmpty ? name : email,
-          'contact_name': name,
-          'email': email,
-          'phone': phone,
-          'is_active': true,
-          'preferred_currency': 'MXN',
-          'country': 'México',
-          'source': 'mobile_app',
-          'has_app_access': true,
-          'profile_completed': false,
-          'app_registered_at': DateTime.now().toIso8601String(),
-        }).select('id').single();
-        
+        final newClient = await _client
+            .from('clients')
+            .insert({
+              'client_type': 'otro',
+              'status': 'active',
+              'business_name': name.isNotEmpty ? name : email,
+              'contact_name': name,
+              'email': email,
+              'phone': phone,
+              'is_active': true,
+              'preferred_currency': 'MXN',
+              'country': 'México',
+              'source': 'mobile_app',
+              'has_app_access': true,
+              'profile_completed': false,
+              'app_registered_at': DateTime.now().toIso8601String(),
+            })
+            .select('id')
+            .single();
+
         clientIdToLink = newClient['id'] as String;
       } catch (e) {
         // En caso de que se haya insertado en paralelo o haya restricción unique, re-buscamos por email
@@ -175,7 +182,8 @@ class CartService {
     }
 
     // 4. Crear o actualizar el perfil vinculándolo con el clientIdToLink
-    final fullName = user.userMetadata?['full_name'] as String? ??
+    final fullName =
+        user.userMetadata?['full_name'] as String? ??
         user.userMetadata?['name'] as String? ??
         'Sin especificar';
     final phone = user.phone ?? '';
@@ -231,7 +239,10 @@ class CartService {
             'client_id': clientId,
             'status': 'active',
             'source': 'mobile_app',
-            'lead_name': profile?['full_name'] ?? _client.auth.currentUser?.email ?? 'Cliente',
+            'lead_name':
+                profile?['full_name'] ??
+                _client.auth.currentUser?.email ??
+                'Cliente',
             'lead_email': profile?['email'] ?? _client.auth.currentUser?.email,
             'lead_phone': profile?['phone'],
           })
@@ -278,7 +289,9 @@ class CartService {
     final cartItems = <CartItem>[];
     _cartQuantitiesLocalCache.clear();
     for (final item in items as List) {
-      final product = await ProductService.getProductById(item['product_id'] as String);
+      final product = await ProductService.getProductById(
+        item['product_id'] as String,
+      );
       final cartItem = CartItem(
         id: item['id'] as String,
         cartId: item['cart_id'] as String,
@@ -322,7 +335,9 @@ class CartService {
 
       if (existing != null) {
         final newQty = _toInt(existing['quantity']) + quantity;
-        if (product != null && product.stock != null && newQty > product.stock!) {
+        if (product != null &&
+            product.stock != null &&
+            newQty > product.stock!) {
           throw Exception('stock_limit_reached:${product.stock}');
         }
         // Increment quantity
@@ -332,22 +347,22 @@ class CartService {
             .eq('id', existing['id']);
         _cartQuantitiesLocalCache[productId] = newQty;
       } else {
-        if (product != null && product.stock != null && quantity > product.stock!) {
+        if (product != null &&
+            product.stock != null &&
+            quantity > product.stock!) {
           throw Exception('stock_limit_reached:${product.stock}');
         }
         // Insert new item
         try {
-          await _client
-              .from('cart_items')
-              .insert({
-                'cart_id': cartId,
-                'product_id': productId,
-                'quantity': quantity,
-                'unit_price': product?.unitPriceMxn ?? 0.0,
-                'product_name_snapshot': product?.name ?? 'Producto',
-                'sku_snapshot': product?.sku,
-                'product_category_snapshot': product?.category,
-              });
+          await _client.from('cart_items').insert({
+            'cart_id': cartId,
+            'product_id': productId,
+            'quantity': quantity,
+            'unit_price': product?.unitPriceMxn ?? 0.0,
+            'product_name_snapshot': product?.name ?? 'Producto',
+            'sku_snapshot': product?.sku,
+            'product_category_snapshot': product?.category,
+          });
           _cartQuantitiesLocalCache[productId] = quantity;
         } catch (e) {
           // If concurrent insert occurred, update the existing item instead
@@ -359,7 +374,9 @@ class CartService {
               .maybeSingle();
           if (retry != null) {
             final newQty = _toInt(retry['quantity']) + quantity;
-            if (product != null && product.stock != null && newQty > product.stock!) {
+            if (product != null &&
+                product.stock != null &&
+                newQty > product.stock!) {
               throw Exception('stock_limit_reached:${product.stock}');
             }
             await _client
@@ -397,7 +414,9 @@ class CartService {
       final product = await ProductService.getProductById(productId);
       if (product != null && product.stock != null) {
         if (quantity > product.stock!) {
-          throw Exception('No puedes exceder el stock disponible de ${product.stock} unidades');
+          throw Exception(
+            'No puedes exceder el stock disponible de ${product.stock} unidades',
+          );
         }
       }
     }
@@ -425,10 +444,7 @@ class CartService {
         _cartQuantitiesLocalCache.remove(productId);
       }
     } catch (_) {}
-    await _client
-        .from('cart_items')
-        .delete()
-        .eq('id', cartItemId);
+    await _client.from('cart_items').delete().eq('id', cartItemId);
   }
 
   /// Remove product from cart by product ID
@@ -456,32 +472,6 @@ class CartService {
         .eq('product_id', productId);
   }
 
-  /// Checkout the active cart and return the generated order ID
-  static Future<String> checkout({String paymentMethod = 'other', String notes = ''}) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw Exception('No autenticado');
-
-    final clientId = await _getClientId(userId);
-
-    final cartData = await _client
-        .from('carts')
-        .select('id')
-        .eq('client_id', clientId)
-        .eq('status', 'active')
-        .maybeSingle();
-
-    if (cartData == null) throw Exception('No tienes un carrito activo');
-    final cartId = cartData['id'] as String;
-
-    final orderId = await _client.rpc('process_cart_checkout', params: {
-      'p_cart_id': cartId,
-      'p_payment_method': paymentMethod,
-      'p_notes': notes,
-    });
-
-    return orderId as String;
-  }
-
   /// Request a quote for the active cart and return the generated quote ID
   static Future<String> requestQuote({String notes = ''}) async {
     final userId = _client.auth.currentUser?.id;
@@ -499,10 +489,10 @@ class CartService {
     if (cartData == null) throw Exception('No tienes un carrito activo');
     final cartId = cartData['id'] as String;
 
-    final quoteId = await _client.rpc('process_cart_quote', params: {
-      'p_cart_id': cartId,
-      'p_notes': notes,
-    });
+    final quoteId = await _client.rpc(
+      'process_cart_quote',
+      params: {'p_cart_id': cartId, 'p_notes': notes},
+    );
 
     return quoteId as String;
   }
@@ -515,9 +505,10 @@ class CartService {
 
     try {
       // 1. Try invoking the RPC function (most secure and accurate, bypasses RLS)
-      final bool exists = await _client.rpc('check_phone_exists', params: {
-        'p_phone': normalized,
-      });
+      final bool exists = await _client.rpc(
+        'check_phone_exists',
+        params: {'p_phone': normalized},
+      );
       return exists;
     } catch (e) {
       // 2. Fallback to direct query if RPC doesn't exist yet

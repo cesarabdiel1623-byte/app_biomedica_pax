@@ -70,12 +70,10 @@ class FavoriteService {
           .eq('id', existing['id'] as String);
       return false;
     } else {
-      await _client
-          .from('client_favorites')
-          .insert({
-            'client_id': clientId,
-            'product_id': productId,
-          });
+      await _client.from('client_favorites').insert({
+        'client_id': clientId,
+        'product_id': productId,
+      });
       return true;
     }
   }

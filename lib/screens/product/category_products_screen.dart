@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../product/product_detail_screen.dart';
@@ -12,15 +11,21 @@ const _kGreen = Color(0xFF16A34A);
 const _kRed = Color(0xFFEF4444);
 
 class CategoryProductsScreen extends StatefulWidget {
+  final String categoryId;
   final String categoryKey;
   final String categoryLabel;
   final String subcategoryLabel;
+  final String? subcategoryId;
+  final String? subcategoryKey;
 
   const CategoryProductsScreen({
     super.key,
+    required this.categoryId,
     required this.categoryKey,
     required this.categoryLabel,
     required this.subcategoryLabel,
+    this.subcategoryId,
+    this.subcategoryKey,
   });
 
   @override
@@ -32,140 +37,13 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
   bool _loading = true;
   String? _error;
 
+  bool get _isSubcategoryView =>
+      widget.subcategoryId?.trim().isNotEmpty == true;
+
   @override
   void initState() {
     super.initState();
     _loadProducts();
-  }
-
-  // Mapea la categoría de la UI al enum de la base de datos
-  String get _dbCategoryKey {
-    switch (widget.categoryKey) {
-      case 'veterinaria':
-        return 'ultrasonido_veterinario';
-      default:
-        return widget.categoryKey;
-    }
-  }
-
-  // Mapea la subcategoría de la UI al valor esperado en base de datos
-  String get _dbSubcategoryKey {
-    final sub = widget.subcategoryLabel.toLowerCase().trim();
-    if (sub.contains('ultrasonido')) {
-      return 'ultrasonido';
-    }
-    if (sub.contains('rayos x')) {
-      return 'rayos_x';
-    }
-    if (sub.contains('monitores')) {
-      return 'monitores';
-    }
-    if (sub.contains('ecg')) {
-      return 'ecg';
-    }
-    if (sub.contains('soporte vida') || sub.contains('soporte de vida')) {
-      return 'soporte_vida';
-    }
-    if (sub.contains('pacs')) {
-      return 'pacs';
-    }
-    if (sub.contains('quirúrgico') || sub.contains('quirurgico')) {
-      return 'quirurgico';
-    }
-    if (sub.contains('rehabilitación') || sub.contains('rehabilitacion')) {
-      return 'rehabilitacion';
-    }
-    if (sub.contains('oftalmología') || sub.contains('oftalmologia')) {
-      return 'oftalmologia';
-    }
-    if (sub.contains('portátil') || sub.contains('portatil')) {
-      return 'portatil';
-    }
-    if (sub.contains('convexo')) {
-      return 'convexo';
-    }
-    if (sub.contains('doppler')) {
-      return 'doppler_color';
-    }
-    if (sub.contains('veterinario')) {
-      return 'veterinario';
-    }
-    if (sub.contains('monitor vet')) {
-      return 'monitor_vet';
-    }
-    if (sub.contains('usg vet')) {
-      return 'usg_vet';
-    }
-    if (sub.contains('anestesia')) {
-      return 'anestesia';
-    }
-    if (sub.contains('dental')) {
-      return 'dental_vet';
-    }
-    if (sub.contains('química') || sub.contains('quimica')) {
-      return 'quimica_clinica';
-    }
-    if (sub.contains('hematología') || sub.contains('hematologia')) {
-      return 'hematologia';
-    }
-    if (sub.contains('urianálisis') || sub.contains('urianalisis')) {
-      return 'urianalisis';
-    }
-    if (sub.contains('microscopía') || sub.contains('microscopia')) {
-      return 'microscopia';
-    }
-    if (sub.contains('centrífugas') || sub.contains('centrifugas')) {
-      return 'centrifugas';
-    }
-    if (sub.contains('gel')) {
-      return 'gel';
-    }
-    if (sub.contains('papel')) {
-      return 'papel_termico';
-    }
-    if (sub.contains('electrodo')) {
-      return 'electrodos';
-    }
-    if (sub.contains('guante')) {
-      return 'guantes';
-    }
-    if (sub.contains('foley') || sub.contains('sonda')) {
-      return 'sondas_foley';
-    }
-    if (sub.contains('transductor') || sub.contains('sonda')) {
-      return 'sondas';
-    }
-    if (sub.contains('cable')) {
-      return 'cables_ecg';
-    }
-    if (sub.contains('pantalla')) {
-      return 'pantallas';
-    }
-    if (sub.contains('batería') || sub.contains('bateria')) {
-      return 'baterias';
-    }
-    if (sub.contains('fuente')) {
-      return 'fuentes_poder';
-    }
-    if (sub.contains('preventivo')) {
-      return 'preventivo';
-    }
-    if (sub.contains('correctivo')) {
-      return 'correctivo';
-    }
-    if (sub.contains('calibración') || sub.contains('calibracion')) {
-      return 'calibracion';
-    }
-    if (sub.contains('instalación') || sub.contains('instalacion')) {
-      return 'instalacion';
-    }
-    if (sub.contains('capacitación') || sub.contains('capacitacion')) {
-      return 'capacitacion';
-    }
-    if (sub.contains('garantía') || sub.contains('garantia')) {
-      return 'garantia';
-    }
-    return sub;
   }
 
   Future<void> _loadProducts() async {
@@ -175,68 +53,21 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
     });
 
     try {
-      final dbCategory = _dbCategoryKey;
-      final dbSubcategory = _dbSubcategoryKey;
+      final subcategoryId = widget.subcategoryId;
+      final List<Product> list;
 
-      // 1. Intentar obtener productos con la categoría y subcategoría exactas
-      final client = Supabase.instance.client;
-      final response = await client
-          .from('products')
-          .select(ProductService.publicProductSelect)
-          .eq('is_active', true)
-          .eq('category', dbCategory)
-          .eq('subcategory', dbSubcategory)
-          .order('name');
-
-      var list = (response as List)
-          .map((json) => Product.fromJson(json))
-          .toList();
-
-      // 2. Si no arroja resultados, buscar todos los de la categoría y filtrar por palabras clave
-      if (list.isEmpty) {
-        final allCatProducts = await ProductService.getAllProducts(
-          category: dbCategory,
+      if (subcategoryId == null || subcategoryId.isEmpty) {
+        list = await ProductService.getProductsByCatalogCategory(
+          categoryId: widget.categoryId,
+          legacyCategory: widget.categoryKey,
         );
-        final keyword = widget.subcategoryLabel.toLowerCase().trim();
-
-        list = allCatProducts.where((p) {
-          final name = p.name.toLowerCase();
-          final desc = (p.description ?? '').toLowerCase();
-          final sub = (p.subcategory ?? '').toLowerCase();
-
-          // Palabras clave específicas según la subcategoría
-          if (keyword == 'ultrasonido') {
-            return name.contains('ultrasonido') ||
-                name.contains('ecógrafo') ||
-                name.contains('usg');
-          } else if (keyword == 'pacs nube' || keyword == 'pacs') {
-            return name.contains('pacs') ||
-                name.contains('cloud') ||
-                name.contains('nube');
-          } else if (keyword == 'rayos x') {
-            return name.contains('rayos') || name.contains('rx');
-          } else if (keyword == 'ecg / cardio') {
-            return name.contains('ecg') ||
-                name.contains('electro') ||
-                name.contains('cardio');
-          } else if (keyword == 'soporte vida') {
-            return name.contains('desfibrilador') ||
-                name.contains('ventilador') ||
-                name.contains('respirador') ||
-                name.contains('dea');
-          } else if (keyword == 'gel usg') {
-            return name.contains('gel');
-          } else if (keyword == 'papel térmico') {
-            return name.contains('papel');
-          } else if (keyword == 'transductores') {
-            return name.contains('transductor') || name.contains('sonda');
-          }
-
-          // Filtro por defecto: contiene la palabra clave
-          return name.contains(keyword) ||
-              desc.contains(keyword) ||
-              sub.contains(keyword);
-        }).toList();
+      } else {
+        list = await ProductService.getProductsByCatalogSubcategory(
+          categoryId: widget.categoryId,
+          subcategoryId: subcategoryId,
+          legacyCategory: widget.categoryKey,
+          legacySubcategory: widget.subcategoryKey,
+        );
       }
 
       if (mounted) {
@@ -275,13 +106,15 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
               widget.subcategoryLabel,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            Text(
-              widget.categoryLabel,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.8),
+            if (_isSubcategoryView &&
+                widget.subcategoryLabel != widget.categoryLabel)
+              Text(
+                widget.categoryLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -310,18 +143,10 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  color: Colors.teal.shade50,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.shopping_cart_outlined,
-                  size: 44,
-                  color: Colors.teal.shade400,
-                ),
+              Icon(
+                Icons.shopping_cart_outlined,
+                size: 64,
+                color: Colors.grey.shade400,
               ),
               const SizedBox(height: 20),
               const Text(
@@ -334,7 +159,9 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Actualmente no contamos con productos disponibles para la subcategoría "${widget.subcategoryLabel}".',
+                _isSubcategoryView
+                    ? 'Actualmente no contamos con productos disponibles para la subcategoría "${widget.subcategoryLabel}".'
+                    : 'Actualmente no contamos con productos disponibles para la categoría "${widget.categoryLabel}".',
                 style: TextStyle(
                   fontSize: 13,
                   color: Colors.grey.shade600,

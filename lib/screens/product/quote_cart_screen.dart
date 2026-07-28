@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/product.dart';
 import '../../models/quote_item.dart';
+import '../../services/auth_identity_service.dart';
 import '../../services/quote_service.dart';
 import 'product_detail_screen.dart';
 import '../../utils/ui_helpers.dart';
@@ -40,7 +41,10 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
     }
   }
 
-  double get _estimatedSubtotal => _items.fold(0.0, (s, i) => s + ((i.product?.unitPriceMxn ?? 0.0) * i.quantity));
+  double get _estimatedSubtotal => _items.fold(
+    0.0,
+    (s, i) => s + ((i.product?.unitPriceMxn ?? 0.0) * i.quantity),
+  );
   int get _totalQty => _items.fold(0, (s, i) => s + i.quantity);
 
   String _fmt(double v) {
@@ -120,12 +124,16 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
                 height: 46,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pop(ctx); // Solo cierra el diálogo, permanece en Cotización
+                    Navigator.pop(
+                      ctx,
+                    ); // Solo cierra el diálogo, permanece en Cotización
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kPrimary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     elevation: 0,
                   ),
                   child: const Text(
@@ -157,8 +165,8 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _kPrimary))
           : _items.isEmpty
-              ? _buildEmptyState()
-              : _buildCartContent(),
+          ? _buildEmptyState()
+          : _buildCartContent(),
     );
   }
 
@@ -187,10 +195,7 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
             Text(
               'Agrega equipos médicos o consumibles desde el catálogo para solicitar una cotización formal.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 16),
             SizedBox(
@@ -200,10 +205,15 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _kPrimary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                   elevation: 0,
                 ),
-                child: const Text('Explorar Catálogo', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Explorar Catálogo',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
@@ -263,16 +273,27 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
                     child: GestureDetector(
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => ProductDetailScreen(productId: p.id)),
+                        MaterialPageRoute(
+                          builder: (_) => ProductDetailScreen(productId: p.id),
+                        ),
                       ).then((_) => _load()),
                       child: SizedBox(
                         width: 72,
                         height: 72,
-                        child: p.mainImageUrl != null && p.mainImageUrl!.isNotEmpty
-                            ? UiHelpers.networkImage(p.mainImageUrl!, fit: BoxFit.contain, iconSize: 28)
+                        child:
+                            p.mainImageUrl != null && p.mainImageUrl!.isNotEmpty
+                            ? UiHelpers.networkImage(
+                                p.mainImageUrl!,
+                                fit: BoxFit.contain,
+                                iconSize: 28,
+                              )
                             : Container(
                                 color: const Color(0xFFF8FAFC),
-                                child: const Icon(Icons.medical_services_outlined, color: Colors.grey, size: 28),
+                                child: const Icon(
+                                  Icons.medical_services_outlined,
+                                  color: Colors.grey,
+                                  size: 28,
+                                ),
                               ),
                       ),
                     ),
@@ -285,18 +306,32 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
                       children: [
                         Text(
                           p.name,
-                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0F172A),
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (p.sku.isNotEmpty) ...[
                           const SizedBox(height: 2),
-                          Text('SKU: ${p.sku}', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+                          Text(
+                            'SKU: ${p.sku}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
                         ],
                         const SizedBox(height: 4),
                         Text(
                           _fmt(p.unitPriceMxn),
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
                         ),
                       ],
                     ),
@@ -321,13 +356,19 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
                                   setState(() {
                                     item.quantity--;
                                   });
-                                  await QuoteService.updateQuantity(p.id, item.quantity);
+                                  await QuoteService.updateQuantity(
+                                    p.id,
+                                    item.quantity,
+                                  );
                                 } else {
                                   _confirmRemove(p);
                                 }
                               },
                               child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 4,
+                                ),
                                 child: Icon(
                                   Icons.remove,
                                   size: 13,
@@ -336,10 +377,16 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                               child: Text(
                                 '${item.quantity}',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
                               ),
                             ),
                             GestureDetector(
@@ -347,10 +394,16 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
                                 setState(() {
                                   item.quantity++;
                                 });
-                                await QuoteService.updateQuantity(p.id, item.quantity);
+                                await QuoteService.updateQuantity(
+                                  p.id,
+                                  item.quantity,
+                                );
                               },
                               child: const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 4,
+                                ),
                                 child: Icon(
                                   Icons.add,
                                   size: 13,
@@ -428,13 +481,18 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF3483FA),
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
               elevation: 0,
             ),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('Solicitar Cotización', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                Text(
+                  'Solicitar Cotización',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
                 SizedBox(width: 6),
                 Icon(Icons.arrow_forward, size: 16),
               ],
@@ -493,29 +551,38 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
     if (mounted) {
       _emailController.text = user.email ?? '';
       _phoneController.text = user.phone ?? '';
-      _nameController.text = user.userMetadata?['full_name'] as String? ?? 
-                             user.userMetadata?['name'] as String? ?? '';
+      _nameController.text =
+          user.userMetadata?['full_name'] as String? ??
+          user.userMetadata?['name'] as String? ??
+          '';
     }
 
     try {
+      final effectiveClientId =
+          await AuthIdentityService.getEffectiveClientId() ?? user.id;
+
       // 1. Fetch from clients table
       final clientData = await client
           .from('clients')
           .select('contact_name, email, contact_phone, business_name')
-          .eq('id', user.id)
+          .eq('id', effectiveClientId)
           .maybeSingle();
 
       if (clientData != null && mounted) {
-        if (clientData['contact_name'] != null && (clientData['contact_name'] as String).isNotEmpty) {
+        if (clientData['contact_name'] != null &&
+            (clientData['contact_name'] as String).isNotEmpty) {
           _nameController.text = clientData['contact_name'] as String;
         }
-        if (clientData['email'] != null && (clientData['email'] as String).isNotEmpty) {
+        if (clientData['email'] != null &&
+            (clientData['email'] as String).isNotEmpty) {
           _emailController.text = clientData['email'] as String;
         }
-        if (clientData['contact_phone'] != null && (clientData['contact_phone'] as String).isNotEmpty) {
+        if (clientData['contact_phone'] != null &&
+            (clientData['contact_phone'] as String).isNotEmpty) {
           _phoneController.text = clientData['contact_phone'] as String;
         }
-        if (clientData['business_name'] != null && (clientData['business_name'] as String).isNotEmpty) {
+        if (clientData['business_name'] != null &&
+            (clientData['business_name'] as String).isNotEmpty) {
           _companyController.text = clientData['business_name'] as String;
         }
       }
@@ -530,10 +597,12 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
           .maybeSingle();
 
       if (profileData != null && mounted) {
-        if (profileData['full_name'] != null && (profileData['full_name'] as String).isNotEmpty) {
+        if (profileData['full_name'] != null &&
+            (profileData['full_name'] as String).isNotEmpty) {
           _nameController.text = profileData['full_name'] as String;
         }
-        if (profileData['phone'] != null && (profileData['phone'] as String).isNotEmpty) {
+        if (profileData['phone'] != null &&
+            (profileData['phone'] as String).isNotEmpty) {
           _phoneController.text = profileData['phone'] as String;
         }
       }
@@ -605,7 +674,11 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
             const SizedBox(height: 16),
             const Text(
               'Datos de Contacto',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _kNavy),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: _kNavy,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
@@ -620,9 +693,19 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary)),
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: _kPrimary,
+                        ),
+                      ),
                       SizedBox(width: 10),
-                      Text('Cargando información del perfil...', style: TextStyle(fontSize: 13, color: _kNavy)),
+                      Text(
+                        'Cargando información del perfil...',
+                        style: TextStyle(fontSize: 13, color: _kNavy),
+                      ),
                     ],
                   ),
                 ),
@@ -634,21 +717,31 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
                   // Full name
                   TextFormField(
                     controller: _nameController,
-                    decoration: _inputDecoration('Nombre completo *', Icons.person_outline),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Ingresa tu nombre completo' : null,
+                    decoration: _inputDecoration(
+                      'Nombre completo *',
+                      Icons.person_outline,
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Ingresa tu nombre completo'
+                        : null,
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 12),
                   // Email
                   TextFormField(
                     controller: _emailController,
-                    decoration: _inputDecoration('Correo electrónico *', Icons.mail_outline),
+                    decoration: _inputDecoration(
+                      'Correo electrónico *',
+                      Icons.mail_outline,
+                    ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
                         return 'Ingresa tu correo electrónico';
                       }
-                      final emailReg = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                      final emailReg = RegExp(
+                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                      );
                       if (!emailReg.hasMatch(v.trim())) {
                         return 'Ingresa un correo electrónico válido';
                       }
@@ -660,7 +753,10 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
                   // Phone
                   TextFormField(
                     controller: _phoneController,
-                    decoration: _inputDecoration('Teléfono (Recomendado)', Icons.phone_android_outlined),
+                    decoration: _inputDecoration(
+                      'Teléfono (Recomendado)',
+                      Icons.phone_android_outlined,
+                    ),
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
                   ),
@@ -668,14 +764,21 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
                   // Company
                   TextFormField(
                     controller: _companyController,
-                    decoration: _inputDecoration('Empresa (Opcional)', Icons.business_outlined),
+                    decoration: _inputDecoration(
+                      'Empresa (Opcional)',
+                      Icons.business_outlined,
+                    ),
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 12),
                   // Message
                   TextFormField(
                     controller: _messageController,
-                    decoration: _inputDecoration('Mensaje / Notas adicionales', Icons.comment_outlined, isMultiline: true),
+                    decoration: _inputDecoration(
+                      'Mensaje / Notas adicionales',
+                      Icons.comment_outlined,
+                      isMultiline: true,
+                    ),
                     maxLines: 3,
                     textInputAction: TextInputAction.done,
                   ),
@@ -689,18 +792,26 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _kPrimary,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         elevation: 0,
                       ),
                       child: _loading
                           ? const SizedBox(
                               width: 24,
                               height: 24,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
                             )
                           : const Text(
                               'Enviar Solicitud',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                     ),
                   ),
@@ -713,7 +824,11 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon, {bool isMultiline = false}) {
+  InputDecoration _inputDecoration(
+    String label,
+    IconData icon, {
+    bool isMultiline = false,
+  }) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),

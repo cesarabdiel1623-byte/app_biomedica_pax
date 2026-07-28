@@ -7,10 +7,7 @@ import '../../utils/ui_helpers.dart';
 class SingleQuestionScreen extends StatefulWidget {
   final ProductQuestion question;
 
-  const SingleQuestionScreen({
-    super.key,
-    required this.question,
-  });
+  const SingleQuestionScreen({super.key, required this.question});
 
   @override
   State<SingleQuestionScreen> createState() => _SingleQuestionScreenState();
@@ -65,10 +62,16 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
                 ),
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                leading: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.red,
+                ),
                 title: const Text(
                   'Eliminar pregunta',
-                  style: TextStyle(fontWeight: FontWeight.w500, color: Colors.red),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -88,19 +91,31 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('¿Eliminar pregunta?', style: TextStyle(fontWeight: FontWeight.bold, color: _kNavy)),
+          title: const Text(
+            '¿Eliminar pregunta?',
+            style: TextStyle(fontWeight: FontWeight.bold, color: _kNavy),
+          ),
           content: const Text('Esta acción no se puede deshacer.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
             TextButton(
               onPressed: () async {
                 Navigator.pop(context); // close dialog
                 _deleteQuestion();
               },
-              child: const Text('Eliminar', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Eliminar',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -113,20 +128,27 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator(color: _kPrimary)),
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator(color: _kPrimary)),
     );
 
     try {
       await QuestionService.deleteQuestion(_currentQuestion.id);
       if (mounted) {
         Navigator.of(context).pop(); // pop loading overlay
-        UiHelpers.showFloatingSuccessToast(context, 'Pregunta eliminada exitosamente.');
+        UiHelpers.showFloatingSuccessToast(
+          context,
+          'Pregunta eliminada exitosamente.',
+        );
         Navigator.of(context).pop(true); // pop screen back with refresh flag
       }
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // pop loading overlay
-        UiHelpers.showFloatingDeleteToast(context, 'Error al eliminar la pregunta: $e');
+        UiHelpers.showFloatingDeleteToast(
+          context,
+          'Error al eliminar la pregunta: $e',
+        );
       }
     }
   }
@@ -170,7 +192,8 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => ProductDetailScreen(productId: product.id),
+                        builder: (_) =>
+                            ProductDetailScreen(productId: product.id),
                       ),
                     );
                   },
@@ -190,7 +213,9 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(7),
-                            child: product.mainImageUrl != null && product.mainImageUrl!.isNotEmpty
+                            child:
+                                product.mainImageUrl != null &&
+                                    product.mainImageUrl!.isNotEmpty
                                 ? Image.network(
                                     product.mainImageUrl!,
                                     fit: BoxFit.cover,
@@ -250,7 +275,10 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
 
               // ── 2. ACTION BUTTONS ───────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
                 child: Row(
                   children: [
                     // Outlined Teal Button: "Hacer otra pregunta"
@@ -295,7 +323,8 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => ProductDetailScreen(productId: product.id),
+                              builder: (_) =>
+                                  ProductDetailScreen(productId: product.id),
                             ),
                           );
                         },
@@ -372,7 +401,11 @@ class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
                         children: [
                           // Left branch bracket/arrow indicator
                           Padding(
-                            padding: const EdgeInsets.only(left: 8, right: 12, top: 2),
+                            padding: const EdgeInsets.only(
+                              left: 8,
+                              right: 12,
+                              top: 2,
+                            ),
                             child: CustomPaint(
                               size: const Size(14, 16),
                               painter: _BracketPainter(),

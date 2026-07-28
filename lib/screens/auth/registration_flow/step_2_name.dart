@@ -31,16 +31,27 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
 
     try {
       await Supabase.instance.client.auth.updateUser(
-        UserAttributes(data: {'full_name': '$nombre $apellido', 'first_name': nombre, 'last_name': apellido}),
+        UserAttributes(
+          data: {
+            'full_name': '$nombre $apellido',
+            'first_name': nombre,
+            'last_name': apellido,
+          },
+        ),
       );
 
       if (mounted) {
-        Navigator.of(context).pop({'success': true, 'name': '$nombre $apellido'});
+        Navigator.of(
+          context,
+        ).pop({'success': true, 'name': '$nombre $apellido'});
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red.shade600),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red.shade600,
+          ),
         );
       }
     } finally {
@@ -60,7 +71,10 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
     return Theme(
       data: ThemeData(
         brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: _primaryColor, brightness: Brightness.light),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _primaryColor,
+          brightness: Brightness.light,
+        ),
         scaffoldBackgroundColor: _greyBg,
       ),
       child: Scaffold(
@@ -73,11 +87,22 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.black87,
+                        size: 20,
+                      ),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     const Expanded(
-                      child: Text('Completar Nombre', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
+                      child: Text(
+                        'Completar Nombre',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                     const SizedBox(width: 48),
                   ],
@@ -94,27 +119,48 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 24, offset: const Offset(0, 8))],
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 64, height: 64,
-                              decoration: BoxDecoration(color: _primaryColor.withValues(alpha: 0.1), shape: BoxShape.circle),
-                              child: const Icon(Icons.person_outline, color: _primaryColor, size: 32),
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                color: _primaryColor.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.person_outline,
+                                color: _primaryColor,
+                                size: 32,
+                              ),
                             ),
                             const SizedBox(height: 24),
                             const Text(
                               'Elige cómo quieres que te llamemos',
-                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 8),
                             Text(
                               'Verán el nombre que elijas todas las personas que interactúen contigo en Go Medical.',
-                              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 32),
@@ -123,13 +169,19 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
                                 Expanded(
                                   child: TextField(
                                     controller: _nombreController,
-                                    textCapitalization: TextCapitalization.words,
+                                    textCapitalization:
+                                        TextCapitalization.words,
                                     decoration: InputDecoration(
                                       labelText: 'Nombre',
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
-                                        borderSide: const BorderSide(color: _primaryColor, width: 2),
+                                        borderSide: const BorderSide(
+                                          color: _primaryColor,
+                                          width: 2,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -138,13 +190,19 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
                                 Expanded(
                                   child: TextField(
                                     controller: _apellidoController,
-                                    textCapitalization: TextCapitalization.words,
+                                    textCapitalization:
+                                        TextCapitalization.words,
                                     decoration: InputDecoration(
                                       labelText: 'Apellido',
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
-                                        borderSide: const BorderSide(color: _primaryColor, width: 2),
+                                        borderSide: const BorderSide(
+                                          color: _primaryColor,
+                                          width: 2,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -159,13 +217,29 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _primaryColor,
                                   foregroundColor: Colors.white,
-                                  disabledBackgroundColor: _primaryColor.withValues(alpha: 0.6),
+                                  disabledBackgroundColor: _primaryColor
+                                      .withValues(alpha: 0.6),
                                   elevation: 0,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
                                 ),
                                 child: _isLoading
-                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                    : const Text('Continuar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Continuar',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                               ),
                             ),
                           ],

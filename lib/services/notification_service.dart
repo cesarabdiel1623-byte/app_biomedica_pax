@@ -54,7 +54,7 @@ class NotificationService {
       _kChannelId,
       _kChannelName,
       description: _kChannelDesc,
-      importance: Importance.max,        // heads-up on lock screen + banner
+      importance: Importance.max, // heads-up on lock screen + banner
       playSound: true,
       enableVibration: true,
       showBadge: true,
@@ -62,7 +62,8 @@ class NotificationService {
 
     final AndroidFlutterLocalNotificationsPlugin? androidPlugin = _plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+          AndroidFlutterLocalNotificationsPlugin
+        >();
 
     await androidPlugin?.createNotificationChannel(channel);
 
@@ -72,10 +73,10 @@ class NotificationService {
 
     const DarwinInitializationSettings darwinSettings =
         DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
 
     const InitializationSettings settings = InitializationSettings(
       android: androidSettings,
@@ -99,7 +100,8 @@ class NotificationService {
       // Android 13+
       final androidPlugin = _plugin
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       final granted = await androidPlugin?.requestNotificationsPermission();
       debugPrint('[NotificationService] Android permission granted: $granted');
     } catch (e) {
@@ -130,13 +132,13 @@ class NotificationService {
           .listen(
             (List<Map<String, dynamic>> rows) {
               // ── Count unread ──────────────────────────────────────────
-              final unread =
-                  rows.where((r) => r['is_read'] == false).toList();
+              final unread = rows.where((r) => r['is_read'] == false).toList();
               unreadCountNotifier.value = unread.length;
 
               // ── Detect brand-new inserts ──────────────────────────────
-              final currentUnreadIds =
-                  unread.map((r) => r['id'].toString()).toList();
+              final currentUnreadIds = unread
+                  .map((r) => r['id'].toString())
+                  .toList();
 
               if (!isFirstEmit) {
                 // Any id that wasn't in our previous snapshot is a new insert
@@ -201,17 +203,17 @@ class NotificationService {
     final tealColor = const Color(0xFF0D9488);
     final AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-      _kChannelId,
-      _kChannelName,
-      channelDescription: _kChannelDesc,
-      importance: Importance.max,
-      priority: Priority.high,
-      color: tealColor,
-      showWhen: true,
-      playSound: true,
-      enableVibration: true,
-      ticker: title,
-    );
+          _kChannelId,
+          _kChannelName,
+          channelDescription: _kChannelDesc,
+          importance: Importance.max,
+          priority: Priority.high,
+          color: tealColor,
+          showWhen: true,
+          playSound: true,
+          enableVibration: true,
+          ticker: title,
+        );
 
     const DarwinNotificationDetails darwinDetails = DarwinNotificationDetails(
       presentAlert: true,

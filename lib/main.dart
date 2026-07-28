@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'models/payment_test_result.dart';
+import 'screens/payment/payment_result_screen.dart';
+import 'services/payment_deep_link_service.dart';
 import 'utils/constants.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth/registration_flow/registration_checklist_screen.dart';
 import 'services/notification_service.dart';
 import 'services/quote_service.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -43,12 +48,61 @@ Future<void> main() async {
   runApp(const GoMedicalApp());
 }
 
-class GoMedicalApp extends StatelessWidget {
+class GoMedicalApp extends StatefulWidget {
   const GoMedicalApp({super.key});
+
+  @override
+  State<GoMedicalApp> createState() => _GoMedicalAppState();
+}
+
+class _GoMedicalAppState extends State<GoMedicalApp> {
+  final PaymentDeepLinkService _paymentDeepLinkService =
+      PaymentDeepLinkService();
+  bool _isNavigatingPaymentResult = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  Future<void> _initDeepLinks() async {
+    await _paymentDeepLinkService.init(onResult: _showPaymentResult);
+  }
+
+  void _showPaymentResult(PaymentTestResult result) {
+    if (_isNavigatingPaymentResult) return;
+
+    final navigator = appNavigatorKey.currentState;
+    if (navigator == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showPaymentResult(result);
+      });
+      return;
+    }
+
+    _isNavigatingPaymentResult = true;
+    navigator
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => PaymentResultScreen(result: result),
+          ),
+        )
+        .whenComplete(() {
+          _isNavigatingPaymentResult = false;
+        });
+  }
+
+  @override
+  void dispose() {
+    _paymentDeepLinkService.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: 'Go Medical',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -66,6 +120,13 @@ class GoMedicalApp extends StatelessWidget {
           onError: Colors.white,
           surface: Color(0xFFF8FAFC),
           onSurface: Color(0xFF0F172A),
+        ),
+        appBarTheme: const AppBarTheme(
+          titleSpacing: 4,
+          centerTitle: false,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
         ),
         cardTheme: CardThemeData(
           color: Colors.white,

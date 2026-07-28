@@ -5,17 +5,10 @@ class QuoteItem {
   int quantity;
   Product? product;
 
-  QuoteItem({
-    required this.productId,
-    required this.quantity,
-    this.product,
-  });
+  QuoteItem({required this.productId, required this.quantity, this.product});
 
   Map<String, dynamic> toJson() {
-    return {
-      'product_id': productId,
-      'quantity': quantity,
-    };
+    return {'product_id': productId, 'quantity': quantity};
   }
 
   factory QuoteItem.fromJson(Map<String, dynamic> json) {

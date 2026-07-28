@@ -11,7 +11,10 @@ class Step3PhoneScreen extends StatefulWidget {
 
 class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
   final _phoneController = TextEditingController();
-  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _otpControllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
   bool _whatsappOptIn = true;
@@ -27,7 +30,9 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
     final phone = _phoneController.text.trim().replaceAll(' ', '');
     if (phone.isEmpty || phone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa un número de teléfono válido (10 dígitos)')),
+        const SnackBar(
+          content: Text('Ingresa un número de teléfono válido (10 dígitos)'),
+        ),
       );
       return;
     }
@@ -43,7 +48,9 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Este número ya está registrado en una cuenta de la app. Inicia sesión o recupera tu cuenta.'),
+              content: Text(
+                'Este número ya está registrado en una cuenta de la app. Inicia sesión o recupera tu cuenta.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -126,13 +133,23 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
         UserAttributes(data: {'whatsapp_opt_in': _whatsappOptIn}),
       );
 
-      if (mounted) setState(() { _currentView = 'success'; _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _currentView = 'success';
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Código incorrecto o expirado'), backgroundColor: Colors.red.shade600),
+          SnackBar(
+            content: Text('Código incorrecto o expirado'),
+            backgroundColor: Colors.red.shade600,
+          ),
         );
-        for (var c in _otpControllers) { c.clear(); }
+        for (var c in _otpControllers) {
+          c.clear();
+        }
         _otpFocusNodes[0].requestFocus();
         setState(() => _isLoading = false);
       }
@@ -142,8 +159,12 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
   @override
   void dispose() {
     _phoneController.dispose();
-    for (var c in _otpControllers) { c.dispose(); }
-    for (var f in _otpFocusNodes) { f.dispose(); }
+    for (var c in _otpControllers) {
+      c.dispose();
+    }
+    for (var f in _otpFocusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -152,7 +173,10 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
     return Theme(
       data: ThemeData(
         brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: _primaryColor, brightness: Brightness.light),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _primaryColor,
+          brightness: Brightness.light,
+        ),
         scaffoldBackgroundColor: _greyBg,
       ),
       child: Scaffold(
@@ -166,13 +190,24 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
                   children: [
                     if (Navigator.canPop(context))
                       IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new,
+                          color: Colors.black87,
+                          size: 20,
+                        ),
                         onPressed: () => Navigator.of(context).pop(),
                       )
                     else
                       const SizedBox(width: 48),
                     const Expanded(
-                      child: Text('Validar Teléfono', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
+                      child: Text(
+                        'Validar Teléfono',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                     const SizedBox(width: 48),
                   ],
@@ -189,13 +224,19 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 24, offset: const Offset(0, 8))],
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
                         child: _currentView == 'input'
                             ? _buildPhoneInput()
                             : _currentView == 'otp'
-                                ? _buildOtpInput()
-                                : _buildSuccess(),
+                            ? _buildOtpInput()
+                            : _buildSuccess(),
                       ),
                     ),
                   ),
@@ -214,14 +255,34 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 64, height: 64,
-          decoration: BoxDecoration(color: _primaryColor.withValues(alpha: 0.1), shape: BoxShape.circle),
-          child: const Icon(Icons.phone_android_outlined, color: _primaryColor, size: 32),
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: _primaryColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.phone_android_outlined,
+            color: _primaryColor,
+            size: 32,
+          ),
         ),
         const SizedBox(height: 24),
-        const Text('Ingresa tu teléfono', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87), textAlign: TextAlign.center),
+        const Text(
+          'Ingresa tu teléfono',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
-        Text('Te enviaremos un código por SMS para verificarlo.', style: TextStyle(fontSize: 14, color: Colors.grey.shade600), textAlign: TextAlign.center),
+        Text(
+          'Te enviaremos un código por SMS para verificarlo.',
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 32),
         TextField(
           controller: _phoneController,
@@ -230,7 +291,10 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
             labelText: 'Número de teléfono',
             prefixIcon: const Icon(Icons.phone_outlined, color: _primaryColor),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _primaryColor, width: 2)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: _primaryColor, width: 2),
+            ),
             hintText: '55 1234 5678',
           ),
         ),
@@ -239,10 +303,28 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
           height: 52,
           child: ElevatedButton(
             onPressed: _isLoading ? null : _sendSmsOtp,
-            style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white, disabledBackgroundColor: _primaryColor.withValues(alpha: 0.6), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _primaryColor.withValues(alpha: 0.6),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
             child: _isLoading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Text('Enviar código SMS', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Enviar código SMS',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
           ),
         ),
         const SizedBox(height: 16),
@@ -254,7 +336,9 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
               context: context,
               builder: (ctx) => AlertDialog(
                 title: const Text('Omitir verificación'),
-                content: const Text('¿Deseas continuar sin verificar tu teléfono?\n\nPodrás verificarlo después desde tu perfil.'),
+                content: const Text(
+                  '¿Deseas continuar sin verificar tu teléfono?\n\nPodrás verificarlo después desde tu perfil.',
+                ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx),
@@ -269,16 +353,26 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
                         );
                       } catch (_) {}
                       Navigator.pop(ctx); // close dialog
-                      navigator.pop({'success': true, 'phone': 'Omitido', 'skipped': true}); // return to checklist
+                      navigator.pop({
+                        'success': true,
+                        'phone': 'Omitido',
+                        'skipped': true,
+                      }); // return to checklist
                     },
-                    style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
                     child: const Text('Omitir'),
                   ),
                 ],
               ),
             );
           },
-          child: Text('Omitir por ahora', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+          child: Text(
+            'Omitir por ahora',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+          ),
         ),
       ],
     );
@@ -290,12 +384,24 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 64, height: 64,
-          decoration: BoxDecoration(color: _primaryColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: _primaryColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
           child: const Icon(Icons.sms_outlined, color: _primaryColor, size: 32),
         ),
         const SizedBox(height: 24),
-        const Text('Ingresa el código', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87), textAlign: TextAlign.center),
+        const Text(
+          'Ingresa el código',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
         RichText(
           textAlign: TextAlign.center,
@@ -303,48 +409,91 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
             style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             children: [
               const TextSpan(text: 'Enviamos un SMS a '),
-              TextSpan(text: _fullPhone, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+              TextSpan(
+                text: _fullPhone,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 36),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(6, (i) => SizedBox(
-            width: 46, height: 56,
-            child: TextField(
-              controller: _otpControllers[i],
-              focusNode: _otpFocusNodes[i],
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              maxLength: 1,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              decoration: InputDecoration(
-                counterText: '',
-                filled: true,
-                fillColor: const Color(0xFFFAFAFA),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _primaryColor, width: 2)),
+          children: List.generate(
+            6,
+            (i) => SizedBox(
+              width: 46,
+              height: 56,
+              child: TextField(
+                controller: _otpControllers[i],
+                focusNode: _otpFocusNodes[i],
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                maxLength: 1,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: const Color(0xFFFAFAFA),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: _primaryColor,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                onChanged: (v) => _onOtpChanged(v, i),
               ),
-              onChanged: (v) => _onOtpChanged(v, i),
             ),
-          )),
+          ),
         ),
         const SizedBox(height: 32),
         SizedBox(
           height: 52,
           child: ElevatedButton(
             onPressed: _isLoading ? null : _verifyOtp,
-            style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white, disabledBackgroundColor: _primaryColor.withValues(alpha: 0.6), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _primaryColor.withValues(alpha: 0.6),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
             child: _isLoading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Text('Verificar código', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Verificar código',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
           ),
         ),
         const SizedBox(height: 12),
         TextButton(
           onPressed: () => setState(() => _currentView = 'input'),
-          child: const Text('Cambiar número', style: TextStyle(color: _primaryColor, fontWeight: FontWeight.w500)),
+          child: const Text(
+            'Cambiar número',
+            style: TextStyle(color: _primaryColor, fontWeight: FontWeight.w500),
+          ),
         ),
       ],
     );
@@ -356,24 +505,71 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 80, height: 80,
-          decoration: BoxDecoration(color: _primaryColor.withValues(alpha: 0.1), shape: BoxShape.circle),
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: _primaryColor.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
           child: const Icon(Icons.check_circle, color: _primaryColor, size: 48),
         ),
         const SizedBox(height: 24),
-        const Text('Validamos tu teléfono', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87), textAlign: TextAlign.center),
+        const Text(
+          'Validamos tu teléfono',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
-        Text(_fullPhone, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _primaryColor), textAlign: TextAlign.center),
+        Text(
+          _fullPhone,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: _primaryColor,
+          ),
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 28),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: const Color(0xFFF0FDF9), borderRadius: BorderRadius.circular(12), border: Border.all(color: _primaryColor.withValues(alpha: 0.2))),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _primaryColor.withValues(alpha: 0.2)),
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 24, height: 24, child: Checkbox(value: _whatsappOptIn, activeColor: _primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)), onChanged: (v) => setState(() => _whatsappOptIn = v ?? false))),
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: _whatsappOptIn,
+                  activeColor: _primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  onChanged: (v) => setState(() => _whatsappOptIn = v ?? false),
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: GestureDetector(onTap: () => setState(() => _whatsappOptIn = !_whatsappOptIn), child: const Text('Acepto recibir promociones y novedades por WhatsApp y/o SMS.', style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.4)))),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _whatsappOptIn = !_whatsappOptIn),
+                  child: const Text(
+                    'Acepto recibir promociones y novedades por WhatsApp y/o SMS.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -381,9 +577,21 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
         SizedBox(
           height: 52,
           child: ElevatedButton(
-            onPressed: () => Navigator.of(context).pop({'success': true, 'phone': _fullPhone}),
-            style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
-            child: const Text('Continuar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            onPressed: () => Navigator.of(
+              context,
+            ).pop({'success': true, 'phone': _fullPhone}),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            child: const Text(
+              'Continuar',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
       ],

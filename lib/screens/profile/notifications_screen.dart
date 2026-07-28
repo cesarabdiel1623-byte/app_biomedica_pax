@@ -4,9 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_helpers.dart';
 import 'quotes_screen.dart';
 import 'quote_detail_screen.dart';
+import 'quote_request_detail_screen.dart';
 import '../product/all_questions_screen.dart';
 import '../product/single_question_screen.dart';
 import '../tickets/ticket_detail_screen.dart';
+import '../../services/auth_identity_service.dart';
 import '../../services/product_service.dart';
 import '../../services/question_service.dart';
 import '../../utils/ui_helpers.dart';
@@ -230,7 +232,9 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
         color: const Color(0xFF0D9488),
         bg: const Color(0xFFE6F7F6),
       );
-    } else if (t.contains('cotiza') || b.contains('cot-')) {
+    } else if (t.contains('cotiza') ||
+        b.contains('cot-') ||
+        b.contains('rq-')) {
       return (
         icon: Icons.request_quote_rounded,
         color: const Color(0xFF1E3A5F),
@@ -324,11 +328,19 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       return;
     }
 
-    // ── 4. Detect quote notification (COT-XXXXXXXX-XXXXXXXX) ──────────────
-    final quoteMatch = RegExp(r'COT-\d{8}-[A-Za-z0-9]+').firstMatch(body);
+    // ── 4. Detect quotes and quote requests ───────────────────────────────
+    final quoteMatch = RegExp(
+      r'(?:COT|RQ)-\d{8}-[A-Za-z0-9]+',
+      caseSensitive: false,
+    ).firstMatch(body);
     if (quoteMatch != null) {
-      await _navigateToQuote(quoteMatch.group(0)!);
+      await _navigateToQuote(quoteMatch.group(0)!.toUpperCase());
       return;
+    }
+
+    if (title.toLowerCase().contains('cotiza') ||
+        body.toLowerCase().contains('cotiza')) {
+      await _navigateToQuotesList();
     }
   }
 
@@ -387,16 +399,18 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
 
         // Try to find the specific question for this product asked by this user
         final userId = Supabase.instance.client.auth.currentUser?.id;
+        final effectiveClientId =
+            await AuthIdentityService.getEffectiveClientId();
         List<dynamic> questionsData = [];
 
-        if (userId != null) {
+        if (userId != null && effectiveClientId != null) {
           final res = await Supabase.instance.client
               .from('product_questions')
               .select(
                 '*, product_answers(*), products(${ProductService.publicProductSelect})',
               )
               .eq('product_id', productId)
-              .eq('client_id', userId)
+              .eq('client_id', effectiveClientId)
               .order('created_at', ascending: false);
           questionsData = res as List;
         }
@@ -467,40 +481,61 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     }
   }
 
-  Future<void> _navigateToQuote(String quoteNumber) async {
-    final response = await Supabase.instance.client
-        .from('quotes')
-        .select('*')
-        .eq('quote_number', quoteNumber)
-        .maybeSingle();
+  Future<void> _navigateToQuote(String referenceNumber) async {
+    try {
+      final client = Supabase.instance.client;
+      Map<String, dynamic>? quote;
+      Map<String, dynamic>? request;
 
-    if (!mounted) return;
+      if (referenceNumber.startsWith('RQ-')) {
+        request = await client
+            .from('quote_requests')
+            .select('*')
+            .eq('request_number', referenceNumber)
+            .maybeSingle();
+      } else {
+        quote = await client
+            .from('quotes')
+            .select('*')
+            .eq('quote_number', referenceNumber)
+            .maybeSingle();
+      }
 
-    if (response != null && response['id'] != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => QuoteDetailScreen(quote: response),
-        ),
-      );
-    } else {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
-      final profileRes = await Supabase.instance.client
-          .from('profiles')
-          .select('client_id')
-          .eq('id', userId)
-          .maybeSingle();
-      final clientId = profileRes?['client_id'] as String? ?? userId;
-      if (mounted) {
+      if (!mounted) return;
+
+      if (request != null && request['id'] != null) {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => QuotesScreen(clientId: clientId),
+            builder: (_) => QuoteRequestDetailScreen(request: request!),
           ),
         );
+        return;
       }
+
+      if (quote != null && quote['id'] != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => QuoteDetailScreen(quote: quote!)),
+        );
+        return;
+      }
+    } catch (_) {
+      // La lista combinada sigue siendo un destino seguro si el detalle no
+      // puede resolverse por cambios de esquema o conectividad.
     }
+
+    await _navigateToQuotesList();
+  }
+
+  Future<void> _navigateToQuotesList() async {
+    final clientId = await AuthIdentityService.getEffectiveClientId();
+    if (!mounted || clientId == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => QuotesScreen(clientId: clientId)),
+    );
   }
 
   String _formatDate(DateTime date) {

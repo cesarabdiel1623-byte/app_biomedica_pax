@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:video_player/video_player.dart';
 import '../../models/service_ticket.dart';
 import '../../models/ticket_message.dart';
 import '../../services/ticket_service.dart';
@@ -149,7 +150,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   .maybeSingle();
 
               if (res != null && mounted) {
-                final msg = TicketMessage.fromJson(res);
+                final messageJson = Map<String, dynamic>.from(res);
+                messageJson['attachment_url'] =
+                    await TicketService.resolveAttachmentUrl(
+                      messageJson['attachment_url'] as String?,
+                    );
+                final msg = TicketMessage.fromJson(messageJson);
                 if (!msg.isInternal) {
                   setState(() {
                     if (index == -1) {
@@ -341,8 +347,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         message: msg,
                         isMe: isMe,
                         curUserId: curUserId,
-                        onImageTap: () =>
-                            _showFullImageLightbox(msg.attachmentUrl!),
+                        onAttachmentTap: () =>
+                            _openAttachment(msg.attachmentUrl!),
                       );
                     },
                   ),
@@ -481,8 +487,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     }
   }
 
-  void _showFullImageLightbox(String imageUrl) {
-    final trustedUrl = UiHelpers.sanitizeTrustedRemoteUrl(imageUrl);
+  void _openAttachment(String attachmentUrl) {
+    final trustedUrl = UiHelpers.sanitizeTrustedRemoteUrl(attachmentUrl);
     if (trustedUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -493,6 +499,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       return;
     }
 
+    if (_isVideoAttachment(trustedUrl)) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        useSafeArea: false,
+        builder: (_) => _VideoAttachmentViewer(videoUrl: trustedUrl),
+      );
+      return;
+    }
+
+    _showFullImageLightbox(trustedUrl);
+  }
+
+  void _showFullImageLightbox(String imageUrl) {
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -508,7 +528,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 maxScale: 4.0,
                 child: Center(
                   child: Image.network(
-                    trustedUrl,
+                    imageUrl,
                     fit: BoxFit.contain,
                     errorBuilder: (_, _, _) => const Center(
                       child: Icon(
@@ -1230,7 +1250,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           Row(
             children: [
               const Text(
-                'Prioridad: ',
+                'Urgencia: ',
                 style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
               Container(
@@ -1561,18 +1581,129 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 }
 
+bool _isVideoAttachment(String url) {
+  final path = Uri.tryParse(url)?.path.toLowerCase() ?? '';
+  return path.endsWith('.mp4') ||
+      path.endsWith('.mov') ||
+      path.endsWith('.m4v') ||
+      path.endsWith('.webm');
+}
+
+class _VideoAttachmentViewer extends StatefulWidget {
+  final String videoUrl;
+
+  const _VideoAttachmentViewer({required this.videoUrl});
+
+  @override
+  State<_VideoAttachmentViewer> createState() => _VideoAttachmentViewerState();
+}
+
+class _VideoAttachmentViewerState extends State<_VideoAttachmentViewer> {
+  late final VideoPlayerController _controller;
+  late final Future<void> _initializeVideo;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+    _initializeVideo = _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _togglePlayback() {
+    setState(() {
+      if (_controller.value.isPlaying) {
+        _controller.pause();
+      } else {
+        _controller.play();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(
+              child: FutureBuilder<void>(
+                future: _initializeVideo,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const CircularProgressIndicator(color: Colors.white);
+                  }
+                  if (snapshot.hasError || !_controller.value.isInitialized) {
+                    return const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'No se pudo reproducir este video.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    );
+                  }
+
+                  return GestureDetector(
+                    onTap: _togglePlayback,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AspectRatio(
+                          aspectRatio: _controller.value.aspectRatio,
+                          child: VideoPlayer(_controller),
+                        ),
+                        if (!_controller.value.isPlaying)
+                          const Icon(
+                            Icons.play_circle_fill,
+                            color: Colors.white,
+                            size: 64,
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton.filled(
+                tooltip: 'Cerrar',
+                onPressed: () => Navigator.of(context).pop(),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black.withValues(alpha: 0.55),
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.close),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ChatBubbleItem extends StatefulWidget {
   final TicketMessage message;
   final bool isMe;
   final String? curUserId;
-  final VoidCallback onImageTap;
+  final VoidCallback onAttachmentTap;
 
   const _ChatBubbleItem({
     super.key,
     required this.message,
     required this.isMe,
     required this.curUserId,
-    required this.onImageTap,
+    required this.onAttachmentTap,
   });
 
   @override
@@ -1634,7 +1765,6 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem>
     final trustedAttachmentUrl = UiHelpers.sanitizeTrustedRemoteUrl(
       msg.attachmentUrl,
     );
-    final hasImage = trustedAttachmentUrl != null;
     final hasCaption = msg.message.isNotEmpty && msg.message != 'Envío de foto';
 
     Widget timeRow({bool light = true}) {
@@ -1699,6 +1829,7 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem>
     Widget bubbleWidget;
     if (trustedAttachmentUrl != null) {
       final attachmentUrl = trustedAttachmentUrl;
+      final isVideo = _isVideoAttachment(attachmentUrl);
       bubbleWidget = Container(
         margin: const EdgeInsets.only(bottom: 10),
         constraints: BoxConstraints(
@@ -1737,7 +1868,7 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem>
                   child: senderLabel,
                 ),
               GestureDetector(
-                onTap: widget.onImageTap,
+                onTap: widget.onAttachmentTap,
                 child: Stack(
                   alignment: Alignment.bottomRight,
                   children: [
@@ -1745,36 +1876,62 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem>
                       color: Colors.white,
                       width: double.infinity,
                       height: 200,
-                      child: Image.network(
-                        attachmentUrl,
-                        width: double.infinity,
-                        height: 200,
-                        fit: BoxFit.contain,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: const Color(0xFFF8FAFC),
-                            child: const Center(
-                              child: SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: _kPrimary,
+                      child: isVideo
+                          ? const ColoredBox(
+                              color: Color(0xFFF1F5F9),
+                              child: Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.play_circle_outline,
+                                      color: _kPrimary,
+                                      size: 52,
+                                    ),
+                                    SizedBox(height: 6),
+                                    Text(
+                                      'Reproducir video',
+                                      style: TextStyle(
+                                        color: _kNavy,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : Image.network(
+                              attachmentUrl,
+                              width: double.infinity,
+                              height: 200,
+                              fit: BoxFit.contain,
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Container(
+                                      color: const Color(0xFFF8FAFC),
+                                      child: const Center(
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: _kPrimary,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                              errorBuilder: (_, _, _) => Container(
+                                color: const Color(0xFFF1F5F9),
+                                child: const Icon(
+                                  Icons.broken_image_outlined,
+                                  color: Colors.grey,
+                                  size: 28,
                                 ),
                               ),
                             ),
-                          );
-                        },
-                        errorBuilder: (_, _, _) => Container(
-                          color: const Color(0xFFF1F5F9),
-                          child: const Icon(
-                            Icons.broken_image_outlined,
-                            color: Colors.grey,
-                            size: 28,
-                          ),
-                        ),
-                      ),
                     ),
                     if (!hasCaption)
                       Positioned(

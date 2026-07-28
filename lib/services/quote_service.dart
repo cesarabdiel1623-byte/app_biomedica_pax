@@ -7,7 +7,6 @@ import '../models/quote_item.dart';
 import 'product_service.dart';
 import 'cart_service.dart';
 
-
 class QuoteService {
   static const String _keyQuote = 'quote_cart_items';
   static final ValueNotifier<int> quoteCountNotifier = ValueNotifier<int>(0);
@@ -81,7 +80,7 @@ class QuoteService {
 
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_keyQuote) ?? [];
-      
+
       int existingIndex = -1;
       final items = <QuoteItem>[];
 
@@ -99,10 +98,18 @@ class QuoteService {
       if (existingIndex != -1) {
         items[existingIndex].quantity += quantity;
       } else {
-        items.add(QuoteItem(productId: product.id, quantity: quantity, product: product));
+        items.add(
+          QuoteItem(
+            productId: product.id,
+            quantity: quantity,
+            product: product,
+          ),
+        );
       }
 
-      final newListStr = items.map((item) => jsonEncode(item.toJson())).toList();
+      final newListStr = items
+          .map((item) => jsonEncode(item.toJson()))
+          .toList();
       await prefs.setStringList(_keyQuote, newListStr);
       await loadCount();
     } catch (e) {
@@ -133,7 +140,9 @@ class QuoteService {
         } catch (_) {}
       }
 
-      final newListStr = items.map((item) => jsonEncode(item.toJson())).toList();
+      final newListStr = items
+          .map((item) => jsonEncode(item.toJson()))
+          .toList();
       await prefs.setStringList(_keyQuote, newListStr);
       await loadCount();
     } catch (e) {
@@ -158,7 +167,9 @@ class QuoteService {
         } catch (_) {}
       }
 
-      final newListStr = items.map((item) => jsonEncode(item.toJson())).toList();
+      final newListStr = items
+          .map((item) => jsonEncode(item.toJson()))
+          .toList();
       await prefs.setStringList(_keyQuote, newListStr);
       await loadCount();
     } catch (e) {
@@ -198,8 +209,12 @@ class QuoteService {
 
     // Generate readable quote request number
     final now = DateTime.now();
-    final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final randStr = (now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0');
+    final dateStr =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    final randStr = (now.millisecondsSinceEpoch % 10000).toString().padLeft(
+      4,
+      '0',
+    );
     final requestNumber = 'RQ-$dateStr-$randStr';
 
     final requestPayload = {
@@ -224,14 +239,18 @@ class QuoteService {
     final quoteRequestId = requestData['id'] as String;
 
     // Step B: Insert quote_request_items
-    final itemsPayload = items.map((item) => {
-      'quote_request_id': quoteRequestId,
-      'product_id': item.productId,
-      'item_name': item.product?.name ?? 'Producto',
-      'sku': item.product?.sku,
-      'quantity': item.quantity,
-      'notes': null,
-    }).toList();
+    final itemsPayload = items
+        .map(
+          (item) => {
+            'quote_request_id': quoteRequestId,
+            'product_id': item.productId,
+            'item_name': item.product?.name ?? 'Producto',
+            'sku': item.product?.sku,
+            'quantity': item.quantity,
+            'notes': null,
+          },
+        )
+        .toList();
 
     await client.from('quote_request_items').insert(itemsPayload);
 

@@ -37,11 +37,17 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
       return;
     }
     if (text.length < 10) {
-      UiHelpers.showWarningToast(context, 'La pregunta debe tener al menos 10 caracteres.');
+      UiHelpers.showWarningToast(
+        context,
+        'La pregunta debe tener al menos 10 caracteres.',
+      );
       return;
     }
     if (text.length > 500) {
-      UiHelpers.showWarningToast(context, 'La pregunta no puede exceder los 500 caracteres.');
+      UiHelpers.showWarningToast(
+        context,
+        'La pregunta no puede exceder los 500 caracteres.',
+      );
       return;
     }
 
@@ -54,7 +60,9 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
           context,
           '✓ Tu pregunta fue enviada. El equipo de Go Medical la responderá pronto.',
         );
-        Navigator.of(context).pop(true); // Return true to trigger reload of list
+        Navigator.of(
+          context,
+        ).pop(true); // Return true to trigger reload of list
       }
     } catch (e) {
       if (mounted) {
@@ -83,7 +91,11 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
         ),
         title: const Text(
           'Preguntar sobre producto',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 18,
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -106,7 +118,11 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
             children: [
               const Text(
                 'Escribe tu pregunta',
-                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: _kNavy),
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.bold,
+                  color: _kNavy,
+                ),
               ),
               const SizedBox(height: 8),
 
@@ -116,14 +132,25 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                 maxLength: 500,
                 autofocus: true,
                 textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(fontSize: 14, color: Colors.black, height: 1.4),
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black,
+                  height: 1.4,
+                ),
                 decoration: InputDecoration(
-                  hintText: 'Ej. ¿El equipo cuenta con certificación COFEPRIS y qué accesorios incluye la caja?',
-                  hintStyle: TextStyle(fontSize: 13.5, color: Colors.grey.shade400),
+                  hintText:
+                      'Ej. ¿El equipo cuenta con certificación COFEPRIS y qué accesorios incluye la caja?',
+                  hintStyle: TextStyle(
+                    fontSize: 13.5,
+                    color: Colors.grey.shade400,
+                  ),
                   contentPadding: const EdgeInsets.all(16),
                   filled: true,
                   fillColor: Colors.white,
-                  counterStyle: const TextStyle(fontSize: 11, color: Colors.grey),
+                  counterStyle: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: Colors.grey.shade300),
@@ -139,7 +166,7 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              
+
               // Helper note card
               Container(
                 padding: const EdgeInsets.all(12),
@@ -151,12 +178,20 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.info_outline_rounded, color: _kPrimary, size: 16),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      color: _kPrimary,
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Tu pregunta será revisada por nuestro equipo técnico y se publicará junto con la respuesta correspondiente.',
-                        style: TextStyle(fontSize: 11.5, color: Colors.teal.shade800, height: 1.35),
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.teal.shade800,
+                          height: 1.35,
+                        ),
                       ),
                     ),
                   ],
@@ -188,7 +223,11 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                         )
                       : const Text(
                           'Enviar pregunta',
-                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                 ),
               ),

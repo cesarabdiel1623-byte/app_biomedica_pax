@@ -90,8 +90,10 @@ class ServiceTicket {
       type: json['type'] as String? ?? 'otro',
       requestedBy: json['requested_by'] as String?,
       assignedTechnician: json['assigned_technician_id'] as String?,
-      assignedTechnicianCustomName: json['assigned_technician_custom_name'] as String?,
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
+      assignedTechnicianCustomName:
+          json['assigned_technician_custom_name'] as String?,
+      createdAt:
+          DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.now(),
       updatedAt: json['updated_at'] != null
           ? DateTime.tryParse(json['updated_at'] as String)
@@ -122,33 +124,58 @@ class ServiceTicket {
   /// Returns a color-keyed status label
   String get statusLabel {
     switch (status) {
-      case 'open': return 'Abierto';
-      case 'in_progress': return 'En Progreso';
-      case 'resolved': return 'Resuelto';
-      case 'closed': return 'Cerrado';
-      case 'cancelled': return 'Cancelado';
-      default: return status;
+      case 'open':
+        return 'Abierto';
+      case 'in_progress':
+        return 'En Progreso';
+      case 'resolved':
+        return 'Resuelto';
+      case 'closed':
+        return 'Cerrado';
+      case 'cancelled':
+        return 'Cancelado';
+      default:
+        return status;
     }
   }
 
   String get priorityLabel {
     switch (priority) {
-      case 'low': return 'Baja';
-      case 'medium': return 'Media';
-      case 'high': return 'Alta';
-      case 'critical': return 'Crítica';
-      default: return priority;
+      case 'low':
+        return 'Programable';
+      case 'medium':
+        return 'Regular';
+      case 'high':
+        return 'Urgente';
+      case 'critical':
+        return 'Inmediata';
+      default:
+        return priority;
     }
   }
 
   String get typeLabel {
+    final normalizedTitle = title.toLowerCase();
+    if (normalizedTitle.startsWith('reparación:')) {
+      return 'Reparación';
+    }
+    if (normalizedTitle.startsWith('soporte técnico:')) {
+      return 'Soporte técnico';
+    }
+
     switch (type) {
-      case 'correctivo': return 'Correctivo';
-      case 'preventivo': return 'Preventivo';
-      case 'instalacion': return 'Instalación';
-      case 'garantia': return 'Garantía';
-      case 'otro': return 'Otro';
-      default: return type;
+      case 'correctivo':
+        return 'Correctivo';
+      case 'preventivo':
+        return 'Preventivo';
+      case 'instalacion':
+        return 'Instalación';
+      case 'garantia':
+        return 'Garantía';
+      case 'otro':
+        return 'Otro';
+      default:
+        return type;
     }
   }
 }

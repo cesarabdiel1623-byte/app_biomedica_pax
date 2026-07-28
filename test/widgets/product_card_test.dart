@@ -4,7 +4,9 @@ import 'package:gomedical_app/models/product.dart';
 import 'package:gomedical_app/screens/home/widgets/product_card.dart';
 
 void main() {
-  testWidgets('ProductCard renders name, price and stock label correctly', (WidgetTester tester) async {
+  testWidgets('ProductCard renders name, price and stock label correctly', (
+    WidgetTester tester,
+  ) async {
     final product = Product(
       id: 'prod-123',
       sku: 'SKU-123',
@@ -27,10 +29,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SizedBox(
-            width: 200,
-            child: ProductCard(product: product),
-          ),
+          body: SizedBox(width: 200, child: ProductCard(product: product)),
         ),
       ),
     );
@@ -45,94 +44,94 @@ void main() {
     expect(find.text('Disponible'), findsOneWidget);
   });
 
-  testWidgets('ProductCard renders campaign badge from activePromotion and hides bottom discount badges', (WidgetTester tester) async {
-    final product = Product(
-      id: 'prod-discount',
-      sku: 'SKU-DISC',
-      name: 'Gel USG 5L',
-      category: 'consumible',
-      application: 'general',
-      unitPriceMxn: 350.00,
-      costPriceMxn: 200.00,
-      oldPrice: 500.00,
-      currency: 'MXN',
-      unit: 'pieza',
-      isActive: true,
-      requiresSerial: false,
-      trackInventory: true,
-      currentStock: 10,
-      minimumStock: 2,
-      createdAt: DateTime.now(),
-      activePromotion: ActiveProductPromotion(
-        productId: 'prod-discount',
-        discountType: 'percentage',
-        discountValue: 30.0,
-        campaignName: 'Buen Fin',
-      ),
-    );
+  testWidgets(
+    'ProductCard renders campaign badge from activePromotion and hides bottom discount badges',
+    (WidgetTester tester) async {
+      final product = Product(
+        id: 'prod-discount',
+        sku: 'SKU-DISC',
+        name: 'Gel USG 5L',
+        category: 'consumible',
+        application: 'general',
+        unitPriceMxn: 350.00,
+        costPriceMxn: 200.00,
+        oldPrice: 500.00,
+        currency: 'MXN',
+        unit: 'pieza',
+        isActive: true,
+        requiresSerial: false,
+        trackInventory: true,
+        currentStock: 10,
+        minimumStock: 2,
+        createdAt: DateTime.now(),
+        activePromotion: ActiveProductPromotion(
+          productId: 'prod-discount',
+          discountType: 'percentage',
+          discountValue: 30.0,
+          campaignName: 'Buen Fin',
+        ),
+      );
 
-    // Build the widget
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 200,
-            child: ProductCard(product: product),
+      // Build the widget
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(width: 200, child: ProductCard(product: product)),
           ),
         ),
-      ),
-    );
+      );
 
-    // Verify campaign badge text (rendered inside MarqueeText)
-    expect(find.text('BUEN FIN'), findsOneWidget);
+      // Verify campaign badge text (rendered inside MarqueeText)
+      expect(find.text('BUEN FIN'), findsOneWidget);
 
-    // Verify current price is rendered
-    expect(find.text('\$350.00'), findsOneWidget);
+      // Verify current price is rendered
+      expect(find.text('\$350.00'), findsOneWidget);
 
-    // Verify old price is NOT rendered on the card (moved exclusively to product details)
-    expect(find.text('\$500.00'), findsNothing);
-    expect(find.text('30% OFF'), findsNothing);
-  });
+      // Verify old price is NOT rendered on the card (moved exclusively to product details)
+      expect(find.text('\$500.00'), findsNothing);
+      expect(find.text('30% OFF'), findsNothing);
+    },
+  );
 
-  testWidgets('ProductCard renders MÁS VENDIDO badge and condition badge when applicable', (WidgetTester tester) async {
-    // Uses salesCount: 120 which matches the real Ultrasonido animal value in the DB.
-    // The card shows MÁS VENDIDO badge when salesCount >= 50 (no activePromotion needed).
-    final product = Product(
-      id: 'prod-best',
-      sku: 'SKU-BEST',
-      name: 'Gel USG 5L',
-      category: 'consumible',
-      application: 'general',
-      unitPriceMxn: 350.00,
-      costPriceMxn: 200.00,
-      currency: 'MXN',
-      unit: 'pieza',
-      isActive: true,
-      requiresSerial: false,
-      trackInventory: true,
-      currentStock: 10,
-      minimumStock: 2,
-      createdAt: DateTime.now(),
-      salesCount: 120,
-      productCondition: 'preowned',
-    );
+  testWidgets(
+    'ProductCard renders MÁS VENDIDO badge and condition badge when applicable',
+    (WidgetTester tester) async {
+      // Uses salesCount: 120 which matches the real Ultrasonido animal value in the DB.
+      // The card shows MÁS VENDIDO badge when salesCount >= 50 (no activePromotion needed).
+      final product = Product(
+        id: 'prod-best',
+        sku: 'SKU-BEST',
+        name: 'Gel USG 5L',
+        category: 'consumible',
+        application: 'general',
+        unitPriceMxn: 350.00,
+        costPriceMxn: 200.00,
+        currency: 'MXN',
+        unit: 'pieza',
+        isActive: true,
+        requiresSerial: false,
+        trackInventory: true,
+        currentStock: 10,
+        minimumStock: 2,
+        createdAt: DateTime.now(),
+        salesCount: 120,
+        productCondition: 'preowned',
+      );
 
-    // Build the widget
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 200,
-            child: ProductCard(product: product),
+      // Build the widget
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(width: 200, child: ProductCard(product: product)),
           ),
         ),
-      ),
-    );
+      );
 
-    // Verify best seller badge
-    expect(find.text('MÁS VENDIDO'), findsOneWidget);
+      // Verify best seller badge
+      expect(find.text('MÁS VENDIDO'), findsOneWidget);
 
-    // Verify condition badge
-    expect(find.text('Seminuevo'), findsOneWidget);
-  });
+      // Verify condition badge
+      expect(find.text('Seminuevo'), findsOneWidget);
+    },
+  );
 }

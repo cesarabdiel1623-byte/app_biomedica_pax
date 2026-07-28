@@ -5,9 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../../services/search_service.dart';
+import '../../widgets/standard_section_header.dart';
 import 'product_detail_screen.dart';
 import '../../utils/ui_helpers.dart';
-
 
 const _kPrimary = Color(0xFF0D9488); // Teal principal
 const _kNavy = Color(0xFF1E3A5F); // Azul navy
@@ -26,14 +26,14 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  
+
   List<String> _history = [];
   List<Product> _recentlyViewed = [];
   List<Product> _suggestions = [];
   List<Product> _results = [];
-  
+
   bool _isLoading = false;
-  bool _isSearching = false; 
+  bool _isSearching = false;
   String _currentQuery = '';
 
   @override
@@ -50,8 +50,6 @@ class _SearchScreenState extends State<SearchScreen> {
       });
     }
   }
-
-
 
   @override
   void dispose() {
@@ -145,7 +143,10 @@ class _SearchScreenState extends State<SearchScreen> {
     _focusNode.requestFocus();
   }
 
-  Future<void> _navigateToDetail(String productId, {String? searchQuery}) async {
+  Future<void> _navigateToDetail(
+    String productId, {
+    String? searchQuery,
+  }) async {
     if (searchQuery != null && searchQuery.isNotEmpty) {
       setState(() {
         _searchController.text = searchQuery;
@@ -155,10 +156,8 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ProductDetailScreen(
-          productId: productId,
-          searchQuery: searchQuery,
-        ),
+        builder: (_) =>
+            ProductDetailScreen(productId: productId, searchQuery: searchQuery),
       ),
     );
     _loadHistoryAndRecent();
@@ -185,12 +184,7 @@ class _SearchScreenState extends State<SearchScreen> {
           body: Column(
             children: [
               _buildHeader(context),
-              Expanded(
-                child: SafeArea(
-                  top: false,
-                  child: _buildBody(),
-                ),
-              ),
+              Expanded(child: SafeArea(top: false, child: _buildBody())),
             ],
           ),
         ),
@@ -199,38 +193,33 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final double statusBarHeight = MediaQuery.of(context).padding.top;
-    return Container(
-      decoration: const BoxDecoration(
-        color: _kPrimary,
-      ),
-      padding: EdgeInsets.only(
-        left: 12,
-        right: 12,
-        top: statusBarHeight + 12,
-        bottom: 12,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
+    return ColoredBox(
+      color: _kPrimary,
+      child: SafeArea(
+        bottom: false,
+        child: SizedBox(
+          height: 64,
+          child: Row(
             children: [
-              const SizedBox(width: 12),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+              StandardBackButton(
                 onPressed: () => Navigator.of(context).maybePop(),
+                tooltip: 'Regresar',
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 4),
               Expanded(
                 child: Container(
-                  height: 50,
+                  height: 46,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: Colors.white, // White search bar container
-                    borderRadius: BorderRadius.circular(23),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: TextField(
                     controller: _searchController,
@@ -242,12 +231,21 @@ class _SearchScreenState extends State<SearchScreen> {
                     onSubmitted: _executeSearch,
                     decoration: InputDecoration(
                       isDense: true,
-                      contentPadding: const EdgeInsets.only(left: 12, right: 8, top: 12, bottom: 12),
+                      contentPadding: const EdgeInsets.only(
+                        left: 12,
+                        right: 8,
+                        top: 12,
+                        bottom: 12,
+                      ),
                       filled: true,
                       fillColor: Colors.white,
                       prefixIcon: const Padding(
                         padding: EdgeInsets.only(left: 12, right: 8),
-                        child: Icon(Icons.search, color: Color(0xFF94A3B8), size: 20),
+                        child: Icon(
+                          Icons.search,
+                          color: Color(0xFF94A3B8),
+                          size: 20,
+                        ),
                       ),
                       prefixIconConstraints: const BoxConstraints(
                         minWidth: 40,
@@ -258,11 +256,11 @@ class _SearchScreenState extends State<SearchScreen> {
                         minHeight: 46,
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(23),
+                        borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(23),
+                        borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
                       ),
                       suffixIcon: _currentQuery.isNotEmpty
@@ -292,18 +290,17 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
               ),
+              const SizedBox(width: 16),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: _kPrimary),
-      );
+      return const Center(child: CircularProgressIndicator(color: _kPrimary));
     }
 
     if (_isSearching) {
@@ -495,7 +492,8 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildSuggestionsList() {
     return ListView.separated(
       itemCount: _suggestions.length + 1,
-      separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+      separatorBuilder: (context, index) =>
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
       itemBuilder: (context, index) {
         if (index == 0) {
           return ListTile(
@@ -505,7 +503,11 @@ class _SearchScreenState extends State<SearchScreen> {
                 color: _kPrimary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.search_rounded, color: _kPrimary, size: 18),
+              child: const Icon(
+                Icons.search_rounded,
+                color: _kPrimary,
+                size: 18,
+              ),
             ),
             title: Text(
               'Buscar "${_searchController.text}"',
@@ -526,7 +528,11 @@ class _SearchScreenState extends State<SearchScreen> {
               color: Color(0xFFF1F5F9),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 18),
+            child: const Icon(
+              Icons.search_rounded,
+              color: Color(0xFF64748B),
+              size: 18,
+            ),
           ),
           title: Text(
             product.name,
@@ -538,7 +544,11 @@ class _SearchScreenState extends State<SearchScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: const Icon(Icons.arrow_outward_rounded, color: Color(0xFF94A3B8), size: 16),
+          trailing: const Icon(
+            Icons.arrow_outward_rounded,
+            color: Color(0xFF94A3B8),
+            size: 16,
+          ),
           onTap: () => _executeSearch(product.name),
         );
       },
@@ -546,11 +556,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSearchOffIcon() {
-    return Icon(
-      Icons.search_rounded,
-      size: 64,
-      color: Colors.grey.shade400,
-    );
+    return Icon(Icons.search_rounded, size: 64, color: Colors.grey.shade400);
   }
 
   Widget _buildSearchResults() {
@@ -577,10 +583,7 @@ class _SearchScreenState extends State<SearchScreen> {
               Text(
                 'No encontramos coincidencias para esta búsqueda.\nIntenta con otros términos o verifica la ortografía.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
               ),
             ],
           ),
@@ -707,7 +710,9 @@ class _ProductCardState extends State<_ProductCard> {
                       height: imgHeight,
                       color: const Color(0xFFF8FAFC),
                       padding: const EdgeInsets.all(6),
-                      child: product.mainImageUrl != null && product.mainImageUrl!.isNotEmpty
+                      child:
+                          product.mainImageUrl != null &&
+                              product.mainImageUrl!.isNotEmpty
                           ? UiHelpers.networkImage(
                               product.mainImageUrl!,
                               fit: BoxFit.contain,
@@ -721,7 +726,9 @@ class _ProductCardState extends State<_ProductCard> {
                       left: 6,
                       top: 6,
                       child: Container(
-                        constraints: BoxConstraints(maxWidth: isCompact ? 100 : 130),
+                        constraints: BoxConstraints(
+                          maxWidth: isCompact ? 100 : 130,
+                        ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 5,
                           vertical: 2,
@@ -743,7 +750,7 @@ class _ProductCardState extends State<_ProductCard> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                             ),
+                    ),
                 ],
               ),
             ),

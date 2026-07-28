@@ -44,10 +44,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           .maybeSingle();
 
       if (profile != null && mounted) {
-        if (profile['full_name'] != null && profile['full_name'].toString().isNotEmpty) {
+        if (profile['full_name'] != null &&
+            profile['full_name'].toString().isNotEmpty) {
           _nameController.text = profile['full_name'];
         }
-        if (profile['phone'] != null && profile['phone'].toString().isNotEmpty) {
+        if (profile['phone'] != null &&
+            profile['phone'].toString().isNotEmpty) {
           _phoneController.text = profile['phone'];
         }
       }
@@ -67,10 +69,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final phone = _phoneController.text.trim();
 
       // Actualizar tabla profiles
-      await Supabase.instance.client.from('profiles').update({
-        'full_name': name,
-        'phone': phone,
-      }).eq('id', userId ?? '');
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'full_name': name, 'phone': phone})
+          .eq('id', userId ?? '');
 
       // Actualizar metadatos de auth del usuario
       await Supabase.instance.client.auth.updateUser(
@@ -79,14 +81,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Perfil actualizado con éxito'), backgroundColor: kPrimary),
+          const SnackBar(
+            content: Text('Perfil actualizado con éxito'),
+            backgroundColor: kPrimary,
+          ),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar: $e'), backgroundColor: kRed),
+          SnackBar(
+            content: Text('Error al actualizar: $e'),
+            backgroundColor: kRed,
+          ),
         );
       }
     } finally {
@@ -98,7 +106,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(title: const Text('Editar Perfil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)), backgroundColor: kPrimary, foregroundColor: Colors.white, elevation: 0),
+      appBar: AppBar(
+        title: const Text(
+          'Editar Perfil',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: kPrimary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: kPrimary))
           : Form(
@@ -108,24 +124,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 children: [
                   TextFormField(
                     controller: _nameController,
-                    decoration: InputDecoration(labelText: 'Nombre Completo *', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Ingresa tu nombre' : null,
+                    decoration: InputDecoration(
+                      labelText: 'Nombre Completo *',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Ingresa tu nombre'
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(labelText: 'Teléfono', border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+                    decoration: InputDecoration(
+                      labelText: 'Teléfono',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 32),
                   SizedBox(
                     height: 48,
                     child: ElevatedButton(
                       onPressed: _saving ? null : _save,
-                      style: ElevatedButton.styleFrom(backgroundColor: kPrimary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
                       child: _saving
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Guardar Cambios', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          : const Text(
+                              'Guardar Cambios',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                 ],

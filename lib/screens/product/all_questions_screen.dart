@@ -13,7 +13,8 @@ class AllProductQuestionsScreen extends StatefulWidget {
   });
 
   @override
-  State<AllProductQuestionsScreen> createState() => _AllProductQuestionsScreenState();
+  State<AllProductQuestionsScreen> createState() =>
+      _AllProductQuestionsScreenState();
 }
 
 class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
@@ -56,7 +57,11 @@ class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
         ),
         title: const Text(
           'Preguntas del producto',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 18,
+          ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -81,7 +86,11 @@ class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
               color: Colors.white,
               child: Row(
                 children: [
-                  const Icon(Icons.shopping_bag_outlined, color: _kPrimary, size: 20),
+                  const Icon(
+                    Icons.shopping_bag_outlined,
+                    color: _kPrimary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -99,122 +108,138 @@ class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
               ),
             ),
             const Divider(height: 1, color: Color(0xFFE2E8F0)),
-            
+
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator(color: _kPrimary))
+                  ? const Center(
+                      child: CircularProgressIndicator(color: _kPrimary),
+                    )
                   : _questions.isEmpty
-                      ? _buildEmptyState()
-                      : RefreshIndicator(
-                          onRefresh: _loadQuestions,
-                          color: _kPrimary,
-                          child: ListView.separated(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _questions.length,
-                            separatorBuilder: (_, _) => const SizedBox(height: 16),
-                            itemBuilder: (context, index) {
-                              final q = _questions[index];
-                              final dateStr = '${q.createdAt.day.toString().padLeft(2, '0')}/${q.createdAt.month.toString().padLeft(2, '0')}/${q.createdAt.year}';
-                              final answer = q.answerText;
+                  ? _buildEmptyState()
+                  : RefreshIndicator(
+                      onRefresh: _loadQuestions,
+                      color: _kPrimary,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _questions.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 16),
+                        itemBuilder: (context, index) {
+                          final q = _questions[index];
+                          final dateStr =
+                              '${q.createdAt.day.toString().padLeft(2, '0')}/${q.createdAt.month.toString().padLeft(2, '0')}/${q.createdAt.year}';
+                          final answer = q.answerText;
 
-                              return Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                                ),
-                                child: Column(
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE0F2F1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text(
+                                        'P',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: _kPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            q.questionText,
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              color: Color(0xFF1F2937),
+                                              fontWeight: FontWeight.w600,
+                                              height: 1.35,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            dateStr,
+                                            style: const TextStyle(
+                                              fontSize: 10.5,
+                                              color: Color(0xFF9CA3AF),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (answer != null &&
+                                    answer.trim().isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 12),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFE0F2F1),
-                                            borderRadius: BorderRadius.circular(4),
+                                            color: const Color(0xFFEFF6FF),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                           child: const Text(
-                                            'P',
+                                            'R',
                                             style: TextStyle(
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
-                                              color: _kPrimary,
+                                              color: Color(0xFF2563EB),
                                             ),
                                           ),
                                         ),
                                         const SizedBox(width: 10),
                                         Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                q.questionText,
-                                                style: const TextStyle(
-                                                  fontSize: 13.5,
-                                                  color: Color(0xFF1F2937),
-                                                  fontWeight: FontWeight.w600,
-                                                  height: 1.35,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                dateStr,
-                                                style: const TextStyle(
-                                                  fontSize: 10.5,
-                                                  color: Color(0xFF9CA3AF),
-                                                ),
-                                              ),
-                                            ],
+                                          child: Text(
+                                            answer,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Color(0xFF4B5563),
+                                              height: 1.35,
+                                            ),
                                           ),
                                         ),
                                       ],
                                     ),
-                                    if (answer != null && answer.trim().isNotEmpty) ...[
-                                      const SizedBox(height: 12),
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 12),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFEFF6FF),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: const Text(
-                                                'R',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF2563EB),
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Text(
-                                                answer,
-                                                style: const TextStyle(
-                                                  fontSize: 13,
-                                                  color: Color(0xFF4B5563),
-                                                  height: 1.35,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
             ),
           ],
         ),
@@ -235,7 +260,10 @@ class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
         },
         backgroundColor: _kPrimary,
         icon: const Icon(Icons.add_comment_rounded, color: Colors.white),
-        label: const Text('Preguntar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Preguntar',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
@@ -247,12 +275,20 @@ class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.chat_bubble_outline_rounded, size: 48, color: Colors.grey.shade400),
+            Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 12),
             const Text(
               'Aún no hay preguntas para este producto.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey,
+              ),
             ),
           ],
         ),

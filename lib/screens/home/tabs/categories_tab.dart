@@ -1,262 +1,388 @@
 import 'package:flutter/material.dart';
+
+import '../../../models/catalog_category.dart';
+import '../../../services/catalog_service.dart';
+import '../../../utils/ui_helpers.dart';
+import '../../../widgets/load_error_state.dart';
+import '../../../widgets/standard_section_header.dart';
 import '../../product/category_products_screen.dart';
 import '../home_screen.dart';
 
+const _kPrimary = Color(0xFF0D9488);
+const _kBackground = Color(0xFFF8FAFC);
+
 class CategoriesTab extends StatefulWidget {
   const CategoriesTab({super.key});
+
   @override
-  State<CategoriesTab> createState() => _CategoriesTabState();
+  State<CategoriesTab> createState() => CategoriesTabState();
 }
 
-class _CategoriesTabState extends State<CategoriesTab> {
+class CategoriesTabState extends State<CategoriesTab> {
+  List<CatalogCategory> _categories = const [];
   int _selectedIndex = 0;
+  bool _loading = true;
+  String? _error;
+  String? _requestedCategoryId;
 
-  static final _categories = [
-    {
-      'key': 'equipo_medico', 'label': 'Equipos\nMédicos',
-      'icon': Icons.medical_services, 'color': const Color(0xFF0D9488),
-      'subs': [
-        {'label': 'Ultrasonido', 'icon': Icons.monitor_heart, 'color': const Color(0xFF0EA5E9)},
-        {'label': 'Rayos X', 'icon': Icons.radio_button_checked, 'color': const Color(0xFF6366F1)},
-        {'label': 'Monitores', 'icon': Icons.desktop_windows, 'color': const Color(0xFF0D9488)},
-        {'label': 'ECG / Cardio', 'icon': Icons.favorite, 'color': const Color(0xFFEF4444)},
-        {'label': 'Soporte Vida', 'icon': Icons.health_and_safety, 'color': const Color(0xFFF59E0B)},
-        {'label': 'PACS Nube', 'icon': Icons.cloud, 'color': const Color(0xFF3B82F6)},
-        {'label': 'Quirúrgico', 'icon': Icons.content_cut, 'color': const Color(0xFFEC4899)},
-        {'label': 'Rehabilitación', 'icon': Icons.accessibility_new, 'color': const Color(0xFF10B981)},
-        {'label': 'Oftalmología', 'icon': Icons.visibility, 'color': const Color(0xFF8B5CF6)},
-      ],
-    },
-    {
-      'key': 'ultrasonido_humano', 'label': 'Ultrasonido',
-      'icon': Icons.monitor_heart, 'color': const Color(0xFF3B82F6),
-      'subs': [
-        {'label': 'Portátil', 'icon': Icons.monitor_heart, 'color': const Color(0xFF3B82F6)},
-        {'label': 'Convexo', 'icon': Icons.sensors, 'color': const Color(0xFF0D9488)},
-        {'label': 'Doppler Color', 'icon': Icons.waterfall_chart, 'color': const Color(0xFFEC4899)},
-        {'label': 'PACS', 'icon': Icons.cloud, 'color': const Color(0xFF0EA5E9)},
-      ],
-    },
-    {
-      'key': 'consumible', 'label': 'Consumibles',
-      'icon': Icons.water_drop, 'color': const Color(0xFF0EA5E9),
-      'subs': [
-        {'label': 'Gel USG', 'icon': Icons.water_drop, 'color': const Color(0xFF0EA5E9)},
-        {'label': 'Papel Térmico', 'icon': Icons.receipt, 'color': const Color(0xFF6B7280)},
-        {'label': 'Electrodos', 'icon': Icons.electrical_services, 'color': const Color(0xFFEF4444)},
-        {'label': 'Guantes', 'icon': Icons.back_hand, 'color': const Color(0xFF3B82F6)},
-        {'label': 'Sondas Foley', 'icon': Icons.device_hub, 'color': const Color(0xFF10B981)},
-      ],
-    },
-    {
-      'key': 'refaccion', 'label': 'Refacciones',
-      'icon': Icons.build, 'color': const Color(0xFFEC4899),
-      'subs': [
-        {'label': 'Transductores', 'icon': Icons.sensors, 'color': const Color(0xFFEC4899)},
-        {'label': 'Cables ECG', 'icon': Icons.cable, 'color': const Color(0xFFEF4444)},
-        {'label': 'Pantallas', 'icon': Icons.monitor, 'color': const Color(0xFF3B82F6)},
-        {'label': 'Baterías', 'icon': Icons.battery_charging_full, 'color': const Color(0xFFF59E0B)},
-        {'label': 'Fuentes Poder', 'icon': Icons.power, 'color': const Color(0xFF6366F1)},
-      ],
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  void selectCategory(String categoryId) {
+    _requestedCategoryId = categoryId;
+    final index = _categories.indexWhere(
+      (category) => category.id == categoryId,
+    );
+    if (index >= 0 && mounted) {
+      setState(() => _selectedIndex = index);
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final categories = await CatalogService.getCategories();
+      if (!mounted) return;
+      final requestedIndex = _requestedCategoryId == null
+          ? -1
+          : categories.indexWhere(
+              (category) => category.id == _requestedCategoryId,
+            );
+      setState(() {
+        _categories = categories;
+        _selectedIndex = requestedIndex >= 0
+            ? requestedIndex
+            : categories.isEmpty
+            ? 0
+            : _selectedIndex.clamp(0, categories.length - 1);
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  IconData _iconFor(String value) {
+    final key = value.toLowerCase();
+    if (key.contains('ultrason') || key.contains('monitor')) {
+      return Icons.monitor_heart_outlined;
+    }
+    if (key.contains('consum') ||
+        key.contains('gel') ||
+        key.contains('liquid')) {
+      return Icons.water_drop_outlined;
+    }
+    if (key.contains('refacc') ||
+        key.contains('repuesto') ||
+        key.contains('cable')) {
+      return Icons.build_outlined;
+    }
+    if (key.contains('accesor')) return Icons.extension_outlined;
+    if (key.contains('servic') || key.contains('manten')) {
+      return Icons.settings_suggest_outlined;
+    }
+    if (key.contains('equipo') || key.contains('medic')) {
+      return Icons.medical_services_outlined;
+    }
+    return Icons.category_outlined;
+  }
+
+  bool _isRemoteImage(String? value) {
+    final uri = Uri.tryParse(value ?? '');
+    return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty;
+  }
+
+  void _openProducts(
+    CatalogCategory category, {
+    CatalogSubcategory? subcategory,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CategoryProductsScreen(
+          categoryId: category.id,
+          categoryKey: category.productCategoryKey,
+          categoryLabel: category.name,
+          subcategoryLabel: subcategory?.name ?? category.name,
+          subcategoryId: subcategory?.id,
+          subcategoryKey: subcategory?.slug,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: _kPrimary));
+    }
+
+    if (_error != null) {
+      return LoadErrorState(
+        error: _error,
+        onRetry: _loadCategories,
+        genericTitle: 'Error al cargar categorías',
+        genericMessage: 'No pudimos consultar las categorías por el momento.',
+      );
+    }
+
+    if (_categories.isEmpty) {
+      return RefreshIndicator(
+        color: _kPrimary,
+        onRefresh: _loadCategories,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 220),
+            Icon(Icons.category_outlined, color: Colors.grey, size: 48),
+            SizedBox(height: 12),
+            Center(child: Text('No hay categorías disponibles')),
+          ],
+        ),
+      );
+    }
+
     final current = _categories[_selectedIndex];
-    final subs = current['subs'] as List;
-    final catColor = current['color'] as Color;
-    final catLabel = (current['label'] as String).replaceAll('\n', ' ');
+
     return Column(
       children: [
-        // Barra verde superior
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [catColor, catColor.withValues(alpha: 0.82)],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 14, 16, 14),
-              child: Row(
-                children: [
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-                    onPressed: () => HomeScreen.showTab(0),
-                  ),
-                  const SizedBox(width: 10),
-                  Icon(current['icon'] as IconData, color: Colors.white, size: 26),
-                  const SizedBox(width: 12),
-                  Text(
-                    catLabel,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // Contenido: sidebar + grid
+        _buildHeader(current),
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Sidebar de categorias pegado a la barra verde
-              Container(
-                width: 90,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.07),
-                      blurRadius: 5,
-                      offset: const Offset(2, 0),
-                    ),
-                  ],
-                ),
-                child: ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: _categories.length,
-                  itemBuilder: (_, i) {
-                    final cat = _categories[i];
-                    final active = i == _selectedIndex;
-                    final color = cat['color'] as Color;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedIndex = i),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-                        decoration: BoxDecoration(
-                          color: active ? color.withValues(alpha: 0.09) : Colors.white,
-                          border: Border(
-                            left: BorderSide(
-                              color: active ? color : Colors.transparent,
-                              width: 3.5,
-                            ),
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              cat['icon'] as IconData,
-                              size: 22,
-                              color: active ? color : Colors.grey.shade400,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              cat['label'] as String,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                height: 1.2,
-                                fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                                color: active ? Colors.black87 : Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // Grid de subcategorias
+              _buildCategorySidebar(),
               Expanded(
-                child: Container(
-                  color: const Color(0xFFF8FAFC),
-                  padding: const EdgeInsets.all(12),
-                  child: GridView.builder(
-                    padding: EdgeInsets.zero,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: 0.78,
-                    ),
-                    itemCount: subs.length,
-                    itemBuilder: (_, i) {
-                      final sub = subs[i];
-                      final color = sub['color'] as Color;
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => CategoryProductsScreen(
-                                categoryKey: current['key'] as String,
-                                subcategoryLabel: sub['label'] as String,
-                                categoryLabel: catLabel,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.grey.shade200, width: 0.8),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.03),
-                                blurRadius: 5,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(sub['icon'] as IconData, color: color, size: 24),
-                              ),
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: Text(
-                                  sub['label'] as String,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade800,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                child: current.subcategories.isEmpty
+                    ? _buildCategoryOverview(current)
+                    : _buildSubcategoryGrid(current),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHeader(CatalogCategory category) {
+    return StandardSectionHeader(
+      title: category.name,
+      backgroundColor: _kPrimary,
+      backTooltip: 'Volver al inicio',
+      onBack: () => HomeScreen.showTab(0),
+    );
+  }
+
+  Widget _buildCategorySidebar() {
+    return Container(
+      width: 84,
+      color: Colors.white,
+      child: ListView.builder(
+        padding: EdgeInsets.zero,
+        itemCount: _categories.length,
+        itemBuilder: (_, index) {
+          final category = _categories[index];
+          final active = index == _selectedIndex;
+
+          return InkWell(
+            onTap: () => setState(() => _selectedIndex = index),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              constraints: const BoxConstraints(minHeight: 82),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+              decoration: BoxDecoration(
+                color: active ? const Color(0xFFF3F4F6) : Colors.white,
+                border: Border(
+                  left: BorderSide(
+                    color: active
+                        ? const Color(0xFF9CA3AF)
+                        : Colors.transparent,
+                    width: 4,
+                  ),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildCategoryVisual(category),
+                  const SizedBox(height: 6),
+                  Text(
+                    category.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      height: 1.2,
+                      fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                      color: active
+                          ? const Color(0xFF0F172A)
+                          : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategoryVisual(CatalogCategory category) {
+    if (_isRemoteImage(category.imageUrl)) {
+      return SizedBox(
+        width: 30,
+        height: 30,
+        child: UiHelpers.networkImage(
+          category.imageUrl!,
+          fit: BoxFit.contain,
+          iconSize: 18,
+        ),
+      );
+    }
+
+    return Icon(_iconFor(category.slug), size: 23, color: Colors.grey.shade500);
+  }
+
+  Widget _buildSubcategoryGrid(CatalogCategory category) {
+    return Container(
+      color: _kBackground,
+      padding: const EdgeInsets.all(8),
+      child: RefreshIndicator(
+        color: _kPrimary,
+        onRefresh: _loadCategories,
+        child: GridView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 6,
+            mainAxisSpacing: 8,
+            mainAxisExtent: 132,
+          ),
+          itemCount: category.subcategories.length,
+          itemBuilder: (_, index) {
+            final subcategory = category.subcategories[index];
+            final imageUrl = CatalogService.resolveSubcategoryImageUrl(
+              subcategory.imagePath,
+            );
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => _openProducts(category, subcategory: subcategory),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 58,
+                      height: 58,
+                      child: imageUrl != null
+                          ? UiHelpers.networkImage(
+                              imageUrl,
+                              fit: BoxFit.contain,
+                              iconSize: 26,
+                            )
+                          : Icon(
+                              _iconFor(subcategory.slug),
+                              color: Colors.grey.shade500,
+                              size: 28,
+                            ),
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        subcategory.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11.2,
+                          height: 1.15,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryOverview(CatalogCategory category) {
+    return RefreshIndicator(
+      color: _kPrimary,
+      onRefresh: _loadCategories,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        children: [
+          const SizedBox(height: 90),
+          Center(
+            child: Icon(
+              _iconFor(category.slug),
+              color: Colors.grey.shade400,
+              size: 58,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            category.name,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Consulta todos los productos disponibles en esta categoría.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 22),
+          Center(
+            child: FilledButton.icon(
+              onPressed: () => _openProducts(category),
+              style: FilledButton.styleFrom(
+                backgroundColor: _kPrimary,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.grid_view_rounded, size: 18),
+              label: const Text('Ver productos'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

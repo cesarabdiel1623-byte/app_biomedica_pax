@@ -83,7 +83,9 @@ class _AbandonedCartDialogState extends State<AbandonedCartDialog> {
                 child: Padding(
                   padding: EdgeInsets.all(8.0),
                   child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0D9488)),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Color(0xFF0D9488),
+                    ),
                   ),
                 ),
               )
@@ -102,10 +104,14 @@ class _AbandonedCartDialogState extends State<AbandonedCartDialog> {
                         ),
                         elevation: 0,
                       ),
-                      onPressed: () => _updateStatus('recovered', widget.onGoToCart),
+                      onPressed: () =>
+                          _updateStatus('recovered', widget.onGoToCart),
                       child: const Text(
                         'Ver mi Carrito',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -120,7 +126,8 @@ class _AbandonedCartDialogState extends State<AbandonedCartDialog> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () => _updateStatus('dismissed', widget.onDismiss),
+                      onPressed: () =>
+                          _updateStatus('dismissed', widget.onDismiss),
                       child: const Text(
                         'No, gracias',
                         style: TextStyle(fontSize: 16),

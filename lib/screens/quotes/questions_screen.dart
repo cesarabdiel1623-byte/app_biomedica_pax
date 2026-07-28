@@ -78,10 +78,16 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                 ),
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                leading: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.red,
+                ),
                 title: const Text(
                   'Eliminar pregunta',
-                  style: TextStyle(fontWeight: FontWeight.w500, color: Colors.red),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -101,19 +107,31 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('¿Eliminar pregunta?', style: TextStyle(fontWeight: FontWeight.bold, color: _kNavy)),
+          title: const Text(
+            '¿Eliminar pregunta?',
+            style: TextStyle(fontWeight: FontWeight.bold, color: _kNavy),
+          ),
           content: const Text('Esta acción no se puede deshacer.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
             TextButton(
               onPressed: () async {
                 Navigator.pop(context); // close dialog
                 _deleteQuestion(q);
               },
-              child: const Text('Eliminar', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Eliminar',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -126,7 +144,8 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator(color: _kPrimary)),
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator(color: _kPrimary)),
     );
 
     try {
@@ -136,12 +155,18 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
         setState(() {
           _questions.removeWhere((item) => item.id == q.id);
         });
-        UiHelpers.showFloatingSuccessToast(context, 'Pregunta eliminada exitosamente.');
+        UiHelpers.showFloatingSuccessToast(
+          context,
+          'Pregunta eliminada exitosamente.',
+        );
       }
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // pop loading overlay
-        UiHelpers.showFloatingDeleteToast(context, 'Error al eliminar la pregunta: $e');
+        UiHelpers.showFloatingDeleteToast(
+          context,
+          'Error al eliminar la pregunta: $e',
+        );
       }
     }
   }
@@ -154,7 +179,11 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
         titleSpacing: 0,
         title: const Text(
           'Preguntas',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 18,
+          ),
         ),
         centerTitle: false,
         backgroundColor: _kPrimary,
@@ -167,20 +196,21 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _kPrimary))
           : _questions.isEmpty
-              ? _buildEmptyState()
-              : RefreshIndicator(
-                  onRefresh: _loadQuestions,
-                  color: _kPrimary,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    itemCount: _questions.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12), // Gap between cards
-                    itemBuilder: (context, index) {
-                      final q = _questions[index];
-                      return _buildQuestionCard(q);
-                    },
-                  ),
-                ),
+          ? _buildEmptyState()
+          : RefreshIndicator(
+              onRefresh: _loadQuestions,
+              color: _kPrimary,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                itemCount: _questions.length,
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: 12), // Gap between cards
+                itemBuilder: (context, index) {
+                  final q = _questions[index];
+                  return _buildQuestionCard(q);
+                },
+              ),
+            ),
     );
   }
 
@@ -221,7 +251,9 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(7),
-                        child: product.mainImageUrl != null && product.mainImageUrl!.isNotEmpty
+                        child:
+                            product.mainImageUrl != null &&
+                                product.mainImageUrl!.isNotEmpty
                             ? Image.network(
                                 product.mainImageUrl!,
                                 fit: BoxFit.cover,
@@ -247,7 +279,11 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                           if (product.isActive == false) ...[
                             Row(
                               children: [
-                                const Icon(Icons.error_outline_rounded, color: Colors.orange, size: 14),
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  color: Colors.orange,
+                                  size: 14,
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Publicación pausada',
@@ -341,7 +377,8 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => ProductDetailScreen(productId: product.id),
+                            builder: (_) =>
+                                ProductDetailScreen(productId: product.id),
                           ),
                         );
                       },
@@ -393,7 +430,9 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                           q.questionText,
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: isExpanded ? FontWeight.bold : FontWeight.w500,
+                            fontWeight: isExpanded
+                                ? FontWeight.bold
+                                : FontWeight.w500,
                             color: _kTextDark,
                             height: 1.35,
                           ),
@@ -411,7 +450,9 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                   ),
                   const SizedBox(width: 8),
                   Icon(
-                    isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
                     color: Colors.grey.shade400,
                     size: 20,
                   ),
@@ -469,7 +510,9 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
 
   int diffInDays(DateTime date) {
     final diff = DateTime.now().difference(date).inDays;
-    return diff > 0 ? diff : 8; // fallback to 8 like in screenshot or 1 if recently asked
+    return diff > 0
+        ? diff
+        : 8; // fallback to 8 like in screenshot or 1 if recently asked
   }
 
   Widget _buildEmptyState() {
@@ -497,10 +540,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
             Text(
               'Las consultas que realices sobre nuestros equipos médicos aparecerán en esta sección.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
           ],
         ),
