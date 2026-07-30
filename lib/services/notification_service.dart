@@ -35,8 +35,20 @@ class NotificationService {
 
   /// Observable badge count — consumed by ValueListenableBuilder in the AppBar.
   final ValueNotifier<int> unreadCountNotifier = ValueNotifier<int>(0);
+  final StreamController<String?> _notificationTapController =
+      StreamController<String?>.broadcast();
 
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
+  String? _pendingTapPayload;
+
+  Stream<String?> get notificationTapStream =>
+      _notificationTapController.stream;
+
+  String? takePendingTapPayload() {
+    final payload = _pendingTapPayload;
+    _pendingTapPayload = null;
+    return payload;
+  }
 
   /// IDs of unread notifications already known at startup — we skip showing
   /// a banner for these so the user isn't spammed on every app launch.
@@ -84,7 +96,21 @@ class NotificationService {
     );
 
     try {
-      await _plugin.initialize(settings);
+      await _plugin.initialize(
+        settings,
+        onDidReceiveNotificationResponse: (response) {
+          final payload = response.payload;
+          if (_notificationTapController.hasListener) {
+            _notificationTapController.add(payload);
+          } else {
+            _pendingTapPayload = payload;
+          }
+        },
+      );
+      final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+      if (launchDetails?.didNotificationLaunchApp ?? false) {
+        _pendingTapPayload = launchDetails?.notificationResponse?.payload;
+      }
     } catch (e) {
       debugPrint('[NotificationService] init error: $e');
     }
@@ -148,7 +174,7 @@ class NotificationService {
                     final title =
                         row['title'] as String? ?? 'Nueva Notificación';
                     final body = row['body'] as String? ?? '';
-                    showHeadsUp(title, body);
+                    showHeadsUp(title, body, payload: id);
                   }
                 }
               }
@@ -198,7 +224,7 @@ class NotificationService {
   ///
   /// Uses the pre-created high-importance channel so Android shows the
   /// floating heads-up card even when the app is in the foreground.
-  Future<void> showHeadsUp(String title, String body) async {
+  Future<void> showHeadsUp(String title, String body, {String? payload}) async {
     // ignore: use_named_constants
     final tealColor = const Color(0xFF0D9488);
     final AndroidNotificationDetails androidDetails =
@@ -233,6 +259,7 @@ class NotificationService {
         title,
         body,
         details,
+        payload: payload,
       );
     } catch (e) {
       debugPrint('[NotificationService] showHeadsUp error: $e');

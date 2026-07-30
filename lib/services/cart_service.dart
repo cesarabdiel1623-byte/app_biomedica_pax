@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
+import 'auth_identity_service.dart';
 import 'product_service.dart';
 import 'quote_service.dart';
 
@@ -22,6 +23,53 @@ class CartItem {
   double get subtotal => (product?.unitPriceMxn ?? 0) * quantity;
   double get subtotalWithIva => subtotal * 1.16;
   double get ivaAmount => subtotal * 0.16;
+}
+
+class CartCouponResult {
+  final bool valid;
+  final String? reason;
+  final String message;
+  final Map<String, dynamic> data;
+
+  const CartCouponResult({
+    required this.valid,
+    required this.message,
+    this.reason,
+    this.data = const {},
+  });
+
+  factory CartCouponResult.fromRpc(dynamic response) {
+    dynamic normalized = response;
+    if (normalized is List && normalized.isNotEmpty) {
+      normalized = normalized.first;
+    }
+
+    if (normalized is! Map) {
+      return const CartCouponResult(
+        valid: false,
+        message: 'El servidor devolvió una respuesta de cupón inválida.',
+      );
+    }
+
+    final data = Map<String, dynamic>.from(normalized);
+    final valid = data['valid'] == true;
+    final reason = data['reason']?.toString().trim();
+    final serverMessage = data['message']?.toString().trim();
+    final message = serverMessage != null && serverMessage.isNotEmpty
+        ? serverMessage
+        : valid
+        ? 'Cupón aplicado correctamente.'
+        : (reason != null && reason.isNotEmpty
+              ? reason
+              : 'No fue posible aplicar el cupón.');
+
+    return CartCouponResult(
+      valid: valid,
+      reason: reason == null || reason.isEmpty ? null : reason,
+      message: message,
+      data: data,
+    );
+  }
 }
 
 /// Service for managing server-side cart using `carts` + `cart_items` tables
@@ -47,172 +95,12 @@ class CartService {
     return 0;
   }
 
-  /// Get client ID linked to user profile, with fallback to userId
-  static Future<String> _getClientId(String userId) async {
-    try {
-      final profile = await _client
-          .from('profiles')
-          .select('client_id')
-          .eq('id', userId)
-          .maybeSingle();
-      if (profile != null && profile['client_id'] != null) {
-        return profile['client_id'] as String;
-      }
-    } catch (_) {
-      // Ignorar errores al buscar perfil
-    }
-    return userId;
-  }
-
-  /// Ensure a client record exists for the current user.
-  /// Users registered before the auto-create trigger was set up may be missing one.
-  static Future<void> _ensureClientExists(String userId) async {
-    final user = _client.auth.currentUser;
-    if (user == null) return;
-    final email = (user.email ?? '').trim().toLowerCase();
-
-    // 1. Intentar obtener el perfil del usuario actual para ver su client_id
-    Map<String, dynamic>? profile;
-    try {
-      profile = await _client
-          .from('profiles')
-          .select('client_id, full_name, email, phone')
-          .eq('id', userId)
-          .maybeSingle();
-    } catch (_) {
-      // Ignorar errores al leer perfil
-    }
-
-    String? linkedClientId = profile?['client_id'];
-
-    if (linkedClientId != null && linkedClientId.isNotEmpty) {
-      // El perfil ya tiene un client_id vinculado.
-      // Verificamos si ese registro de cliente existe en la tabla clients.
-      try {
-        final clientRecord = await _client
-            .from('clients')
-            .select('id')
-            .eq('id', linkedClientId)
-            .maybeSingle();
-
-        if (clientRecord != null) {
-          // Todo correcto: el cliente existe y está vinculado.
-          return;
-        }
-      } catch (_) {
-        // Ignorar error al verificar existencia del cliente
-      }
-    }
-
-    // 2. Si no tiene client_id o el cliente no existe, buscamos por correo normalizado
-    String? clientIdToLink = linkedClientId;
-
-    if (email.isNotEmpty) {
-      try {
-        final existingClient = await _client
-            .from('clients')
-            .select('id')
-            .eq('email', email)
-            .maybeSingle();
-
-        if (existingClient != null) {
-          clientIdToLink = existingClient['id'] as String;
-          // Actualizar acceso a la app del cliente existente
-          await _client
-              .from('clients')
-              .update({
-                'has_app_access': true,
-                'app_registered_at': DateTime.now().toIso8601String(),
-                'updated_at': DateTime.now().toIso8601String(),
-              })
-              .eq('id', clientIdToLink);
-        }
-      } catch (_) {
-        // Ignorar error al buscar cliente existente
-      }
-    }
-
-    // 3. Si no se encontró cliente por correo, creamos uno nuevo
-    if (clientIdToLink == null || clientIdToLink.isEmpty) {
-      final name =
-          user.userMetadata?['full_name'] as String? ??
-          user.userMetadata?['name'] as String? ??
-          email;
-      final phone = user.phone ?? '';
-
-      try {
-        // Insertamos un nuevo cliente y dejamos que la base genere el UUID
-        final newClient = await _client
-            .from('clients')
-            .insert({
-              'client_type': 'otro',
-              'status': 'active',
-              'business_name': name.isNotEmpty ? name : email,
-              'contact_name': name,
-              'email': email,
-              'phone': phone,
-              'is_active': true,
-              'preferred_currency': 'MXN',
-              'country': 'México',
-              'source': 'mobile_app',
-              'has_app_access': true,
-              'profile_completed': false,
-              'app_registered_at': DateTime.now().toIso8601String(),
-            })
-            .select('id')
-            .single();
-
-        clientIdToLink = newClient['id'] as String;
-      } catch (e) {
-        // En caso de que se haya insertado en paralelo o haya restricción unique, re-buscamos por email
-        if (email.isNotEmpty) {
-          try {
-            final retryClient = await _client
-                .from('clients')
-                .select('id')
-                .eq('email', email)
-                .maybeSingle();
-            if (retryClient != null) {
-              clientIdToLink = retryClient['id'] as String;
-            }
-          } catch (_) {}
-        }
-        if (clientIdToLink == null) rethrow;
-      }
-    }
-
-    // 4. Crear o actualizar el perfil vinculándolo con el clientIdToLink
-    final fullName =
-        user.userMetadata?['full_name'] as String? ??
-        user.userMetadata?['name'] as String? ??
-        'Sin especificar';
-    final phone = user.phone ?? '';
-
-    try {
-      await _client.from('profiles').upsert({
-        'id': userId,
-        'full_name': fullName,
-        'email': email,
-        'phone': phone,
-        'role': 'client',
-        'client_id': clientIdToLink,
-        'is_active': true,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    } catch (_) {
-      // Ignorar errores al guardar/actualizar perfiles
-    }
-  }
-
   /// Get or create active cart for current user, populating profile details
   static Future<String> getOrCreateActiveCart() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('No autenticado');
 
-    // Ensure client record exists (handles legacy users without one)
-    await _ensureClientExists(userId);
-
-    final clientId = await _getClientId(userId);
+    final clientId = await AuthIdentityService.requireLinkedClientId();
 
     // Try to find active cart
     final existing = await _client
@@ -264,12 +152,59 @@ class CartService {
     }
   }
 
+  static Future<String> _requireActiveCartId() async {
+    final clientId = await AuthIdentityService.requireLinkedClientId();
+    final cart = await _client
+        .from('carts')
+        .select('id')
+        .eq('client_id', clientId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+    if (cart == null) {
+      throw Exception('No tienes un carrito activo.');
+    }
+    return cart['id'] as String;
+  }
+
+  /// Validates and applies a coupon exclusively through the backend contract.
+  static Future<CartCouponResult> applyCartCoupon(String code) async {
+    final normalizedCode = code.trim();
+    if (normalizedCode.isEmpty) {
+      throw Exception('Escribe un código de cupón.');
+    }
+
+    final cartId = await _requireActiveCartId();
+    final response = await _client.rpc(
+      'apply_cart_coupon',
+      params: {'p_cart_id': cartId, 'p_code': normalizedCode},
+    );
+    final result = CartCouponResult.fromRpc(response);
+    if (result.valid) {
+      await getCartPricing();
+    }
+    return result;
+  }
+
+  /// Requests the authoritative cart pricing without calculating backend
+  /// totals on the device.
+  static Future<dynamic> getCartPricing() async {
+    final cartId = await _requireActiveCartId();
+    return _client.rpc('get_cart_pricing', params: {'p_cart_id': cartId});
+  }
+
+  static Future<void> removeCartCoupon() async {
+    final cartId = await _requireActiveCartId();
+    await _client.rpc('remove_cart_coupon', params: {'p_cart_id': cartId});
+    await getCartPricing();
+  }
+
   /// Get all items in the active cart with product details
   static Future<List<CartItem>> getCartItems() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return [];
 
-    final clientId = await _getClientId(userId);
+    final clientId = await AuthIdentityService.requireLinkedClientId();
 
     final cartData = await _client
         .from('carts')
@@ -358,7 +293,6 @@ class CartService {
             'cart_id': cartId,
             'product_id': productId,
             'quantity': quantity,
-            'unit_price': product?.unitPriceMxn ?? 0.0,
             'product_name_snapshot': product?.name ?? 'Producto',
             'sku_snapshot': product?.sku,
             'product_category_snapshot': product?.category,
@@ -453,7 +387,7 @@ class CartService {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
 
-    final clientId = await _getClientId(userId);
+    final clientId = await AuthIdentityService.requireLinkedClientId();
 
     final cartData = await _client
         .from('carts')
@@ -477,7 +411,7 @@ class CartService {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('No autenticado');
 
-    final clientId = await _getClientId(userId);
+    final clientId = await AuthIdentityService.requireLinkedClientId();
 
     final cartData = await _client
         .from('carts')
@@ -497,31 +431,22 @@ class CartService {
     return quoteId as String;
   }
 
-  /// Checks if a normalized phone number is already registered in clients with has_app_access = true.
-  /// Bypasses RLS using custom database RPC or does a selective fallback query.
+  /// Checks if a normalized phone number is already registered.
+  ///
+  /// The lookup stays behind the backend RPC so the mobile client cannot use
+  /// the `clients` table to enumerate registered phone numbers.
   static Future<bool> isPhoneRegistered(String phone) async {
     final normalized = phone.replaceAll(RegExp(r'[^0-9]'), '');
     if (normalized.isEmpty) return false;
 
     try {
-      // 1. Try invoking the RPC function (most secure and accurate, bypasses RLS)
       final bool exists = await _client.rpc(
         'check_phone_exists',
         params: {'p_phone': normalized},
       );
       return exists;
-    } catch (e) {
-      // 2. Fallback to direct query if RPC doesn't exist yet
-      try {
-        final List<dynamic> result = await _client
-            .from('clients')
-            .select('id')
-            .eq('has_app_access', true)
-            .or('phone.eq.$normalized,phone.eq.+52$normalized');
-        return result.isNotEmpty;
-      } catch (_) {
-        return false;
-      }
+    } catch (_) {
+      return false;
     }
   }
 
@@ -530,7 +455,7 @@ class CartService {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return 0;
 
-    final clientId = await _getClientId(userId);
+    final clientId = await AuthIdentityService.requireLinkedClientId();
 
     final cartData = await _client
         .from('carts')

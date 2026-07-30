@@ -89,7 +89,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: _loading ? Colors.white : const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: _kPrimary,
         foregroundColor: Colors.white,
@@ -99,24 +99,29 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.subcategoryLabel,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            if (_isSubcategoryView &&
-                widget.subcategoryLabel != widget.categoryLabel)
-              Text(
-                widget.categoryLabel,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.8),
-                ),
+        title: _loading
+            ? const SizedBox.shrink()
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.subcategoryLabel,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (_isSubcategoryView &&
+                      widget.subcategoryLabel != widget.categoryLabel)
+                    Text(
+                      widget.categoryLabel,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
       ),
       body: _buildBody(),
     );

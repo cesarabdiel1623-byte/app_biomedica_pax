@@ -1,0 +1,1044 @@
+MAPA DEL CODIGO DE LA APP GO MEDICAL
+Ultima actualizacion: 28 de julio de 2026
+
+Este archivo sirve para explicar el proyecto movil Go Medical a otra persona
+del equipo, mostrar como esta organizada la app y ubicar rapidamente donde esta
+el codigo de cada pantalla, servicio y flujo importante.
+
+No contiene credenciales, llaves privadas ni datos sensibles.
+
+
+1. RESUMEN DEL PROYECTO
+
+Go Medical es una app movil Flutter para un marketplace de equipo medico. La
+app permite:
+
+- Iniciar sesion o registrarse con Supabase Auth.
+- Consultar productos, categorias, subcategorias, banners y promociones desde
+  Supabase.
+- Ver detalle de productos, imagenes, caracteristicas, preguntas y opiniones.
+- Agregar productos al carrito.
+- Solicitar cotizaciones.
+- Probar el flujo preparado de Mercado Pago mediante una Edge Function.
+- Guardar direcciones de entrega.
+- Programar servicios de mantenimiento biomédico.
+- Crear y consultar tickets de soporte.
+- Administrar favoritos, historial, opiniones, compras y notificaciones.
+
+Tecnologia principal:
+
+- Flutter / Dart.
+- Supabase Auth, Database, Storage, Realtime y Edge Functions.
+- Android como plataforma movil principal en esta etapa.
+- flutter_custom_tabs para abrir checkout externo de Mercado Pago.
+- flutter_map, geolocator y latlong2 para ubicacion y mapa.
+- image_picker, file_picker y video_player para adjuntos, fotos y video.
+
+
+2. ESTRUCTURA GENERAL DEL CODIGO
+
+Raiz del proyecto:
+
+- pubspec.yaml
+  Define nombre del paquete, dependencias, assets e iconos.
+
+- dart_defines.json
+  Archivo local con credenciales de desarrollo. Esta ignorado por Git y no debe
+  subirse al repositorio.
+
+- dart_defines.example.json
+  Ejemplo sin secretos reales para que otra persona sepa que variables debe
+  crear.
+
+- flutter_native_splash.yaml
+  Configuracion del splash nativo.
+
+- android/
+  Configuracion Android, launcher icon, splash y AndroidManifest.
+
+- assets/
+  Imagenes locales de la app, logo, splash y medios de pago.
+
+- lib/
+  Codigo principal de la aplicacion movil.
+
+- test/ e integration_test/
+  Pruebas unitarias, widgets e integracion.
+
+
+Dentro de lib/:
+
+- lib/main.dart
+  Entrada principal de la app. Inicializa constantes, Supabase, notificaciones,
+  deep links de pago y decide si mostrar login, home o pantalla de configuracion
+  pendiente.
+
+- lib/utils/
+  Constantes y helpers generales.
+
+- lib/models/
+  Modelos de datos usados por pantallas y servicios.
+
+- lib/services/
+  Capa de comunicacion con Supabase, storage, funciones, carrito, pagos,
+  ubicacion, tickets, preguntas, opiniones, favoritos, etc.
+
+- lib/screens/
+  Pantallas de la aplicacion separadas por modulo: auth, home, product,
+  profile, tickets, quotes y payment.
+
+- lib/widgets/
+  Widgets reutilizables globales.
+
+
+3. ARRANQUE DE LA APP
+
+Archivo principal:
+
+- lib/main.dart
+
+Flujo:
+
+1. Flutter inicia con main().
+2. Se conserva el splash nativo mientras se preparan servicios.
+3. Constants.init() lee valores inyectados por dart-define.
+4. QuoteService.init() prepara cotizaciones locales.
+5. Si existen SUPABASE_URL y SUPABASE_ANON_KEY, se inicializa Supabase.
+6. NotificationService inicia notificaciones locales.
+7. GoMedicalApp carga MaterialApp, tema visual y AuthGate.
+
+Pantallas iniciales:
+
+- MissingConfigScreen
+  Sale cuando faltan credenciales de Supabase.
+
+- AuthGate
+  Revisa la sesion actual de Supabase.
+  Si hay usuario y registro completo, abre HomeScreen.
+  Si falta completar datos, abre RegistrationChecklistScreen.
+  Si no hay sesion, abre LoginScreen.
+
+
+4. TEMA VISUAL
+
+El tema base se define en:
+
+- lib/main.dart
+
+Colores principales:
+
+- Verde principal: #0D9488
+- Azul oscuro / texto fuerte: #0F172A
+- Verde secundario: #10B981
+- Fondo base: #F8FAFC o blanco segun pantalla
+
+El home y muchas pantallas usan encabezado verde, fondo blanco, iconos grises
+cuando son neutrales y verde cuando estan activos.
+
+
+5. PANTALLAS PRINCIPALES
+
+5.1 Autenticacion y registro
+
+Carpeta:
+
+- lib/screens/auth/
+
+Archivos:
+
+- login_screen.dart
+  Pantalla de inicio de sesion. Maneja correo/password y Google Sign-In.
+
+- register_screen.dart
+  Pantalla inicial de registro.
+
+- otp_verification_screen.dart
+  Verificacion OTP.
+
+- registration_flow/registration_checklist_screen.dart
+  Checklist para completar el registro del usuario.
+
+- registration_flow/step_1_email.dart
+  Captura email.
+
+- registration_flow/step_1_otp.dart
+  Valida OTP del email.
+
+- registration_flow/step_2_name.dart
+  Captura nombre.
+
+- registration_flow/step_3_phone.dart
+  Captura telefono o permite saltarlo segun flujo.
+
+- registration_flow/step_4_password.dart
+  Captura contraseña.
+
+Servicio relacionado:
+
+- Supabase Auth desde supabase_flutter.
+- lib/services/auth_identity_service.dart para obtener el client_id efectivo.
+
+
+5.2 Home principal
+
+Archivo:
+
+- lib/screens/home/home_screen.dart
+
+Responsabilidad:
+
+- Contiene la navegacion principal con BottomNavigationBar.
+- Mantiene 5 tabs:
+  Inicio, Categorias, Carrito, Soporte y Perfil.
+- Oculta la barra inferior durante la carga inicial para que la app no se vea
+  incompleta.
+
+Tabs:
+
+- lib/screens/home/tabs/marketplace_tab.dart
+  Inicio / marketplace.
+
+- lib/screens/home/tabs/categories_tab.dart
+  Exploracion por categorias.
+
+- lib/screens/home/tabs/cart_tab.dart
+  Carrito.
+
+- lib/screens/tickets/tickets_list_screen.dart
+  Soporte / tickets de servicio.
+
+- lib/screens/home/tabs/profile_tab.dart
+  Perfil del usuario.
+
+
+5.3 Inicio / marketplace
+
+Archivo:
+
+- lib/screens/home/tabs/marketplace_tab.dart
+
+Que muestra:
+
+- Barra de busqueda.
+- Acceso a cotizaciones.
+- Notificaciones.
+- Ubicacion de entrega.
+- Banners promocionales.
+- Categorias activas desde Supabase.
+- Secciones horizontales de productos por categoria.
+- Promociones cuando existen.
+
+Servicios relacionados:
+
+- ProductService
+- CatalogService
+- PromotionBannerService
+- AddressService
+- QuoteService
+- NotificationService
+
+Tablas o vistas usadas:
+
+- products
+- product_media
+- product_specs
+- active_product_promotions
+- categories
+- subcategories
+- active_promotion_banners
+- active_promotion_cards
+- client_addresses
+- carts
+
+
+5.4 Categorias
+
+Archivos:
+
+- lib/screens/home/tabs/categories_tab.dart
+- lib/screens/product/category_catalog_screen.dart
+- lib/screens/product/category_products_screen.dart
+
+Responsabilidad:
+
+- Mostrar categorias y subcategorias.
+- Abrir una pantalla por categoria.
+- Listar productos de una categoria o subcategoria.
+
+Servicios relacionados:
+
+- CatalogService
+- ProductService
+
+Tablas:
+
+- categories
+- subcategories
+- products
+- product_media
+- product_specs
+
+
+5.5 Producto
+
+Archivos:
+
+- lib/screens/product/product_detail_screen.dart
+- lib/screens/product/category_products_screen.dart
+- lib/screens/product/search_screen.dart
+- lib/screens/home/widgets/product_card.dart
+
+Responsabilidad:
+
+- Mostrar ficha completa del producto.
+- Mostrar precio, imagenes, disponibilidad, envio, garantia, metodo de pago,
+  preguntas, opiniones y productos relacionados.
+- Permitir agregar al carrito.
+- Permitir solicitar cotizacion cuando aplique.
+- Permitir agregar a favoritos.
+
+Servicios relacionados:
+
+- ProductService
+- CartService
+- FavoriteService
+- QuestionService
+- ReviewService
+- MercadoPagoTestService
+
+Tablas:
+
+- products
+- product_media
+- product_specs
+- product_reviews
+- product_questions
+- client_favorites
+- carts
+- cart_items
+
+
+5.6 Busqueda
+
+Archivo:
+
+- lib/screens/product/search_screen.dart
+
+Responsabilidad:
+
+- Buscar productos por nombre, descripcion, marca, sku o marca comercial.
+- Mostrar busquedas recientes.
+- Mostrar productos vistos recientemente.
+- Mostrar resultado vacio cuando no hay coincidencias.
+
+Servicio relacionado:
+
+- SearchService
+- ProductService
+
+
+5.7 Carrito y compra
+
+Archivos:
+
+- lib/screens/home/tabs/cart_tab.dart
+- lib/screens/home/widgets/checkout_sheet.dart
+- lib/screens/payment/payment_result_screen.dart
+
+Responsabilidad:
+
+- Mostrar productos agregados al carrito.
+- Seleccionar o deseleccionar productos.
+- Cambiar cantidad.
+- Eliminar productos con el icono de basura.
+- Aplicar cupon cuando el backend/admin este listo.
+- Iniciar prueba de pago preparada para Mercado Pago.
+
+Servicios relacionados:
+
+- CartService
+- MercadoPagoTestService
+- PaymentDeepLinkService
+- AddressService
+
+Tablas / funciones:
+
+- carts
+- cart_items
+- products
+- client_addresses
+- Edge Function: create-mp-test-preference
+
+Nota importante:
+
+- El pago de Mercado Pago en esta etapa esta preparado para pruebas. La app no
+  debe enviar precio, total, IVA, producto ni cantidad al backend de pago.
+  El backend debe crear la preferencia de forma segura.
+
+
+5.8 Mercado Pago
+
+Archivos:
+
+- lib/services/mercado_pago_test_service.dart
+- lib/services/payment_deep_link_service.dart
+- lib/screens/payment/payment_result_screen.dart
+- assets/images/payments/mercadopago_v3.svg
+
+Responsabilidad:
+
+- Validar que exista sesion activa.
+- Invocar la Edge Function create-mp-test-preference.
+- Recibir checkout_url.
+- Validar que la URL sea HTTPS y de dominio permitido de Mercado Pago.
+- Abrir checkout con flutter_custom_tabs.
+- Procesar deep links de resultado.
+
+Seguridad aplicada:
+
+- El cliente movil no manda montos ni productos al crear la preferencia.
+- La URL de checkout se valida antes de abrirla.
+- La funcion sensible debe vivir en Supabase Edge Functions o backend.
+
+
+5.9 Direcciones de entrega
+
+Archivos:
+
+- lib/screens/home/address_picker_screen.dart
+- lib/services/address_service.dart
+
+Responsabilidad:
+
+- Elegir direccion guardada.
+- Agregar nueva direccion.
+- Editar direccion existente.
+- Guardar direccion como principal.
+- Mostrar CP en el inicio cuando hay direccion seleccionada.
+- Usar mapa y geolocalizacion para ayudar a llenar los datos.
+
+Tabla:
+
+- client_addresses
+
+Campos importantes:
+
+- client_id
+- label
+- address
+- city
+- state
+- postal_code
+- latitude
+- longitude
+- is_default
+
+La app tambien guarda dentro de address detalles como:
+
+- Direccion
+- Interior
+- Colonia
+- Localidad
+- Municipio
+- Estado
+- Codigo postal
+- Indicaciones
+- Nombre de quien recibe
+- Telefono de quien recibe
+
+Estos detalles se guardan como texto estructurado dentro del campo address para
+no romper la tabla actual.
+
+
+5.10 Cotizaciones
+
+Archivos:
+
+- lib/screens/product/quote_cart_screen.dart
+- lib/screens/home/widgets/quote_request_sheet.dart
+- lib/screens/profile/quotes_screen.dart
+- lib/screens/profile/quote_detail_screen.dart
+- lib/screens/profile/quote_request_detail_screen.dart
+- lib/services/quote_service.dart
+
+Responsabilidad:
+
+- Agregar productos a solicitud de cotizacion.
+- Capturar datos necesarios para enviar la solicitud.
+- Ver solicitudes y cotizaciones desde el perfil.
+- Consultar detalle de una cotizacion.
+
+Tablas:
+
+- quote_requests
+- quote_request_items
+- quotes
+- quote_items
+- clients
+- profiles
+
+
+5.11 Preguntas
+
+Archivos:
+
+- lib/screens/quotes/questions_screen.dart
+- lib/screens/product/ask_question_screen.dart
+- lib/screens/product/all_questions_screen.dart
+- lib/screens/product/single_question_screen.dart
+- lib/services/question_service.dart
+
+Responsabilidad:
+
+- Hacer preguntas sobre productos.
+- Ver preguntas propias.
+- Ver preguntas y respuestas del producto.
+- Eliminar preguntas cuando aplique.
+
+Tabla:
+
+- product_questions
+
+
+5.12 Opiniones
+
+Archivos:
+
+- lib/screens/quotes/reviews_screen.dart
+- lib/screens/product/write_review_screen.dart
+- lib/screens/product/all_reviews_screen.dart
+- lib/widgets/review_video_tile.dart
+- lib/services/review_service.dart
+
+Responsabilidad:
+
+- Ver opiniones pendientes y realizadas.
+- Crear, editar o eliminar opinion.
+- Calificar con estrellas.
+- Agregar hasta 5 fotos y 1 video de maximo 1 minuto.
+- Mostrar opiniones dentro del producto.
+
+Tablas / buckets:
+
+- product_reviews
+- orders
+- order_items
+- Storage bucket: review-assets
+
+
+5.13 Favoritos e historial
+
+Archivos:
+
+- lib/screens/product/favorites_screen.dart
+- lib/screens/product/recently_viewed_screen.dart
+- lib/screens/product/manage_history_screen.dart
+- lib/services/favorite_service.dart
+
+Responsabilidad:
+
+- Guardar productos favoritos.
+- Mostrar productos vistos recientemente.
+- Permitir administrar el historial.
+
+Tabla:
+
+- client_favorites
+
+El historial reciente usa almacenamiento local para experiencia rapida.
+
+
+5.14 Perfil
+
+Archivo:
+
+- lib/screens/home/tabs/profile_tab.dart
+
+Responsabilidad:
+
+- Mostrar datos del usuario.
+- Acceder a compras, cotizaciones, favoritos, historial, preguntas, opiniones,
+  mantenimientos, ayuda, editar perfil y notificaciones.
+- Cerrar sesion.
+
+Pantallas relacionadas:
+
+- lib/screens/profile/edit_profile_screen.dart
+- lib/screens/profile/orders_screen.dart
+- lib/screens/profile/order_detail_screen.dart
+- lib/screens/profile/quotes_screen.dart
+- lib/screens/profile/maintenance_screen.dart
+- lib/screens/profile/notifications_screen.dart
+
+Nota:
+
+- El apartado de facturacion fue retirado porque no se usara en esta version.
+
+
+5.15 Compras / pedidos
+
+Archivos:
+
+- lib/screens/profile/orders_screen.dart
+- lib/screens/profile/order_detail_screen.dart
+
+Responsabilidad:
+
+- Mostrar pedidos del usuario.
+- Consultar detalle de productos comprados.
+- Navegar a producto y a opiniones cuando corresponda.
+
+Tablas:
+
+- orders
+- order_items
+- products
+
+
+5.16 Mantenimiento biomedico
+
+Archivo:
+
+- lib/screens/profile/maintenance_screen.dart
+
+Responsabilidad:
+
+- Crear solicitudes de mantenimiento o reparacion.
+- Capturar informacion del equipo:
+  nombre del equipo, modelo, marca y numero de serie.
+- Capturar estado y diagnostico segun tipo de servicio.
+- Capturar descripcion del problema u observaciones del equipo.
+- Adjuntar fotos y video.
+- Capturar contacto y logistica:
+  responsable, telefono, area/departamento, hospital/clinica/institucion y
+  ubicacion del servicio.
+
+Tipos de servicio actuales:
+
+- Mantenimiento preventivo
+- Mantenimiento correctivo
+- Reparacion
+
+Tabla:
+
+- service_tickets
+- equipment_units, cuando se relaciona con equipos existentes.
+- profiles para obtener datos del usuario cuando aplica.
+
+Punto importante:
+
+- El formulario cambia segun el tipo de servicio para pedir solo lo necesario y
+  evitar preguntas confusas.
+
+
+5.17 Tickets de soporte
+
+Archivos:
+
+- lib/screens/tickets/tickets_list_screen.dart
+- lib/screens/tickets/ticket_detail_screen.dart
+- lib/services/ticket_service.dart
+- lib/models/service_ticket.dart
+- lib/models/ticket_message.dart
+
+Responsabilidad:
+
+- Ver lista de tickets por estado.
+- Entrar al detalle de un ticket.
+- Enviar mensajes.
+- Adjuntar archivos, imagenes o video.
+- Recibir actualizaciones por realtime.
+
+Tablas / storage:
+
+- service_tickets
+- service_ticket_messages
+- Bucket de adjuntos de tickets, segun configuracion de Supabase.
+
+Pendiente de seguridad recomendado:
+
+- Si los adjuntos contienen informacion privada, el bucket debe ser privado y
+  entregar URLs firmadas.
+
+
+5.18 Notificaciones
+
+Archivos:
+
+- lib/services/notification_service.dart
+- lib/screens/profile/notifications_screen.dart
+
+Responsabilidad:
+
+- Cargar notificaciones del usuario.
+- Escuchar cambios con Supabase Realtime.
+- Marcar como leidas.
+- Navegar desde una notificacion al contenido relacionado.
+
+Tabla:
+
+- notifications
+
+
+6. SERVICIOS DE LA APP
+
+- AuthIdentityService
+  Obtiene el client_id real asociado al usuario autenticado.
+
+- ProductService
+  Consulta productos publicos. Usa columnas explicitas para no pedir datos
+  internos sensibles como costos.
+
+- CatalogService
+  Consulta categorias y subcategorias activas desde Supabase.
+
+- PromotionBannerService
+  Consulta banners/cards activos desde vistas de Supabase y resuelve imagenes
+  publicas del storage.
+
+- CartService
+  Gestiona carts, cart_items, cantidades y vinculacion con clients/profiles.
+
+- QuoteService
+  Gestiona solicitudes de cotizacion y contador local de cotizaciones.
+
+- FavoriteService
+  Alta, baja y consulta de favoritos.
+
+- SearchService
+  Maneja busquedas recientes y apoyo al buscador.
+
+- QuestionService
+  Gestiona preguntas de productos.
+
+- ReviewService
+  Gestiona opiniones, fotos, videos y permisos de opinion segun compras.
+
+- AddressService
+  Gestiona direcciones guardadas y direccion principal.
+
+- LocationService
+  Apoya en ubicacion/geolocalizacion y datos del cliente.
+
+- TicketService
+  Gestiona tickets y mensajes de soporte.
+
+- NotificationService
+  Gestiona notificaciones locales y realtime.
+
+- MercadoPagoTestService
+  Invoca la funcion de prueba de Mercado Pago y abre checkout seguro.
+
+- PaymentDeepLinkService
+  Escucha enlaces de regreso de pago y abre PaymentResultScreen.
+
+
+7. MODELOS PRINCIPALES
+
+- lib/models/product.dart
+  Modelo de producto, imagenes, specs, promociones y precios.
+
+- lib/models/catalog_category.dart
+  Modelo de categoria y subcategoria.
+
+- lib/models/promotion_banner.dart
+  Modelo para banners/cards promocionales.
+
+- lib/models/quote_item.dart
+  Producto dentro de una solicitud de cotizacion.
+
+- lib/models/payment_test_result.dart
+  Resultado del pago de prueba.
+
+- lib/models/service_ticket.dart
+  Ticket de servicio.
+
+- lib/models/ticket_message.dart
+  Mensaje dentro de ticket.
+
+
+8. WIDGETS REUTILIZABLES
+
+- lib/widgets/load_error_state.dart
+  Estado visual para errores de carga o falta de internet.
+
+- lib/widgets/standard_section_header.dart
+  Header estandar y boton de regreso.
+
+- lib/widgets/review_video_tile.dart
+  Vista de video en opiniones.
+
+- lib/screens/home/widgets/product_card.dart
+  Tarjeta de producto usada en home y listados.
+
+- lib/screens/home/widgets/banner_carousel.dart
+  Carrusel de banners.
+
+- lib/screens/home/widgets/promotion_cards_section.dart
+  Cards promocionales.
+
+- lib/screens/home/widgets/shimmer_card.dart
+  Skeleton de carga.
+
+- lib/screens/home/widgets/checkout_sheet.dart
+  Hoja inferior del checkout.
+
+- lib/screens/home/widgets/quote_request_sheet.dart
+  Hoja inferior para solicitud de cotizacion.
+
+
+9. ASSETS IMPORTANTES
+
+- assets/images/logo.png
+  Logo principal.
+
+- assets/images/splash_icon.png
+- assets/images/splash_mark.png
+  Recursos del splash.
+
+- assets/images/payments/mercadopago_v3.svg
+- assets/images/payments/visa_v3.svg
+- assets/images/payments/mastercard_v3.svg
+- assets/images/payments/oxxo_v3.svg
+  Iconos de medios de pago.
+
+
+10. BASE DE DATOS Y SUPABASE
+
+La app depende de Supabase como fuente de verdad. Las tablas/vistas que aparecen
+en el codigo son:
+
+- profiles
+- clients
+- products
+- product_media
+- product_specs
+- active_product_promotions
+- categories
+- subcategories
+- active_promotion_banners
+- active_promotion_cards
+- carts
+- cart_items
+- client_addresses
+- client_favorites
+- orders
+- order_items
+- quote_requests
+- quote_request_items
+- quotes
+- quote_items
+- product_questions
+- product_reviews
+- service_tickets
+- service_ticket_messages
+- notifications
+- equipment_units
+
+Buckets usados:
+
+- product-media
+- promotion-assets
+- review-assets
+- bucket de adjuntos de tickets segun TicketService / Supabase.
+
+Funciones usadas:
+
+- create-mp-test-preference
+  Funcion de prueba para crear preferencia de Mercado Pago.
+
+
+11. SEGURIDAD ACTUAL DE LA APP MOVIL
+
+- Las credenciales no estan escritas directamente en lib/.
+- Supabase se inicializa con variables de entorno de compilacion:
+  SUPABASE_URL y SUPABASE_ANON_KEY.
+- Google Sign-In usa client IDs por dart-define.
+- ProductService pide columnas publicas explicitas para productos.
+- MercadoPagoTestService no manda totales ni productos desde Flutter para crear
+  la preferencia.
+- La URL de Mercado Pago se valida antes de abrirse.
+- Las operaciones sensibles deben quedar protegidas por RLS, RPC o Edge
+  Functions en Supabase.
+
+Puntos que deben revisarse en Supabase:
+
+- Politicas RLS reales de cada tabla.
+- Permisos de RPC y Edge Functions.
+- Buckets privados para adjuntos sensibles.
+- Que promociones y fechas se calculen en base de datos/backend, no con el reloj
+  del telefono.
+
+
+12. COMO MOSTRAR EL PROYECTO EN UNA REVISION
+
+Orden recomendado para presentar la app:
+
+1. Arranque y login.
+   Mostrar login, registro y checklist.
+
+2. Inicio.
+   Mostrar busqueda, ubicacion, banners, categorias y productos.
+
+3. Catalogo.
+   Abrir categorias y subcategorias.
+
+4. Producto.
+   Mostrar ficha de producto, metodo de pago, opiniones, preguntas y productos
+   relacionados.
+
+5. Carrito.
+   Agregar producto, cambiar cantidad, eliminar con icono, cupon y compra.
+
+6. Direcciones.
+   Mostrar seleccion, edicion y direccion principal.
+
+7. Cotizaciones.
+   Mostrar solicitud y listado desde perfil.
+
+8. Opiniones y preguntas.
+   Mostrar pantallas de perfil y detalle del producto.
+
+9. Mantenimiento y soporte.
+   Mostrar formulario de mantenimiento, tickets y chat de ticket.
+
+10. Seguridad.
+    Explicar que las credenciales estan fuera del codigo, que Mercado Pago se
+    prepara desde backend y que Supabase debe tener RLS.
+
+
+13. DONDE CAMBIAR CADA COSA
+
+- Cambiar colores globales:
+  lib/main.dart
+
+- Cambiar barra inferior:
+  lib/screens/home/home_screen.dart
+
+- Cambiar inicio:
+  lib/screens/home/tabs/marketplace_tab.dart
+
+- Cambiar categorias:
+  lib/screens/home/tabs/categories_tab.dart
+  lib/screens/product/category_catalog_screen.dart
+
+- Cambiar tarjeta de producto:
+  lib/screens/home/widgets/product_card.dart
+
+- Cambiar detalle del producto:
+  lib/screens/product/product_detail_screen.dart
+
+- Cambiar carrito:
+  lib/screens/home/tabs/cart_tab.dart
+
+- Cambiar checkout:
+  lib/screens/home/widgets/checkout_sheet.dart
+
+- Cambiar direcciones:
+  lib/screens/home/address_picker_screen.dart
+  lib/services/address_service.dart
+
+- Cambiar Mercado Pago:
+  lib/services/mercado_pago_test_service.dart
+  lib/services/payment_deep_link_service.dart
+  lib/screens/payment/payment_result_screen.dart
+
+- Cambiar mantenimiento:
+  lib/screens/profile/maintenance_screen.dart
+
+- Cambiar tickets:
+  lib/screens/tickets/tickets_list_screen.dart
+  lib/screens/tickets/ticket_detail_screen.dart
+  lib/services/ticket_service.dart
+
+- Cambiar perfil:
+  lib/screens/home/tabs/profile_tab.dart
+
+- Cambiar opiniones:
+  lib/screens/quotes/reviews_screen.dart
+  lib/screens/product/write_review_screen.dart
+  lib/services/review_service.dart
+
+- Cambiar preguntas:
+  lib/screens/quotes/questions_screen.dart
+  lib/screens/product/ask_question_screen.dart
+  lib/services/question_service.dart
+
+
+14. COMANDOS UTILES
+
+Ejecutar en Android con credenciales locales:
+
+flutter run --dart-define-from-file=dart_defines.json
+
+Analizar errores:
+
+flutter analyze
+
+Ejecutar pruebas:
+
+flutter test
+
+Regenerar splash si se modifica flutter_native_splash.yaml:
+
+dart run flutter_native_splash:create
+
+
+15. PRUEBAS EXISTENTES
+
+- test/widget_test.dart
+- test/widgets/product_card_test.dart
+- test/unit/product_test.dart
+- test/unit/catalog_category_test.dart
+- test/unit/address_test.dart
+- test/unit/promotion_banner_test.dart
+- test/services/mercado_pago_test_service_test.dart
+- test/services/payment_deep_link_service_test.dart
+- integration_test/app_integration_test.dart
+
+Las pruebas ayudan a validar modelos, tarjetas, banners, direcciones y pagos de
+prueba. Para flujos reales de Mercado Pago e inventario se necesita validar
+tambien desde backend/Supabase.
+
+
+16. NOTAS PARA EL EQUIPO WEB / ADMINISTRATIVO
+
+La app movil consume datos que deben estar correctamente creados en la parte web
+administrativa o en Supabase:
+
+- Categorias y subcategorias activas con sort_order.
+- Banners y cards promocionales activos.
+- Productos activos con imagenes publicas.
+- Promociones calculadas por backend/base de datos.
+- Cupones, si se habilita el flujo completo.
+- Tickets de servicio y mensajes.
+- Solicitudes de mantenimiento con todos los campos necesarios para seguimiento.
+- Direcciones de clientes para envios.
+
+Para evitar diferencias entre web y app, la base de datos debe ser la fuente de
+verdad y la app solo debe leer los contratos publicos necesarios.
+
+
+17. PENDIENTES RECOMENDADOS
+
+- Confirmar RLS de todas las tablas usadas por la app.
+- Confirmar que process_cart_checkout no pueda ejecutarse desde anon ni desde
+  el cliente movil sin validaciones de pago.
+- Completar Mercado Pago real en backend antes de produccion.
+- Revisar que buckets con informacion privada usen URLs firmadas.
+- Documentar migraciones oficiales en un repositorio privado de base de datos.
+- Agregar pruebas de integracion reales para checkout, webhooks e inventario.
+- Completar renombrado de iOS/macOS antes de publicar en esas plataformas.
+
+
+18. RESUMEN PARA PRESENTACION CORTA
+
+"Go Medical es una app Flutter conectada a Supabase. La aplicacion separa las
+pantallas en screens, la comunicacion con la base en services y los datos en
+models. El home consume categorias, banners y productos desde Supabase. El
+carrito y las direcciones tambien se guardan en base de datos. El pago con
+Mercado Pago esta preparado para que el backend cree la preferencia, sin enviar
+montos desde Flutter. La app incluye soporte, tickets, cotizaciones, opiniones,
+preguntas y solicitudes de mantenimiento biomedico. Las credenciales se cargan
+por dart-define y no deben subirse al repositorio."
+

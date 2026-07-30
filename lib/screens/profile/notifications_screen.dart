@@ -9,6 +9,7 @@ import '../product/all_questions_screen.dart';
 import '../product/single_question_screen.dart';
 import '../tickets/ticket_detail_screen.dart';
 import '../../services/auth_identity_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/product_service.dart';
 import '../../services/question_service.dart';
 import '../../utils/ui_helpers.dart';
@@ -71,7 +72,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         elevation: 0,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: kPrimary))
+          ? const _NotificationsLoadingBody()
           : ListView(
               padding: const EdgeInsets.symmetric(vertical: 12),
               children: [
@@ -149,17 +150,52 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 }
 
 class NotificationsListScreen extends StatefulWidget {
-  const NotificationsListScreen({super.key});
+  const NotificationsListScreen({super.key, this.initialNotificationId});
+
+  final String? initialNotificationId;
 
   @override
   State<NotificationsListScreen> createState() =>
       _NotificationsListScreenState();
 }
 
+class _NotificationDestinationLoadingScreen extends StatelessWidget {
+  const _NotificationDestinationLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: kPrimary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        titleSpacing: 0,
+      ),
+      body: const _NotificationsLoadingBody(),
+    );
+  }
+}
+
+class _NotificationsLoadingBody extends StatelessWidget {
+  const _NotificationsLoadingBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Colors.white,
+      child: Center(child: CircularProgressIndicator(color: kPrimary)),
+    );
+  }
+}
+
 class _NotificationsListScreenState extends State<NotificationsListScreen> {
   List<dynamic> _notifications = [];
   bool _loading = true;
+  bool _refreshing = false;
   String? _error;
+  bool _initialNotificationHandled = false;
 
   @override
   void initState() {
@@ -167,11 +203,14 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     _loadNotifications();
   }
 
-  Future<void> _loadNotifications() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadNotifications({bool forceLoading = false}) async {
+    final shouldShowLoading = forceLoading || _notifications.isEmpty;
+    if (mounted) {
+      setState(() {
+        _loading = shouldShowLoading;
+        _error = null;
+      });
+    }
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) throw Exception('No autenticado');
@@ -187,6 +226,7 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
           _notifications = response as List;
           _loading = false;
         });
+        _openInitialNotificationIfNeeded();
       }
     } catch (e) {
       if (mounted) {
@@ -198,7 +238,51 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     }
   }
 
+  Future<void> _refreshNotifications() async {
+    if (_refreshing) return;
+    setState(() {
+      _refreshing = true;
+      _loading = true;
+    });
+    try {
+      await _loadNotifications(forceLoading: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _refreshing = false;
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  void _openInitialNotificationIfNeeded() {
+    final id = widget.initialNotificationId;
+    if (_initialNotificationHandled || id == null || id.isEmpty) return;
+    final index = _notifications.indexWhere(
+      (item) => item['id']?.toString() == id,
+    );
+    if (index == -1) return;
+    _initialNotificationHandled = true;
+    final notification = Map<String, dynamic>.from(
+      _notifications[index] as Map,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _handleNotificationTap(notification);
+    });
+  }
+
   Future<void> _markAllAsRead() async {
+    final unreadCount = _notifications
+        .where((item) => item['is_read'] == false)
+        .length;
+    if (unreadCount == 0) return;
+    setState(() {
+      _notifications = _notifications
+          .map((item) => {...item as Map, 'is_read': true})
+          .toList();
+    });
+    NotificationService.instance.unreadCountNotifier.value = 0;
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) return;
@@ -207,16 +291,20 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
           .update({'is_read': true})
           .eq('user_id', userId)
           .eq('is_read', false);
-      _loadNotifications();
-    } catch (_) {}
+    } catch (_) {
+      await _loadNotifications();
+    }
   }
 
   Future<void> _markAsRead(String id) async {
     try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
       await Supabase.instance.client
           .from('notifications')
           .update({'is_read': true})
-          .eq('id', id);
+          .eq('id', id)
+          .eq('user_id', userId);
     } catch (_) {}
   }
 
@@ -276,65 +364,88 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
   }
 
   Future<void> _handleNotificationTap(Map<String, dynamic> notification) async {
-    final String id = notification['id'] as String;
+    final String id = notification['id']?.toString() ?? '';
     final bool isRead = notification['is_read'] as bool? ?? false;
-    final String body = notification['body'] ?? '';
-    final String title = notification['title'] ?? '';
+    final String body = notification['body']?.toString() ?? '';
+    final String title = notification['title']?.toString() ?? '';
 
-    // ── 1. Mark as read immediately (optimistic UI update) ────────────────
-    if (!isRead) {
+    if (!isRead && id.isNotEmpty) {
       _markAsRead(id); // fire-and-forget in background
-      setState(() {
-        final idx = _notifications.indexWhere((n) => n['id'] == id);
-        if (idx != -1) {
-          _notifications[idx] = {..._notifications[idx], 'is_read': true};
-        }
-      });
+      if (mounted) {
+        setState(() {
+          final idx = _notifications.indexWhere(
+            (n) => n['id']?.toString() == id,
+          );
+          if (idx != -1) {
+            _notifications[idx] = {
+              ..._notifications[idx] as Map,
+              'is_read': true,
+            };
+          }
+        });
+      }
+      final currentCount =
+          NotificationService.instance.unreadCountNotifier.value;
+      if (currentCount > 0) {
+        NotificationService.instance.unreadCountNotifier.value =
+            currentCount - 1;
+      }
     }
 
-    // ── 2. Detect question/answer notification ────────────────────────────
-    // Title pattern: "Pregunta respondida"
-    // Body pattern:  Tu pregunta sobre "ProductName" fue respondida: "answerText"
+    await Future<void>.delayed(Duration.zero);
+
     final bool isQuestionNotif =
         title.toLowerCase().contains('pregunta') ||
         body.toLowerCase().contains('pregunta');
 
     if (isQuestionNotif) {
-      // Extract product name from body: sobre "X"
       final nameMatch = RegExp(r'sobre\s+"([^"]+)"').firstMatch(body);
-      // Extract the answer text from body: respondida: "Y"
       final answerMatch = RegExp(r'respondida:\s+"([^"]+)"').firstMatch(body);
 
-      final String? productName = nameMatch?.group(1);
+      final String? productName =
+          _notificationValue(notification, const [
+            'product_name',
+            'productName',
+          ]) ??
+          nameMatch?.group(1);
       final String? answerText = answerMatch?.group(1);
 
       if (productName != null) {
         await _navigateToProductQuestions(productName, answerHint: answerText);
+        return;
       }
-      return;
     }
 
-    // ── 3. Detect ticket notification (TCK-XXXXXXXX-XXXXXXXX) ─────────────
-    final ticketMatch = RegExp(r'TCK-\d{8}-[A-Za-z0-9]+').firstMatch(body);
-    if (ticketMatch != null) {
-      final ticketNumber = ticketMatch.group(0)!;
+    final ticketNumber =
+        _notificationValue(notification, const [
+          'ticket_number',
+          'ticketNumber',
+        ]) ??
+        RegExp(r'TCK-\d{8}-[A-Za-z0-9]+').firstMatch(body)?.group(0);
+    if (ticketNumber != null) {
       if (!mounted) return;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => TicketDetailScreen(ticketNumber: ticketNumber),
-        ),
+      final loadingRoute = _showDestinationLoading();
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || !loadingRoute.isCurrent) return;
+      _replaceDestinationLoading(
+        loadingRoute,
+        TicketDetailScreen(ticketNumber: ticketNumber),
       );
       return;
     }
 
-    // ── 4. Detect quotes and quote requests ───────────────────────────────
-    final quoteMatch = RegExp(
-      r'(?:COT|RQ)-\d{8}-[A-Za-z0-9]+',
-      caseSensitive: false,
-    ).firstMatch(body);
-    if (quoteMatch != null) {
-      await _navigateToQuote(quoteMatch.group(0)!.toUpperCase());
+    final quoteReference =
+        _notificationValue(notification, const [
+          'quote_number',
+          'request_number',
+          'reference_number',
+        ]) ??
+        RegExp(
+          r'(?:COT|RQ)-\d{8}-[A-Za-z0-9]+',
+          caseSensitive: false,
+        ).firstMatch(body)?.group(0);
+    if (quoteReference != null) {
+      await _navigateToQuote(quoteReference.toUpperCase());
       return;
     }
 
@@ -342,6 +453,57 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
         body.toLowerCase().contains('cotiza')) {
       await _navigateToQuotesList();
     }
+  }
+
+  String? _notificationValue(
+    Map<String, dynamic> notification,
+    List<String> keys,
+  ) {
+    final sources = <Map<String, dynamic>>[notification];
+    for (final containerKey in const ['data', 'metadata', 'payload']) {
+      final value = notification[containerKey];
+      if (value is Map) {
+        sources.add(Map<String, dynamic>.from(value));
+      }
+    }
+    for (final source in sources) {
+      for (final key in keys) {
+        final value = source[key]?.toString().trim();
+        if (value != null && value.isNotEmpty) return value;
+      }
+    }
+    return null;
+  }
+
+  Route<void> _showDestinationLoading() {
+    final route = PageRouteBuilder<void>(
+      opaque: true,
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+      pageBuilder: (_, _, _) => const _NotificationDestinationLoadingScreen(),
+    );
+    Navigator.of(context).push(route);
+    return route;
+  }
+
+  void _replaceDestinationLoading(
+    Route<void> loadingRoute,
+    Widget destination,
+  ) {
+    if (!mounted || !loadingRoute.isCurrent) return;
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder<void>(
+        opaque: true,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (_, _, _) => destination,
+      ),
+    );
+  }
+
+  void _closeDestinationLoading(Route<void> loadingRoute) {
+    if (!mounted || !loadingRoute.isActive) return;
+    Navigator.of(context).removeRoute(loadingRoute);
   }
 
   /// Navigates to [AllProductQuestionsScreen] for the given product name.
@@ -353,25 +515,8 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     String productName, {
     String? answerHint,
   }) async {
-    // Show a non-blocking overlay while we resolve the product ID
     if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black26,
-      builder: (_) => const Center(
-        child: Card(
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: CircularProgressIndicator(color: kPrimary),
-          ),
-        ),
-      ),
-    );
+    final loadingRoute = _showDestinationLoading();
 
     try {
       // ── Try exact match first ────────────────────────────────────────────
@@ -390,8 +535,7 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
           .limit(1)
           .maybeSingle();
 
-      if (!mounted) return;
-      Navigator.of(context).pop(); // close loading overlay
+      if (!mounted || !loadingRoute.isCurrent) return;
 
       if (product != null && product['id'] != null) {
         final productId = product['id'] as String;
@@ -436,31 +580,27 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
             }
           }
 
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    SingleQuestionScreen(question: selectedQuestion),
-              ),
+          if (mounted && loadingRoute.isCurrent) {
+            _replaceDestinationLoading(
+              loadingRoute,
+              SingleQuestionScreen(question: selectedQuestion),
             );
             return;
           }
         }
 
         // Fallback: If no single question could be resolved, show all questions
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AllProductQuestionsScreen(
-                productId: productId,
-                productName: actualName,
-              ),
+        if (mounted && loadingRoute.isCurrent) {
+          _replaceDestinationLoading(
+            loadingRoute,
+            AllProductQuestionsScreen(
+              productId: productId,
+              productName: actualName,
             ),
           );
         }
       } else {
+        _closeDestinationLoading(loadingRoute);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('No se encontró el producto de esta notificación.'),
@@ -470,7 +610,7 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.of(context).pop();
+        _closeDestinationLoading(loadingRoute);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al abrir la pregunta: $e'),
@@ -482,6 +622,8 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
   }
 
   Future<void> _navigateToQuote(String referenceNumber) async {
+    if (!mounted) return;
+    final loadingRoute = _showDestinationLoading();
     try {
       final client = Supabase.instance.client;
       Map<String, dynamic>? quote;
@@ -501,22 +643,20 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
             .maybeSingle();
       }
 
-      if (!mounted) return;
+      if (!mounted || !loadingRoute.isCurrent) return;
 
       if (request != null && request['id'] != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => QuoteRequestDetailScreen(request: request!),
-          ),
+        _replaceDestinationLoading(
+          loadingRoute,
+          QuoteRequestDetailScreen(request: request),
         );
         return;
       }
 
       if (quote != null && quote['id'] != null) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => QuoteDetailScreen(quote: quote!)),
+        _replaceDestinationLoading(
+          loadingRoute,
+          QuoteDetailScreen(quote: quote),
         );
         return;
       }
@@ -525,17 +665,37 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       // puede resolverse por cambios de esquema o conectividad.
     }
 
-    await _navigateToQuotesList();
+    await _openQuotesListFromLoading(loadingRoute);
   }
 
   Future<void> _navigateToQuotesList() async {
-    final clientId = await AuthIdentityService.getEffectiveClientId();
-    if (!mounted || clientId == null) return;
+    if (!mounted) return;
+    final loadingRoute = _showDestinationLoading();
+    await _openQuotesListFromLoading(loadingRoute);
+  }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => QuotesScreen(clientId: clientId)),
-    );
+  Future<void> _openQuotesListFromLoading(Route<void> loadingRoute) async {
+    try {
+      final clientId = await AuthIdentityService.getEffectiveClientId();
+      if (!mounted || !loadingRoute.isCurrent) return;
+      if (clientId == null) {
+        _closeDestinationLoading(loadingRoute);
+        return;
+      }
+      _replaceDestinationLoading(
+        loadingRoute,
+        QuotesScreen(clientId: clientId),
+      );
+    } catch (error) {
+      _closeDestinationLoading(loadingRoute);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No fue posible abrir la cotización: $error'),
+          backgroundColor: kRed,
+        ),
+      );
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -623,29 +783,33 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
           ),
           Expanded(
             child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: kPrimary),
-                  )
+                ? const _NotificationsLoadingBody()
                 : _error != null
                 ? _buildError()
                 : _notifications.isEmpty
                 ? _buildEmptyState()
                 : RefreshIndicator(
                     color: kPrimary,
-                    onRefresh: _loadNotifications,
+                    backgroundColor: Colors.white,
+                    displacement: 42,
+                    triggerMode: RefreshIndicatorTriggerMode.onEdge,
+                    onRefresh: _refreshNotifications,
                     child: ListView.separated(
                       padding: EdgeInsets.zero,
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics(),
-                      ),
+                      physics: const AlwaysScrollableScrollPhysics(),
                       itemCount: _notifications.length,
                       separatorBuilder: (_, _) => const Divider(
                         height: 1,
                         thickness: 1,
                         color: Color(0xFFEEEEEE),
                       ),
-                      itemBuilder: (context, i) =>
-                          _buildNotifCard(_notifications[i]),
+                      itemBuilder: (context, i) {
+                        final notification = _notifications[i];
+                        return KeyedSubtree(
+                          key: ValueKey(notification['id']?.toString() ?? i),
+                          child: _buildNotifCard(notification),
+                        );
+                      },
                     ),
                   ),
           ),

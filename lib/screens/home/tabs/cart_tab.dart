@@ -175,104 +175,16 @@ class CartTabState extends State<CartTab> {
     return '\$$buf.${parts[1]}';
   }
 
-  void _showCouponDialog() {
-    showDialog(
+  Future<void> _showCouponDialog() async {
+    final changed = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
-      builder: (context) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(viewInsets: EdgeInsets.zero),
-          child: Center(
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.85,
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Ingresar cupón de descuento',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.5,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Escribe tu cupón al finalizar la compra para que el equipo lo valide antes de confirmar la orden.',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        color: Colors.grey.shade600,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE0F2F1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            color: _kPrimary,
-                            size: 18,
-                          ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Los descuentos se aplican después de validar el cupón.',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: Color(0xFF0F766E),
-                                height: 1.35,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text(
-                            'Entendido',
-                            style: TextStyle(
-                              color: _kPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+      builder: (_) => const _CartCouponDialog(),
     );
+
+    if (changed == true && mounted) {
+      await load(showSpinner: false);
+    }
   }
 
   void _showPurchaseSummaryBottomSheet() {
@@ -797,11 +709,14 @@ class CartTabState extends State<CartTab> {
         ),
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator(color: _kPrimary))
+              ? const _CartLoadingBody()
               : _items.isEmpty
               ? RefreshIndicator(
                   color: _kPrimary,
-                  onRefresh: load,
+                  backgroundColor: Colors.white,
+                  displacement: 42,
+                  triggerMode: RefreshIndicatorTriggerMode.onEdge,
+                  onRefresh: () => load(showSpinner: true),
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
@@ -840,60 +755,73 @@ class CartTabState extends State<CartTab> {
                   ),
                 )
               : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(
-                        left: 12,
-                        top: 8,
-                        bottom: 4,
-                      ),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: Checkbox(
-                              value:
-                                  _selectedItemIds.length == _items.length &&
-                                  _items.isNotEmpty,
-                              activeColor: _kPrimary,
-                              onChanged: (val) {
-                                setState(() {
-                                  if (val == true) {
-                                    _selectedItemIds = _items
-                                        .map((i) => i.id)
-                                        .toSet();
-                                  } else {
-                                    _selectedItemIds.clear();
-                                  }
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _selectedItemIds.length == _items.length &&
-                                    _items.isNotEmpty
-                                ? 'Deseleccionar todos'
-                                : 'Seleccionar todos',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
                     Expanded(
                       child: RefreshIndicator(
                         color: _kPrimary,
-                        onRefresh: load,
+                        backgroundColor: Colors.white,
+                        displacement: 42,
+                        triggerMode: RefreshIndicatorTriggerMode.onEdge,
+                        onRefresh: () => load(showSpinner: true),
                         child: CustomScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           slivers: [
+                            SliverToBoxAdapter(
+                              child: Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 12,
+                                      top: 8,
+                                      bottom: 4,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          height: 24,
+                                          width: 24,
+                                          child: Checkbox(
+                                            value:
+                                                _selectedItemIds.length ==
+                                                    _items.length &&
+                                                _items.isNotEmpty,
+                                            activeColor: _kPrimary,
+                                            onChanged: (val) {
+                                              setState(() {
+                                                if (val == true) {
+                                                  _selectedItemIds = _items
+                                                      .map((i) => i.id)
+                                                      .toSet();
+                                                } else {
+                                                  _selectedItemIds.clear();
+                                                }
+                                              });
+                                            },
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _selectedItemIds.length ==
+                                                      _items.length &&
+                                                  _items.isNotEmpty
+                                              ? 'Deseleccionar todos'
+                                              : 'Seleccionar todos',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Divider(
+                                    height: 1,
+                                    color: Color(0xFFF1F5F9),
+                                  ),
+                                ],
+                              ),
+                            ),
                             SliverPadding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
@@ -1369,6 +1297,211 @@ class CartTabState extends State<CartTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CartCouponDialog extends StatefulWidget {
+  const _CartCouponDialog();
+
+  @override
+  State<_CartCouponDialog> createState() => _CartCouponDialogState();
+}
+
+class _CartCouponDialogState extends State<_CartCouponDialog> {
+  final TextEditingController _codeController = TextEditingController();
+  bool _loading = false;
+  bool _changed = false;
+  bool _success = false;
+  String? _feedback;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  String _cleanError(Object error) {
+    return error.toString().replaceFirst('Exception: ', '').trim();
+  }
+
+  Future<void> _applyCoupon() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _feedback = null;
+    });
+
+    try {
+      final result = await CartService.applyCartCoupon(_codeController.text);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _success = result.valid;
+        _changed = _changed || result.valid;
+        _feedback = result.message;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _success = false;
+        _feedback = _cleanError(error);
+      });
+    }
+  }
+
+  Future<void> _removeCoupon() async {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _feedback = null;
+    });
+
+    try {
+      await CartService.removeCartCoupon();
+      if (!mounted) return;
+      _codeController.clear();
+      setState(() {
+        _loading = false;
+        _success = true;
+        _changed = true;
+        _feedback = 'El cupón se quitó del carrito.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _success = false;
+        _feedback = _cleanError(error);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Cupón de descuento',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'El servidor validará el código y calculará el total definitivo.',
+              style: TextStyle(
+                fontSize: 13.5,
+                color: Color(0xFF64748B),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _codeController,
+              enabled: !_loading,
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              enableSuggestions: false,
+              onSubmitted: (_) => _applyCoupon(),
+              decoration: InputDecoration(
+                labelText: 'Código del cupón',
+                prefixIcon: const Icon(
+                  Icons.confirmation_number_outlined,
+                  color: _kPrimary,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: _kPrimary, width: 1.5),
+                ),
+              ),
+            ),
+            if (_feedback != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: _success
+                      ? const Color(0xFFE6F6F3)
+                      : const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _feedback!,
+                  style: TextStyle(
+                    color: _success
+                        ? const Color(0xFF0F766E)
+                        : const Color(0xFFB91C1C),
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: _loading ? null : _removeCoupon,
+                  child: const Text(
+                    'Quitar cupón',
+                    style: TextStyle(color: Color(0xFF64748B)),
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: _loading
+                      ? null
+                      : () => Navigator.pop(context, _changed),
+                  child: const Text('Cerrar'),
+                ),
+                const SizedBox(width: 4),
+                FilledButton(
+                  onPressed: _loading ? null : _applyCoupon,
+                  style: FilledButton.styleFrom(backgroundColor: _kPrimary),
+                  child: _loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Aplicar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CartLoadingBody extends StatelessWidget {
+  const _CartLoadingBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Colors.white,
+      child: Center(child: CircularProgressIndicator(color: _kPrimary)),
     );
   }
 }

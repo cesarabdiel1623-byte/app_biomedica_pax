@@ -1,8 +1,10 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 import '../models/service_ticket.dart';
 import '../models/ticket_message.dart';
 import '../utils/ui_helpers.dart';
+import 'auth_identity_service.dart';
 
 class TicketService {
   static final _db = Supabase.instance.client;
@@ -10,34 +12,22 @@ class TicketService {
   static const _storageReferencePrefix = 'storage://';
   static const _maxVideoBytes = 40 * 1024 * 1024;
   static const _allowedVideoExtensions = {'mp4', 'mov', 'm4v', 'webm'};
+  static const _uuid = Uuid();
 
   // Solo join a 'clients' (columnas confirmadas). El join a equipment_units
   // se omite porque las columnas varían según el schema.
   static const _select = '*, clients(business_name, trade_name)';
 
-  /// Fetches tickets linked to the current user's client profile or created by the user.
+  /// Fetches tickets linked to the current user's client profile.
   static Future<List<ServiceTicket>> getMyTickets() async {
     final userId = _db.auth.currentUser?.id;
     if (userId == null) return [];
 
-    // 1. Obtener client_id del perfil del usuario (si está vinculado)
-    final profileRes = await _db
-        .from('profiles')
-        .select('client_id')
-        .eq('id', userId)
-        .maybeSingle();
-
-    final clientId = profileRes?['client_id'] as String?;
-    final effectiveClientId = (clientId != null && clientId.isNotEmpty)
-        ? clientId
-        : userId;
-
-    // 2. Traer todos los tickets que pertenezcan a este cliente (effectiveClientId)
-    //    O que hayan sido creados por este usuario (requested_by = userId)
+    final clientId = await AuthIdentityService.requireLinkedClientId();
     final res = await _db
         .from('service_tickets')
         .select(_select)
-        .or('client_id.eq.$effectiveClientId,requested_by.eq.$userId')
+        .eq('client_id', clientId)
         .order('created_at', ascending: false);
 
     return (res as List)
@@ -47,6 +37,7 @@ class TicketService {
 
   /// Ticket individual por ID
   static Future<ServiceTicket?> getTicketById(String id) async {
+    await _ensureTicketBelongsToCurrentClient(id);
     final res = await _db
         .from('service_tickets')
         .select(_select)
@@ -59,10 +50,12 @@ class TicketService {
 
   /// Ticket individual por número de ticket (ej. TCK-20260622-8CA2922A)
   static Future<ServiceTicket?> getTicketByNumber(String ticketNumber) async {
+    final clientId = await AuthIdentityService.requireLinkedClientId();
     final res = await _db
         .from('service_tickets')
         .select(_select)
         .eq('ticket_number', ticketNumber)
+        .eq('client_id', clientId)
         .maybeSingle();
 
     if (res == null) return null;
@@ -71,6 +64,7 @@ class TicketService {
 
   /// Obtener mensajes de chat asociados al ticket (solo no internos)
   static Future<List<TicketMessage>> getTicketMessages(String ticketId) async {
+    await _ensureTicketBelongsToCurrentClient(ticketId);
     final res = await _db
         .from('service_ticket_messages')
         .select('*, profiles:sender_profile_id(full_name)')
@@ -96,6 +90,11 @@ class TicketService {
     String? attachmentUrl,
   }) async {
     final userId = _db.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('Debes iniciar sesión para enviar mensajes.');
+    }
+    await _ensureTicketBelongsToCurrentClient(ticketId);
+
     final normalizedAttachment = _normalizeAttachmentReference(attachmentUrl);
     if (attachmentUrl != null && normalizedAttachment == null) {
       throw Exception('URL de adjunto no permitida.');
@@ -139,9 +138,9 @@ class TicketService {
       UiHelpers.validateImageUpload(bytes, fileName);
     }
 
-    final cleanName = UiHelpers.sanitizeStorageFileName(fileName);
-    final cleanFileName = '${DateTime.now().microsecondsSinceEpoch}_$cleanName';
-    final path = '$ticketId/$cleanFileName';
+    await _ensureTicketBelongsToCurrentClient(ticketId);
+    final extension = _fileExtension(fileName);
+    final path = '$ticketId/${_uuid.v4()}.$extension';
 
     await _db.storage
         .from(_attachmentBucket)
@@ -157,9 +156,6 @@ class TicketService {
   static Future<String?> resolveAttachmentUrl(String? reference) async {
     if (reference == null || reference.trim().isEmpty) return null;
     final value = reference.trim();
-    final trustedUrl = UiHelpers.sanitizeTrustedRemoteUrl(value);
-    if (trustedUrl != null) return trustedUrl;
-
     final storageReference = _parseStorageReference(value);
     if (storageReference == null) return null;
 
@@ -178,20 +174,49 @@ class TicketService {
     if (value.isEmpty) return null;
 
     if (_parseStorageReference(value) != null) return value;
-    return UiHelpers.sanitizeTrustedRemoteUrl(value);
+    return null;
   }
 
   static _StorageAttachment? _parseStorageReference(String reference) {
     final uri = Uri.tryParse(reference);
-    if (uri == null ||
-        uri.scheme != 'storage' ||
-        uri.host != _attachmentBucket) {
+    if (uri == null) return null;
+
+    if (uri.scheme == 'storage' && uri.host == _attachmentBucket) {
+      final path = uri.path.replaceFirst(RegExp(r'^/+'), '');
+      if (_isSafeStoragePath(path)) {
+        return _StorageAttachment(bucket: uri.host, path: path);
+      }
       return null;
     }
 
-    final path = uri.path.replaceFirst(RegExp(r'^/+'), '');
-    if (path.isEmpty || path.contains('..')) return null;
-    return _StorageAttachment(bucket: uri.host, path: path);
+    // Compatibilidad con referencias antiguas de Supabase: se extrae la ruta,
+    // pero nunca se reutiliza la URL pública o firmada recibida.
+    if (uri.scheme == 'https') {
+      final segments = uri.pathSegments;
+      final objectIndex = segments.indexOf('object');
+      if (objectIndex >= 0 && objectIndex + 3 < segments.length) {
+        final accessType = segments[objectIndex + 1];
+        final bucket = segments[objectIndex + 2];
+        if ({'public', 'sign', 'authenticated'}.contains(accessType) &&
+            bucket == _attachmentBucket) {
+          final path = segments.sublist(objectIndex + 3).join('/');
+          if (_isSafeStoragePath(path)) {
+            return _StorageAttachment(bucket: bucket, path: path);
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  static bool _isSafeStoragePath(String path) {
+    if (path.isEmpty || path.contains('..') || path.startsWith('/')) {
+      return false;
+    }
+    final segments = path.split('/');
+    return segments.length == 2 &&
+        segments.every((segment) => segment.trim().isNotEmpty);
   }
 
   static void _validateVideoUpload(Uint8List bytes, String fileName) {
@@ -213,6 +238,30 @@ class TicketService {
     }
   }
 
+  static String _fileExtension(String fileName) {
+    final cleanName = UiHelpers.sanitizeStorageFileName(fileName);
+    final dotIndex = cleanName.lastIndexOf('.');
+    if (dotIndex <= 0 || dotIndex == cleanName.length - 1) {
+      throw Exception('El archivo debe tener una extensión válida.');
+    }
+    return cleanName.substring(dotIndex + 1).toLowerCase();
+  }
+
+  static Future<void> _ensureTicketBelongsToCurrentClient(
+    String ticketId,
+  ) async {
+    final clientId = await AuthIdentityService.requireLinkedClientId();
+    final ticket = await _db
+        .from('service_tickets')
+        .select('id')
+        .eq('id', ticketId)
+        .eq('client_id', clientId)
+        .maybeSingle();
+    if (ticket == null) {
+      throw Exception('No tienes acceso a este ticket.');
+    }
+  }
+
   static String _imageContentType(String fileName) {
     final lower = fileName.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
@@ -227,6 +276,7 @@ class TicketService {
     if (userId == null) return;
 
     try {
+      await _ensureTicketBelongsToCurrentClient(ticketId);
       final nowStr = DateTime.now().toIso8601String();
       await _db
           .from('service_ticket_messages')
@@ -245,6 +295,7 @@ class TicketService {
     if (userId == null) return;
 
     try {
+      await _ensureTicketBelongsToCurrentClient(ticketId);
       await _db
           .from('service_ticket_messages')
           .update({'delivered_at': DateTime.now().toIso8601String()})

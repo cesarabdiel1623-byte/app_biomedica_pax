@@ -152,6 +152,7 @@ class UiHelpers {
     String message, {
     String? actionLabel,
     VoidCallback? onAction,
+    double bottomMargin = 24,
   }) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -159,7 +160,7 @@ class UiHelpers {
         behavior: SnackBarBehavior.floating,
         backgroundColor: const Color(0xFFF0FDF4), // Verde menta muy suave
         elevation: 2,
-        margin: const EdgeInsets.only(bottom: 85, left: 16, right: 16),
+        margin: EdgeInsets.only(bottom: bottomMargin, left: 16, right: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -205,14 +206,18 @@ class UiHelpers {
   }
 
   /// Muestra una alerta de advertencia (ámbar)
-  static void showWarningToast(BuildContext context, String message) {
+  static void showWarningToast(
+    BuildContext context,
+    String message, {
+    double bottomMargin = 24,
+  }) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: const Color(0xFFFFFBEB), // Ámbar suave
         elevation: 2,
-        margin: const EdgeInsets.only(bottom: 85, left: 16, right: 16),
+        margin: EdgeInsets.only(bottom: bottomMargin, left: 16, right: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -247,14 +252,18 @@ class UiHelpers {
   }
 
   /// Muestra una alerta de error (rojo)
-  static void showErrorToast(BuildContext context, String message) {
+  static void showErrorToast(
+    BuildContext context,
+    String message, {
+    double bottomMargin = 24,
+  }) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
         backgroundColor: const Color(0xFFFEF2F2), // Rojo suave premium
         elevation: 2,
-        margin: const EdgeInsets.only(bottom: 85, left: 16, right: 16),
+        margin: EdgeInsets.only(bottom: bottomMargin, left: 16, right: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -559,29 +568,19 @@ class UiHelpers {
       width: width,
       height: height,
       fit: fit,
-      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        if (wasSynchronouslyLoaded) return child;
-        return AnimatedOpacity(
-          opacity: frame == null ? 0 : 1,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-          child: child,
-        );
-      },
+      gaplessPlayback: true,
+      filterQuality: FilterQuality.medium,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
         return Container(
           width: width,
           height: height,
-          color: const Color(0xFFF1F5F9), // Gris pizarra claro
-          child: const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                color: Color(0xFF0D9488), // Color teal
-                strokeWidth: 2,
-              ),
+          color: const Color(0xFFF8FAFC),
+          child: Center(
+            child: Icon(
+              Icons.image_outlined,
+              color: Colors.grey.shade300,
+              size: iconSize,
             ),
           ),
         );

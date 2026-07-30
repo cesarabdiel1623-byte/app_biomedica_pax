@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -7,6 +9,7 @@ import 'services/payment_deep_link_service.dart';
 import 'utils/constants.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'screens/profile/notifications_screen.dart';
 import 'screens/auth/registration_flow/registration_checklist_screen.dart';
 import 'services/notification_service.dart';
 import 'services/quote_service.dart';
@@ -16,36 +19,69 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 Future<void> main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-  await Constants.init();
+  runApp(const _GoMedicalBootstrap());
+}
 
-  // Inicializar cotizaciones locales
-  try {
-    await QuoteService.init();
-  } catch (e) {
-    debugPrint('Error inicializando QuoteService: $e');
+class _GoMedicalBootstrap extends StatefulWidget {
+  const _GoMedicalBootstrap();
+
+  @override
+  State<_GoMedicalBootstrap> createState() => _GoMedicalBootstrapState();
+}
+
+class _GoMedicalBootstrapState extends State<_GoMedicalBootstrap> {
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FlutterNativeSplash.remove();
+    });
+    unawaited(_initializeApp());
   }
 
-  // Inicializar Supabase si tenemos las credenciales (por ahora puede fallar si están vacías,
-  // inyectadas por dart-define / dart-define-from-file.
-  try {
-    if (Constants.hasSupabaseConfig) {
-      await Supabase.initialize(
-        url: Constants.supabaseUrl,
-        publishableKey: Constants.supabaseAnonKey,
-      );
+  Future<void> _initializeApp() async {
+    await Constants.init();
+
+    try {
+      await QuoteService.init();
+    } catch (e) {
+      debugPrint('Error inicializando QuoteService: $e');
     }
-  } catch (e) {
-    debugPrint('Error inicializando Supabase: $e');
+
+    try {
+      if (Constants.hasSupabaseConfig) {
+        await Supabase.initialize(
+          url: Constants.supabaseUrl,
+          publishableKey: Constants.supabaseAnonKey,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error inicializando Supabase: $e');
+    }
+
+    if (!mounted) return;
+    setState(() => _ready = true);
   }
 
-  // Inicializar notificaciones locales
-  try {
-    await NotificationService.instance.init();
-  } catch (e) {
-    debugPrint('Error inicializando NotificationService: $e');
-  }
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return const GoMedicalApp();
 
-  runApp(const GoMedicalApp());
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF0D9488),
+            strokeWidth: 2.5,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class GoMedicalApp extends StatefulWidget {
@@ -59,15 +95,30 @@ class _GoMedicalAppState extends State<GoMedicalApp> {
   final PaymentDeepLinkService _paymentDeepLinkService =
       PaymentDeepLinkService();
   bool _isNavigatingPaymentResult = false;
+  bool _isOpeningNotification = false;
+  StreamSubscription<String?>? _notificationTapSubscription;
 
   @override
   void initState() {
     super.initState();
     _initDeepLinks();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeNotifications();
+    });
   }
 
   Future<void> _initDeepLinks() async {
     await _paymentDeepLinkService.init(onResult: _showPaymentResult);
+  }
+
+  Future<void> _initializeNotifications() async {
+    try {
+      await NotificationService.instance.init();
+      if (!mounted) return;
+      _initNotificationTaps();
+    } catch (e) {
+      debugPrint('Error inicializando NotificationService: $e');
+    }
   }
 
   void _showPaymentResult(PaymentTestResult result) {
@@ -93,8 +144,45 @@ class _GoMedicalAppState extends State<GoMedicalApp> {
         });
   }
 
+  void _initNotificationTaps() {
+    if (_notificationTapSubscription != null) return;
+    _notificationTapSubscription = NotificationService
+        .instance
+        .notificationTapStream
+        .listen(_openNotification);
+    final pending = NotificationService.instance.takePendingTapPayload();
+    if (pending != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openNotification(pending);
+      });
+    }
+  }
+
+  void _openNotification(String? notificationId) {
+    if (_isOpeningNotification) return;
+    final navigator = appNavigatorKey.currentState;
+    if (navigator == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openNotification(notificationId);
+      });
+      return;
+    }
+    _isOpeningNotification = true;
+    navigator
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                NotificationsListScreen(initialNotificationId: notificationId),
+          ),
+        )
+        .whenComplete(() {
+          _isOpeningNotification = false;
+        });
+  }
+
   @override
   void dispose() {
+    _notificationTapSubscription?.cancel();
     _paymentDeepLinkService.dispose();
     super.dispose();
   }
@@ -276,7 +364,13 @@ class _AuthGateState extends State<AuthGate> {
         if (snapshot.connectionState == ConnectionState.waiting &&
             session == null) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            backgroundColor: Colors.white,
+            body: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF0D9488),
+                strokeWidth: 2.5,
+              ),
+            ),
           );
         }
 

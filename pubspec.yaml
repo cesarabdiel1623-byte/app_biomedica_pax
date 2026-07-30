@@ -50,6 +50,7 @@ dependencies:
   flutter_svg: ^2.3.0
   flutter_native_splash: ^2.4.0
   video_player: ^2.13.0
+  uuid: ^4.6.0
 
 dev_dependencies:
   flutter_test:

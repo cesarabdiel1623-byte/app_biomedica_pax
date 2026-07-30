@@ -42,19 +42,19 @@ class _ShimmerCardState extends State<ShimmerCard>
             width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0xFFF1F5F9)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  height: 130,
+                  height: 150,
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     color: Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(16),
+                      top: Radius.circular(10),
                     ),
                   ),
                 ),

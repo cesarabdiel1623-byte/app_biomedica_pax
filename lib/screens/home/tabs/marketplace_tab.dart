@@ -21,7 +21,6 @@ import '../widgets/banner_carousel.dart';
 import '../widgets/product_card.dart';
 import '../widgets/promotion_cards_section.dart';
 import '../widgets/abandoned_cart_dialog.dart';
-import '../widgets/shimmer_card.dart';
 import '../../../widgets/load_error_state.dart';
 
 const _kPrimary = Color(0xFF0D9488);
@@ -49,6 +48,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
   List<Product> _products = [];
   List<CatalogCategory> _catalogCategories = const [];
   bool _loading = true;
+  bool _refreshingHome = false;
   String? _error;
   String? _activeCategory;
   String _currentLocation = 'Selecciona tu ubicación';
@@ -181,9 +181,17 @@ class MarketplaceTabState extends State<MarketplaceTab> {
   }
 
   Future<void> _refreshHome() async {
-    await Future.wait([load(), _loadCatalogCategories()]);
-    if (mounted) {
-      setState(() => _bannerRefreshToken++);
+    if (_refreshingHome) return;
+    setState(() => _refreshingHome = true);
+    try {
+      await Future.wait([load(isLiveSearch: true), _loadCatalogCategories()]);
+      if (mounted) {
+        setState(() => _bannerRefreshToken++);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _refreshingHome = false);
+      }
     }
   }
 
@@ -224,6 +232,9 @@ class MarketplaceTabState extends State<MarketplaceTab> {
               )
             : await ProductService.getAllProducts(category: _activeCategory);
       }
+      if (!_productsInitialLoadDone && mounted) {
+        await _precacheInitialProductImages(p);
+      }
       if (mounted) {
         setState(() {
           _products = p;
@@ -241,6 +252,29 @@ class MarketplaceTabState extends State<MarketplaceTab> {
       _productsInitialLoadDone = true;
       _reportInitialLoadIfReady();
     }
+  }
+
+  Future<void> _precacheInitialProductImages(List<Product> products) async {
+    final urls = products
+        .map(
+          (product) => UiHelpers.sanitizeTrustedRemoteUrl(product.mainImageUrl),
+        )
+        .whereType<String>()
+        .toSet()
+        .take(2);
+
+    await Future.wait(
+      urls.map((url) async {
+        try {
+          await precacheImage(
+            NetworkImage(url),
+            context,
+          ).timeout(const Duration(seconds: 2));
+        } catch (error) {
+          debugPrint('[MarketplaceTab] No se pudo precargar producto: $error');
+        }
+      }),
+    );
   }
 
   void _setCategory(String? cat) {
@@ -328,6 +362,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
 
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top;
     final isHomeLanding = _searchQuery.isEmpty && _activeCategory == null;
 
     final promoProducts = _products.where((p) => p.hasDiscount).toList();
@@ -347,13 +382,15 @@ class MarketplaceTabState extends State<MarketplaceTab> {
         )
         .where((section) => section.products.isNotEmpty)
         .toList();
-    final topPadding = MediaQuery.of(context).padding.top;
-    final showHomeModules = !_loading && _error == null;
+    final showHomeModules = !_loading && !_refreshingHome && _error == null;
     return ColoredBox(
       color: Colors.white,
       child: RefreshIndicator(
         color: _kPrimary,
-        edgeOffset: topPadding + 90,
+        backgroundColor: Colors.white,
+        edgeOffset: topInset + 150,
+        displacement: 42,
+        triggerMode: RefreshIndicatorTriggerMode.onEdge,
         onRefresh: _refreshHome,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -386,24 +423,10 @@ class MarketplaceTabState extends State<MarketplaceTab> {
             if (showHomeModules && _hasQuickCategories())
               SliverToBoxAdapter(child: _quickCats()),
 
-            if (_loading)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisExtent: 230,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => const ShimmerCard(),
-                    childCount: 4,
-                  ),
-                ),
+            if (_refreshingHome || _loading)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: _MarketplaceLoadingBody(),
               )
             else if (_error != null)
               SliverFillRemaining(
@@ -820,5 +843,17 @@ class MarketplaceTabState extends State<MarketplaceTab> {
       }
     }
     return cat.replaceAll('_', ' ');
+  }
+}
+
+class _MarketplaceLoadingBody extends StatelessWidget {
+  const _MarketplaceLoadingBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Colors.white,
+      child: Center(child: CircularProgressIndicator(color: _kPrimary)),
+    );
   }
 }

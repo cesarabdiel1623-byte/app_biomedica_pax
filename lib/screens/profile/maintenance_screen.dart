@@ -40,12 +40,12 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
 
   String _ticketType = 'preventivo';
   String _urgency = 'low';
-  String _powerStatus = 'Sí';
-  String _previousMaintenance = 'No';
-  String _failureFrequency = 'Falla constante';
-  String _issueDuration = 'Hoy';
-  String _visibleDamage = 'No';
-  String _previousRepair = 'No';
+  String? _powerStatus;
+  String? _previousMaintenance;
+  String? _failureFrequency;
+  String? _issueDuration;
+  String? _visibleDamage;
+  String? _previousRepair;
   String? _selectedEquipmentId;
   String? _effectiveClientId;
   String? _accessNotice;
@@ -56,6 +56,8 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   bool _loading = true;
   bool _submitting = false;
   bool _selectingMedia = false;
+  final _scrollController = ScrollController();
+  final _submitButtonKey = GlobalKey();
 
   String get _serviceLabel {
     switch (_ticketType) {
@@ -111,6 +113,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     _contactPhoneController.dispose();
     _areaController.dispose();
     _institutionController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -222,7 +225,6 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     );
     if (selected != null && mounted) {
       setState(() => _selectedAddress = selected);
-      _formKey.currentState?.validate();
     }
   }
 
@@ -231,7 +233,12 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     setState(() {
       _ticketType = type;
       _urgency = type == 'preventivo' ? 'low' : 'medium';
-      _powerStatus = 'Sí';
+      _powerStatus = null;
+      _previousMaintenance = null;
+      _failureFrequency = null;
+      _issueDuration = null;
+      _visibleDamage = null;
+      _previousRepair = null;
       _errorCodeController.clear();
     });
   }
@@ -470,12 +477,49 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   }
 
   Future<void> _submitRequest() async {
-    FocusScope.of(context).unfocus();
-    if (!_formKey.currentState!.validate()) return;
-    if (_effectiveClientId == null || _selectedAddress == null) {
+    double? initialButtonY;
+    final buttonContext = _submitButtonKey.currentContext;
+    if (buttonContext != null) {
+      final box = buttonContext.findRenderObject() as RenderBox?;
+      if (box != null && box.hasSize) {
+        initialButtonY = box.localToGlobal(Offset.zero).dy;
+      }
+    }
+
+    final isValid = _formKey.currentState!.validate();
+
+    if (initialButtonY != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final currentContext = _submitButtonKey.currentContext;
+        if (currentContext != null) {
+          final box = currentContext.findRenderObject() as RenderBox?;
+          if (box != null && box.hasSize) {
+            final newButtonY = box.localToGlobal(Offset.zero).dy;
+            final dyDiff = newButtonY - initialButtonY!;
+            if (dyDiff.abs() > 0.5) {
+              final newOffset = (_scrollController.offset + dyDiff).clamp(
+                0.0,
+                _scrollController.position.maxScrollExtent,
+              );
+              _scrollController.jumpTo(newOffset);
+            }
+          }
+        }
+      });
+    }
+
+    if (!isValid || _selectedAddress == null) {
+      UiHelpers.showWarningToast(
+        context,
+        'Hay campos sin completar',
+      );
+      return;
+    }
+    if (_effectiveClientId == null) {
       UiHelpers.showErrorToast(
         context,
-        'Selecciona una dirección antes de enviar la solicitud.',
+        'No se pudo determinar tu cuenta. Intenta de nuevo.',
       );
       return;
     }
@@ -502,11 +546,11 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
         )
         ..writeln('\n=== SOLICITUD ===')
         ..writeln('• Tipo: $_serviceLabel')
-        ..writeln('• ¿El equipo enciende?: $_powerStatus');
+        ..writeln('• ¿El equipo enciende?: ${_powerStatus ?? "No indicado"}');
 
       if (_ticketType == 'preventivo') {
         description.writeln(
-          '• Mantenimiento preventivo anterior: $_previousMaintenance',
+          '• Mantenimiento preventivo anterior: ${_previousMaintenance ?? "No indicado"}',
         );
         if (_previousMaintenance == 'Sí') {
           description.writeln(
@@ -515,15 +559,19 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
         }
       } else if (_ticketType == 'correctivo') {
         if (_powerStatus == 'Sí') {
-          description.writeln('• Frecuencia de la falla: $_failureFrequency');
+          description.writeln(
+            '• Frecuencia de la falla: ${_failureFrequency ?? "No indicada"}',
+          );
         }
         description.writeln(
-          '• ${_powerStatus == "No" ? "Dejó de encender" : "La falla comenzó"}: $_issueDuration',
+          '• ${_powerStatus == "No" ? "Dejó de encender" : "La falla comenzó"}: ${_issueDuration ?? "No indicada"}',
         );
       } else if (_ticketType == 'reparacion') {
         description
-          ..writeln('• Daños visibles: $_visibleDamage')
-          ..writeln('• Reparado anteriormente: $_previousRepair');
+          ..writeln('• Daños visibles: ${_visibleDamage ?? "No indicado"}')
+          ..writeln(
+            '• Reparado anteriormente: ${_previousRepair ?? "No indicado"}',
+          );
       }
 
       final errorCode = _errorCodeController.text.trim();
@@ -644,19 +692,23 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
             ? const Center(child: CircularProgressIndicator(color: kPrimary))
             : Form(
                 key: _formKey,
-                child: ListView(
+                child: SingleChildScrollView(
+                  controller: _scrollController,
                   padding: EdgeInsets.zero,
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
-                  children: [
-                    if (_accessNotice != null) _noticeBanner(_accessNotice!),
-                    _introHeader(),
-                    _equipmentSection(),
-                    _diagnosticSection(),
-                    _descriptionSection(),
-                    _contactSection(),
-                    _submitButton(),
-                  ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_accessNotice != null) _noticeBanner(_accessNotice!),
+                      _introHeader(),
+                      _equipmentSection(),
+                      _diagnosticSection(),
+                      _descriptionSection(),
+                      _contactSection(),
+                      _submitButton(),
+                    ],
+                  ),
                 ),
               ),
       ),
@@ -836,6 +888,8 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
         label: '¿Ha recibido mantenimiento preventivo?',
         icon: Icons.event_repeat_outlined,
         value: _previousMaintenance,
+        placeholder: 'Selecciona una opción',
+        requiredMessage: 'Selecciona si ha recibido mantenimiento preventivo',
         options: const [
           _ChoiceOption(value: 'Sí', label: 'Sí'),
           _ChoiceOption(value: 'No', label: 'No'),
@@ -865,10 +919,12 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
       if (_powerStatus == 'Sí') ...[
         const SizedBox(height: 12),
         _choiceField<String>(
-          key: const ValueKey('failure-frequency'),
+          key: ValueKey('failure-frequency-$_failureFrequency'),
           label: 'Frecuencia de la falla',
           icon: Icons.repeat_outlined,
           value: _failureFrequency,
+          placeholder: 'Selecciona una opción',
+          requiredMessage: 'Indica la frecuencia de la falla',
           options: const [
             _ChoiceOption(value: 'Falla constante', label: 'Constante'),
             _ChoiceOption(
@@ -895,10 +951,12 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     return [
       const SizedBox(height: 12),
       _choiceField<String>(
-        key: const ValueKey('visible-damage'),
+        key: ValueKey('visible-damage-$_visibleDamage'),
         label: '¿Tiene daños visibles?',
         icon: Icons.build_outlined,
         value: _visibleDamage,
+        placeholder: 'Selecciona una opción',
+        requiredMessage: 'Indica si tiene daños visibles',
         options: const [
           _ChoiceOption(value: 'Sí', label: 'Sí'),
           _ChoiceOption(value: 'No', label: 'No'),
@@ -908,10 +966,12 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
       ),
       const SizedBox(height: 12),
       _choiceField<String>(
-        key: const ValueKey('previous-repair'),
+        key: ValueKey('previous-repair-$_previousRepair'),
         label: '¿Ha sido reparado anteriormente?',
         icon: Icons.history_outlined,
         value: _previousRepair,
+        placeholder: 'Selecciona una opción',
+        requiredMessage: 'Indica si ha sido reparado anteriormente',
         options: const [
           _ChoiceOption(value: 'Sí', label: 'Sí'),
           _ChoiceOption(value: 'No', label: 'No'),
@@ -930,6 +990,8 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
       label: '¿El equipo enciende?',
       icon: Icons.power_settings_new_outlined,
       value: _powerStatus,
+      placeholder: 'Selecciona una opción',
+      requiredMessage: 'Indica si el equipo enciende',
       options: const [
         _ChoiceOption(value: 'Sí', label: 'Sí'),
         _ChoiceOption(value: 'No', label: 'No'),
@@ -940,10 +1002,12 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
 
   Widget _issueDurationDropdown({required String label}) {
     return _choiceField<String>(
-      key: ValueKey('issue-duration-$_powerStatus'),
+      key: ValueKey('issue-duration-$_powerStatus-$_issueDuration'),
       label: label,
       icon: Icons.schedule_outlined,
       value: _issueDuration,
+      placeholder: 'Selecciona una opción',
+      requiredMessage: 'Indica desde cuándo ocurre',
       options: const [
         _ChoiceOption(value: 'Hoy', label: 'Hoy'),
         _ChoiceOption(value: 'Hace 2 a 7 días', label: 'Hace 2 a 7 días'),
@@ -1187,85 +1251,40 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (address != null)
-              InkWell(
-                onTap: _openAddressPicker,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: field.hasError ? kRed : const Color(0xFFCBD5E1),
+            InkWell(
+              onTap: _openAddressPicker,
+              borderRadius: BorderRadius.circular(8),
+              child: InputDecorator(
+                isEmpty: false,
+                decoration:
+                    _inputDecoration(
+                      label: 'Ubicación del servicio',
+                      icon: Icons.location_on_outlined,
+                    ).copyWith(
+                      errorText: field.errorText,
+                      suffixIcon: const Icon(
+                        Icons.chevron_right,
+                        color: Color(0xFF94A3B8),
+                      ),
+                      contentPadding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
                     ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        color: kPrimary,
-                        size: 22,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Ubicación del servicio',
-                              style: TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              _addressSummary(address),
-                              style: const TextStyle(
-                                color: kNavy,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                height: 1.35,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-                    ],
-                  ),
-                ),
-              )
-            else
-              OutlinedButton.icon(
-                onPressed: _openAddressPicker,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: kPrimary,
-                  minimumSize: const Size.fromHeight(52),
-                  side: BorderSide(color: field.hasError ? kRed : kPrimary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                icon: const Icon(Icons.add_location_alt_outlined),
-                label: const Text(
-                  'Seleccionar o escribir dirección',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            if (field.hasError) ...[
-              const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.only(left: 12),
                 child: Text(
-                  field.errorText!,
-                  style: const TextStyle(color: kRed, fontSize: 12),
+                  address == null
+                      ? 'Seleccionar o escribir dirección'
+                      : _addressSummary(address),
+                  maxLines: address == null ? 1 : 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: address == null ? const Color(0xFF64748B) : kNavy,
+                    fontSize: 14,
+                    fontWeight: address == null
+                        ? FontWeight.w400
+                        : FontWeight.w600,
+                    height: 1.35,
+                  ),
                 ),
               ),
-            ],
+            ),
           ],
         );
       },
@@ -1273,8 +1292,8 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   }
 
   Widget _submitButton() {
-    return Container(
-      color: Colors.white,
+    return Padding(
+      key: _submitButtonKey,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       child: SizedBox(
         width: double.infinity,
@@ -1325,124 +1344,34 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     Key? key,
     required String label,
     required IconData icon,
-    required T value,
+    required T? value,
     required List<_ChoiceOption<T>> options,
     required ValueChanged<T> onChanged,
     bool optional = false,
+    String? placeholder,
+    String? requiredMessage,
   }) {
-    final selected = options.firstWhere(
-      (option) => option.value == value,
-      orElse: () => options.first,
-    );
+    final selected = value == null
+        ? null
+        : options.firstWhere(
+            (o) => o.value == value,
+            orElse: () => options.first,
+          );
 
-    return InkWell(
+    return _AnchoredChoiceField<T>(
       key: key,
-      onTap: () => _showChoiceSheet<T>(
-        title: label,
-        value: value,
-        options: options,
-        onChanged: onChanged,
+      value: value,
+      options: options,
+      onChanged: onChanged,
+      decoration: _inputDecoration(
+        label: label,
+        icon: icon,
+        optional: optional,
       ),
-      borderRadius: BorderRadius.circular(8),
-      child: InputDecorator(
-        decoration: _inputDecoration(
-          label: label,
-          icon: icon,
-          optional: optional,
-        ).copyWith(suffixIcon: const Icon(Icons.keyboard_arrow_down)),
-        child: Text(
-          selected.label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-          ),
-        ),
-      ),
+      selectedLabel: selected?.label,
+      placeholder: placeholder ?? 'Selecciona',
+      requiredMessage: requiredMessage,
     );
-  }
-
-  Future<void> _showChoiceSheet<T>({
-    required String title,
-    required T value,
-    required List<_ChoiceOption<T>> options,
-    required ValueChanged<T> onChanged,
-  }) async {
-    FocusScope.of(context).unfocus();
-    final selected = await showModalBottomSheet<T>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD1D5DB),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: kNavy,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    separatorBuilder: (_, _) =>
-                        const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                    itemBuilder: (_, index) {
-                      final option = options[index];
-                      final isSelected = option.value == value;
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          option.label,
-                          style: const TextStyle(
-                            color: kNavy,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        trailing: isSelected
-                            ? const Icon(Icons.check, color: kPrimary)
-                            : null,
-                        onTap: () =>
-                            Navigator.of(sheetContext).pop(option.value),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
-    if (selected != null && mounted) {
-      onChanged(selected);
-    }
   }
 
   Widget _dateSelector({
@@ -1519,29 +1448,52 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     );
   }
 
-  InputDecoration _descriptionInputDecoration(String hint) {
-    final base = _inputDecoration(
-      label: '',
-      icon: Icons.notes_outlined,
-      alignLabelWithHint: true,
+  InputDecoration _descriptionInputDecoration(String label) {
+    const borderColor = Color(0xFFCBD5E1);
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: borderColor),
     );
 
-    return base.copyWith(
-      labelText: null,
-      hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
-      floatingLabelBehavior: FloatingLabelBehavior.never,
+    return InputDecoration(
+      labelText: label,
+      alignLabelWithHint: true,
       prefixIcon: const Padding(
-        padding: EdgeInsets.only(top: 18),
+        padding: EdgeInsets.only(top: 17, left: 12, right: 8),
         child: Align(
-          alignment: Alignment.topCenter,
-          widthFactor: 1,
-          heightFactor: 1,
+          alignment: Alignment.topLeft,
+          widthFactor: 1.0,
+          heightFactor: 1.0,
           child: Icon(Icons.notes_outlined, color: kPrimary, size: 21),
         ),
       ),
-      prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-      contentPadding: const EdgeInsets.fromLTRB(4, 18, 14, 14),
+      prefixIconConstraints: const BoxConstraints(minWidth: 42, minHeight: 42),
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      contentPadding: const EdgeInsets.fromLTRB(14, 18, 14, 14),
+      labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+      floatingLabelStyle: const TextStyle(
+        color: kPrimary,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+      border: border,
+      enabledBorder: border,
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: kPrimary, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: kRed),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: kRed, width: 1.5),
+      ),
+      errorMaxLines: 2,
+      floatingLabelBehavior: FloatingLabelBehavior.auto,
+      isDense: true,
     );
   }
 
@@ -1560,7 +1512,20 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     return InputDecoration(
       labelText: optional ? '$label (opcional)' : label,
       alignLabelWithHint: alignLabelWithHint,
-      prefixIcon: Icon(icon, color: kPrimary, size: 21),
+      prefixIcon: alignLabelWithHint
+          ? Padding(
+              padding: const EdgeInsets.only(top: 14, left: 12, right: 8),
+              child: Align(
+                alignment: Alignment.topLeft,
+                widthFactor: 1.0,
+                heightFactor: 1.0,
+                child: Icon(icon, color: kPrimary, size: 21),
+              ),
+            )
+          : Icon(icon, color: kPrimary, size: 21),
+      prefixIconConstraints: alignLabelWithHint
+          ? const BoxConstraints(minWidth: 42, minHeight: 42)
+          : null,
       filled: true,
       fillColor: const Color(0xFFF8FAFC),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -1653,6 +1618,220 @@ class _ChoiceOption<T> {
   final String label;
 
   const _ChoiceOption({required this.value, required this.label});
+}
+
+class _AnchoredChoiceField<T> extends StatefulWidget {
+  final T? value;
+  final List<_ChoiceOption<T>> options;
+  final ValueChanged<T> onChanged;
+  final InputDecoration decoration;
+  final String? selectedLabel;
+  final String placeholder;
+  final String? requiredMessage;
+
+  const _AnchoredChoiceField({
+    super.key,
+    required this.value,
+    required this.options,
+    required this.onChanged,
+    required this.decoration,
+    required this.selectedLabel,
+    required this.placeholder,
+    this.requiredMessage,
+  });
+
+  @override
+  State<_AnchoredChoiceField<T>> createState() =>
+      _AnchoredChoiceFieldState<T>();
+}
+
+class _AnchoredChoiceFieldState<T> extends State<_AnchoredChoiceField<T>> {
+  // GlobalKey ensures the FormField keeps its state (incl. error text)
+  // across rebuilds triggered by overlay open/close setState calls.
+  final _innerKey = GlobalKey<FormFieldState<T>>();
+  final LayerLink _layerLink = LayerLink();
+  final GlobalKey _fieldKey = GlobalKey();
+  OverlayEntry? _menuEntry;
+
+  bool get _isOpen => _menuEntry != null;
+
+  @override
+  void didUpdateWidget(_AnchoredChoiceField<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sync FormField value when parent state changes — do it post-frame
+    // so we are not inside a build call.
+    if (oldWidget.value != widget.value) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _innerKey.currentState?.didChange(widget.value);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _menuEntry?.remove();
+    _menuEntry = null;
+    super.dispose();
+  }
+
+  void _toggleMenu() {
+    FocusScope.of(context).unfocus();
+    if (_isOpen) {
+      _closeMenu();
+    } else {
+      _openMenu();
+    }
+  }
+
+  void _openMenu() {
+    final fieldBox = _fieldKey.currentContext?.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(context);
+    if (fieldBox == null || !fieldBox.hasSize) return;
+
+    final fieldSize = fieldBox.size;
+    _menuEntry = OverlayEntry(
+      builder: (overlayContext) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _closeMenu,
+            ),
+          ),
+          CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.bottomLeft,
+            followerAnchor: Alignment.topLeft,
+            offset: const Offset(0, 6),
+            child: Material(
+              color: Colors.transparent,
+              elevation: 10,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: fieldSize.width,
+                constraints: const BoxConstraints(maxHeight: 220),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: widget.options.length,
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                  itemBuilder: (_, index) {
+                    final option = widget.options[index];
+                    final isSelected = option.value == widget.value;
+                    return InkWell(
+                      onTap: () {
+                        _closeMenu();
+                        widget.onChanged(option.value);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                option.label,
+                                style: TextStyle(
+                                  color: kNavy,
+                                  fontSize: 14,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(
+                                Icons.check,
+                                color: kPrimary,
+                                size: 20,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    overlay.insert(_menuEntry!);
+    setState(() {});
+  }
+
+  void _closeMenu() {
+    _menuEntry?.remove();
+    _menuEntry = null;
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = widget.value != null;
+    return FormField<T>(
+      key: _innerKey,          // stable key → state (incl. errorText) survives rebuilds
+      initialValue: widget.value,
+      validator: widget.requiredMessage != null
+          ? (v) => (v == null) ? widget.requiredMessage : null
+          : null,
+      builder: (field) {
+        // NO addPostFrameCallback here — value sync happens in didUpdateWidget.
+        final effectiveDecoration = widget.decoration.copyWith(
+          suffixIcon: AnimatedRotation(
+            turns: _isOpen ? 0.5 : 0,
+            duration: const Duration(milliseconds: 180),
+            child: Icon(
+              Icons.keyboard_arrow_down,
+              color: field.hasError ? const Color(0xFFDC2626) : null,
+            ),
+          ),
+          errorText: field.errorText,
+          enabledBorder: field.hasError
+              ? OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFFDC2626)),
+                )
+              : null,
+        );
+        return CompositedTransformTarget(
+          link: _layerLink,
+          child: InkWell(
+            key: _fieldKey,
+            onTap: _toggleMenu,
+            borderRadius: BorderRadius.circular(8),
+            child: InputDecorator(
+              decoration: effectiveDecoration,
+              child: Text(
+                hasValue ? widget.selectedLabel! : widget.placeholder,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: hasValue
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFF94A3B8),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _PendingAttachment {

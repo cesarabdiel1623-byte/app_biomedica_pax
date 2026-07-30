@@ -11,7 +11,8 @@ import 'promotion_navigation.dart';
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
 const _kBannerAspectRatio = 16 / 9;
-const _kBannerInterval = Duration(seconds: 5);
+const _kBannerInterval = Duration(seconds: 3);
+const _kInitialBannerPage = 100000;
 
 class BannerCarousel extends StatefulWidget {
   const BannerCarousel({
@@ -29,10 +30,14 @@ class BannerCarousel extends StatefulWidget {
 
 class _BannerCarouselState extends State<BannerCarousel>
     with WidgetsBindingObserver {
-  final _controller = PageController();
+  final _controller = PageController(
+    initialPage: _kInitialBannerPage,
+    viewportFraction: 0.90,
+  );
   List<DisplayPromotionBanner> _banners = const [];
   Map<String, Product?> _productsById = const {};
   int _current = 0;
+  int _physicalPage = _kInitialBannerPage;
   bool _loading = true;
   String? _error;
   Timer? _timer;
@@ -93,6 +98,7 @@ class _BannerCarouselState extends State<BannerCarousel>
         forceRefresh: forceRefresh,
       );
       final productsById = await _loadProducts(banners);
+      await _precacheBannerImages(banners);
       if (!mounted) return;
       setState(() {
         _banners = banners;
@@ -100,6 +106,7 @@ class _BannerCarouselState extends State<BannerCarousel>
         _current = 0;
         _loading = false;
       });
+      _alignCarouselToFirstBanner();
       _completeInitialLoad();
       _startTimer();
     } catch (error) {
@@ -125,6 +132,33 @@ class _BannerCarouselState extends State<BannerCarousel>
     _timer = Timer(_kBannerInterval, _advanceBanner);
   }
 
+  void _alignCarouselToFirstBanner() {
+    if (_banners.length < 2) return;
+    _physicalPage =
+        _kInitialBannerPage - (_kInitialBannerPage % _banners.length);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_controller.hasClients) return;
+      _controller.jumpToPage(_physicalPage);
+    });
+  }
+
+  Future<void> _precacheBannerImages(
+    List<DisplayPromotionBanner> banners,
+  ) async {
+    await Future.wait(
+      banners.map((banner) async {
+        try {
+          await precacheImage(
+            NetworkImage(banner.imageUrl),
+            context,
+          ).timeout(const Duration(seconds: 4));
+        } catch (error) {
+          debugPrint('[BannerCarousel] No se pudo precargar: $error');
+        }
+      }),
+    );
+  }
+
   Future<void> _advanceBanner() async {
     if (!mounted || !_screenActive || !_appActive || _banners.length < 2) {
       return;
@@ -134,7 +168,7 @@ class _BannerCarouselState extends State<BannerCarousel>
       return;
     }
 
-    final next = (_current + 1) % _banners.length;
+    final next = _physicalPage + 1;
     await _controller.animateToPage(
       next,
       duration: const Duration(milliseconds: 420),
@@ -190,12 +224,12 @@ class _BannerCarouselState extends State<BannerCarousel>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth - 24;
+        final availableWidth = constraints.maxWidth;
         final bannerWidth = availableWidth > 720 ? 720.0 : availableWidth;
-        final height = (bannerWidth / _kBannerAspectRatio).clamp(150.0, 320.0);
+        final height = (bannerWidth / _kBannerAspectRatio).clamp(140.0, 300.0);
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: Center(
             child: SizedBox(
               width: bannerWidth,
@@ -210,17 +244,30 @@ class _BannerCarouselState extends State<BannerCarousel>
                   }
                   return false;
                 },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: PageView.builder(
-                    controller: _controller,
-                    itemCount: _banners.length,
-                    onPageChanged: (index) {
-                      if (mounted) setState(() => _current = index);
-                    },
-                    itemBuilder: (_, index) => _buildBanner(_banners[index]),
-                  ),
-                ),
+                child: _banners.length == 1
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: _buildBanner(_banners.first),
+                      )
+                    : PageView.builder(
+                        controller: _controller,
+                        padEnds: true,
+                        onPageChanged: (index) {
+                          _physicalPage = index;
+                          final logicalIndex = index % _banners.length;
+                          if (mounted && logicalIndex != _current) {
+                            setState(() => _current = logicalIndex);
+                          }
+                          final nextBanner =
+                              _banners[(logicalIndex + 1) % _banners.length];
+                          precacheImage(
+                            NetworkImage(nextBanner.imageUrl),
+                            context,
+                          ).catchError((Object _) {});
+                        },
+                        itemBuilder: (_, index) =>
+                            _buildBanner(_banners[index % _banners.length]),
+                      ),
               ),
             ),
           ),
@@ -241,179 +288,215 @@ class _BannerCarouselState extends State<BannerCarousel>
         (banner.headline?.trim().isNotEmpty == true ||
             banner.subheadline?.trim().isNotEmpty == true ||
             productId?.isNotEmpty == true);
-    return Material(
-      color: backgroundColor,
-      child: InkWell(
-        onTap:
-            PromotionNavigation.hasDestination(
-              banner,
-              productAvailable: productId == null || product != null,
-            )
-            ? () => PromotionNavigation.open(context, banner)
-            : null,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.network(
-              displayBanner.imageUrl,
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-              semanticLabel: banner.selectedAsset?.altText,
-              filterQuality: FilterQuality.high,
-              errorBuilder: (_, _, _) => ColoredBox(
-                color: backgroundColor,
-                child: const Center(
-                  child: Icon(
-                    Icons.image_not_supported_outlined,
-                    color: Colors.grey,
-                    size: 32,
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap:
+              PromotionNavigation.hasDestination(
+                banner,
+                productAvailable: productId == null || product != null,
+              )
+              ? () => PromotionNavigation.open(context, banner)
+              : null,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(
+                displayBanner.imageUrl,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                semanticLabel: banner.selectedAsset?.altText,
+                filterQuality: FilterQuality.medium,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => const ColoredBox(
+                  color: Color(0xFFF8FAFC),
+                  child: Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      color: Colors.grey,
+                      size: 32,
+                    ),
                   ),
                 ),
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return ColoredBox(
+                    color: backgroundColor,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: _kPrimary,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  );
+                },
               ),
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return ColoredBox(
-                  color: backgroundColor,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: _kPrimary,
-                      strokeWidth: 2,
+              if (showOverlay)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: MediaQuery.sizeOf(context).width * 0.6,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 12, 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          backgroundColor.withValues(alpha: 0.94),
+                          backgroundColor.withValues(alpha: 0.0),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-            if (showOverlay)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  width: MediaQuery.sizeOf(context).width * 0.6,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        backgroundColor.withValues(alpha: 0.94),
-                        backgroundColor.withValues(alpha: 0.0),
-                      ],
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (banner.badgeText?.trim().isNotEmpty == true)
-                        Text(
-                          banner.badgeText!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: accentColor,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      if (banner.headline?.trim().isNotEmpty == true)
-                        Text(
-                          banner.headline!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: textColor,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      if (banner.subheadline?.trim().isNotEmpty == true) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          banner.subheadline!,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: textColor.withValues(alpha: 0.9),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                      if (product != null) ...[
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Text(
-                              product.formattedPrice,
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (banner.badgeText?.trim().isNotEmpty == true)
+                          Text(
+                            banner.badgeText!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: accentColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
-                            if (product.hasDiscount) ...[
-                              const SizedBox(width: 6),
+                          ),
+                        if (banner.headline?.trim().isNotEmpty == true)
+                          Text(
+                            banner.headline!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        if (banner.subheadline?.trim().isNotEmpty == true) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            banner.subheadline!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: textColor.withValues(alpha: 0.9),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                        if (product != null) ...[
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
                               Text(
-                                product.formattedOldPrice,
+                                product.formattedPrice,
                                 style: TextStyle(
-                                  color: textColor.withValues(alpha: 0.7),
-                                  fontSize: 10,
-                                  decoration: TextDecoration.lineThrough,
-                                  decorationColor: textColor,
+                                  color: textColor,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              if (product.hasDiscount) ...[
+                                const SizedBox(width: 6),
+                                Text(
+                                  product.formattedOldPrice,
+                                  style: TextStyle(
+                                    color: textColor.withValues(alpha: 0.7),
+                                    fontSize: 10,
+                                    decoration: TextDecoration.lineThrough,
+                                    decorationColor: textColor,
+                                  ),
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                        Text(
-                          product.stockStatusLabel,
-                          style: TextStyle(
-                            color: textColor.withValues(alpha: 0.9),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
                           ),
-                        ),
-                      ] else if (productId?.isNotEmpty == true) ...[
-                        const SizedBox(height: 5),
-                        Text(
-                          'Producto no disponible',
-                          style: TextStyle(
-                            color: textColor.withValues(alpha: 0.9),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                          Text(
+                            product.stockStatusLabel,
+                            style: TextStyle(
+                              color: textColor.withValues(alpha: 0.9),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
+                        ] else if (productId?.isNotEmpty == true) ...[
+                          const SizedBox(height: 5),
+                          Text(
+                            'Producto no disponible',
+                            style: TextStyle(
+                              color: textColor.withValues(alpha: 0.9),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                        if (banner.ctaText?.trim().isNotEmpty == true) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            banner.ctaText!,
+                            style: TextStyle(
+                              color: accentColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ],
-                      if (banner.ctaText?.trim().isNotEmpty == true) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          banner.ctaText!,
-                          style: TextStyle(
-                            color: accentColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildLoading() {
-    return Container(
-      height: 138,
-      margin: const EdgeInsets.fromLTRB(10, 10, 10, 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: const Center(
-        child: CircularProgressIndicator(color: _kPrimary, strokeWidth: 2),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final bannerWidth = availableWidth > 720 ? 720.0 : availableWidth;
+        final height = (bannerWidth / _kBannerAspectRatio).clamp(140.0, 300.0);
+        return Center(
+          child: Container(
+            width: bannerWidth,
+            height: height,
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: _kPrimary,
+                    strokeWidth: 2.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
+
 
   Widget _buildError() {
     return Container(

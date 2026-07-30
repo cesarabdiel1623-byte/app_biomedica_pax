@@ -68,12 +68,17 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
           tooltip: 'Regresar',
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(
-          widget.category.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
+        title: _loading
+            ? const SizedBox.shrink()
+            : Text(
+                widget.category.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
       ),
       body: _buildBody(),
     );
@@ -81,9 +86,7 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: _kPrimary, strokeWidth: 2.5),
-      );
+      return const Center(child: CircularProgressIndicator(color: _kPrimary));
     }
 
     if (_error != null) {

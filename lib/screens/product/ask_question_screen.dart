@@ -36,13 +36,6 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
       UiHelpers.showWarningToast(context, 'La pregunta no puede estar vacía.');
       return;
     }
-    if (text.length < 10) {
-      UiHelpers.showWarningToast(
-        context,
-        'La pregunta debe tener al menos 10 caracteres.',
-      );
-      return;
-    }
     if (text.length > 500) {
       UiHelpers.showWarningToast(
         context,
@@ -58,7 +51,7 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
       if (mounted) {
         UiHelpers.showQuestionSubmittedToast(
           context,
-          '✓ Tu pregunta fue enviada. El equipo de Go Medical la responderá pronto.',
+          '✓ Tu pregunta fue enviada.',
         );
         Navigator.of(
           context,

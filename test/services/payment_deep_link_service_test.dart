@@ -100,6 +100,29 @@ void main() {
       service.dispose();
     });
 
+    test('procesa retornos con payment_id diferentes', () async {
+      final controller = StreamController<Uri>.broadcast();
+      final handled = <PaymentTestResult>[];
+      final service = PaymentDeepLinkService(
+        initialLinkLoader: () async => null,
+        linkStreamFactory: () => controller.stream,
+      );
+
+      await service.init(onResult: handled.add);
+      controller.add(
+        Uri.parse('gomedical://payment/success?payment_id=123&status=approved'),
+      );
+      controller.add(
+        Uri.parse('gomedical://payment/success?payment_id=456&status=approved'),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(handled, [PaymentTestResult.success, PaymentTestResult.success]);
+
+      await controller.close();
+      service.dispose();
+    });
+
     test('ignora enlaces inválidos del stream', () async {
       final controller = StreamController<Uri>.broadcast();
       final handled = <PaymentTestResult>[];

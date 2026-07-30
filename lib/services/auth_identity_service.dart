@@ -1,10 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Helper centralizado para resolver la identidad efectiva del cliente.
+/// Helper centralizado para resolver la identidad de negocio del cliente.
 ///
-/// Algunas tablas de negocio cuelgan de `profiles.client_id` y otras
-/// instalaciones antiguas aún dependen de `auth.uid()`. Este helper mantiene
-/// el mismo fallback conservador para no romper flujos existentes.
+/// `auth.uid()` identifica al usuario autenticado y no debe tratarse como si
+/// fuera un `clients.id`. La relación válida se obtiene de
+/// `profiles.client_id`.
 class AuthIdentityService {
   static final _client = Supabase.instance.client;
 
@@ -13,21 +13,32 @@ class AuthIdentityService {
   static Future<String?> getEffectiveClientId() async {
     final user = _client.auth.currentUser;
     if (user == null) return null;
+    return requireLinkedClientId();
+  }
 
-    try {
-      final profile = await _client
-          .from('profiles')
-          .select('client_id')
-          .eq('id', user.id)
-          .maybeSingle();
-      final clientId = profile?['client_id'] as String?;
-      if (clientId != null && clientId.isNotEmpty) {
-        return clientId;
-      }
-    } catch (_) {
-      // Fallback silencioso a auth.uid para instalaciones con perfil incompleto.
+  /// Returns the client linked by the backend or throws a clear integration
+  /// error. Sensitive business flows must not treat `auth.uid()` as a
+  /// `clients.id`.
+  static Future<String> requireLinkedClientId() async {
+    final user = _client.auth.currentUser;
+    if (user == null) {
+      throw Exception('Debes iniciar sesión para continuar.');
     }
 
-    return user.id;
+    final profile = await _client
+        .from('profiles')
+        .select('client_id')
+        .eq('id', user.id)
+        .maybeSingle();
+    final clientId = profile?['client_id'] as String?;
+
+    if (clientId == null || clientId.trim().isEmpty) {
+      throw Exception(
+        'Tu cuenta todavía no está vinculada a un cliente. '
+        'Contacta a soporte para completar el acceso.',
+      );
+    }
+
+    return clientId;
   }
 }

@@ -147,6 +147,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   .from('service_ticket_messages')
                   .select('*, profiles:sender_profile_id(full_name)')
                   .eq('id', newId)
+                  .eq('is_internal', false)
                   .maybeSingle();
 
               if (res != null && mounted) {

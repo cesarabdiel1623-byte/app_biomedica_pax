@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'auth_identity_service.dart';
 
 class ClientAddressDetails {
   final String streetAddress;
@@ -180,24 +181,8 @@ class AddressService {
   static final _db = Supabase.instance.client;
 
   static Future<String?> _getEffectiveClientId() async {
-    final user = _db.auth.currentUser;
-    if (user == null) return null;
-
-    try {
-      final profile = await _db
-          .from('profiles')
-          .select('client_id')
-          .eq('id', user.id)
-          .maybeSingle();
-      final clientId = profile?['client_id'] as String?;
-      if (clientId != null && clientId.isNotEmpty) {
-        return clientId;
-      }
-    } catch (_) {
-      // Fallback silencioso al auth.uid cuando aún no existe el perfil enlazado.
-    }
-
-    return user.id;
+    if (_db.auth.currentUser == null) return null;
+    return AuthIdentityService.requireLinkedClientId();
   }
 
   static Future<List<ClientAddress>> getAddresses() async {
@@ -232,35 +217,6 @@ class AddressService {
     return data != null ? ClientAddress.fromMap(data) : null;
   }
 
-  /// Asegura que el usuario tiene un registro en la tabla 'clients'.
-  static Future<void> _ensureClientExists() async {
-    final user = _db.auth.currentUser;
-    if (user == null) return;
-    final meta = user.userMetadata;
-    try {
-      final clientId = await _getEffectiveClientId();
-      if (clientId == null) return;
-      final nameStr = (meta?['full_name'] ?? meta?['name'] ?? '').toString();
-      await _db
-          .from('clients')
-          .upsert(
-            {
-              'id': clientId,
-              'business_name': nameStr.isEmpty ? 'Usuario' : nameStr,
-              'contact_name': nameStr,
-              'email': user.email ?? '',
-              'is_active': true,
-              'preferred_currency': 'MXN',
-              'country': 'México',
-            },
-            onConflict: 'id',
-            ignoreDuplicates: true,
-          );
-    } catch (e) {
-      print('Aviso _ensureClientExists: $e');
-    }
-  }
-
   static Future<ClientAddress> saveAddress({
     required String label,
     required String address,
@@ -273,9 +229,6 @@ class AddressService {
   }) async {
     final clientId = await _getEffectiveClientId();
     if (clientId == null) throw Exception('No hay sesión activa');
-
-    // Garantizar que el perfil existe antes de insertar
-    await _ensureClientExists();
 
     if (isDefault) {
       await _db

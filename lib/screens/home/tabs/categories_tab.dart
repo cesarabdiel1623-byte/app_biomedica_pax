@@ -125,11 +125,36 @@ class CategoriesTabState extends State<CategoriesTab> {
 
   @override
   Widget build(BuildContext context) {
+    final current = _categories.isNotEmpty
+        ? _categories[_selectedIndex.clamp(0, _categories.length - 1)]
+        : null;
+
+    return Column(
+      children: [
+        StandardSectionHeader(
+          title: current?.name ?? 'Categorías',
+          backgroundColor: _kPrimary,
+          backTooltip: 'Volver al inicio',
+          onBack: () => HomeScreen.showTab(0),
+        ),
+        Expanded(
+          child: _buildBody(current),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBody(CatalogCategory? current) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _kPrimary));
+      return const ColoredBox(
+        color: Colors.white,
+        child: Center(
+          child: CircularProgressIndicator(color: _kPrimary),
+        ),
+      );
     }
 
-    if (_error != null) {
+    if (_error != null && _categories.isEmpty) {
       return LoadErrorState(
         error: _error,
         onRetry: _loadCategories,
@@ -138,7 +163,7 @@ class CategoriesTabState extends State<CategoriesTab> {
       );
     }
 
-    if (_categories.isEmpty) {
+    if (_categories.isEmpty || current == null) {
       return RefreshIndicator(
         color: _kPrimary,
         onRefresh: _loadCategories,
@@ -154,36 +179,19 @@ class CategoriesTabState extends State<CategoriesTab> {
       );
     }
 
-    final current = _categories[_selectedIndex];
-
-    return Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildHeader(current),
+        _buildCategorySidebar(),
         Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildCategorySidebar(),
-              Expanded(
-                child: current.subcategories.isEmpty
-                    ? _buildCategoryOverview(current)
-                    : _buildSubcategoryGrid(current),
-              ),
-            ],
-          ),
+          child: current.subcategories.isEmpty
+              ? _buildCategoryOverview(current)
+              : _buildSubcategoryGrid(current),
         ),
       ],
     );
   }
 
-  Widget _buildHeader(CatalogCategory category) {
-    return StandardSectionHeader(
-      title: category.name,
-      backgroundColor: _kPrimary,
-      backTooltip: 'Volver al inicio',
-      onBack: () => HomeScreen.showTab(0),
-    );
-  }
 
   Widget _buildCategorySidebar() {
     return Container(

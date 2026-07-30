@@ -559,7 +559,7 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
 
     try {
       final effectiveClientId =
-          await AuthIdentityService.getEffectiveClientId() ?? user.id;
+          await AuthIdentityService.requireLinkedClientId();
 
       // 1. Fetch from clients table
       final clientData = await client

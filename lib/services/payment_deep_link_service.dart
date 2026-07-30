@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/payment_test_result.dart';
 
@@ -69,11 +70,12 @@ class PaymentDeepLinkService {
   void _handleUri(Uri? uri) {
     if (uri == null) return;
 
+    debugPrint('Retorno completo de Mercado Pago: $uri');
+
     final result = parseResult(uri);
     if (result == null) return;
 
-    final dedupeKey =
-        '${uri.scheme.toLowerCase()}://${uri.host.toLowerCase()}${uri.path.toLowerCase()}';
+    final dedupeKey = uri.toString();
     if (_lastHandledKey == dedupeKey) return;
     _lastHandledKey = dedupeKey;
     _onResult?.call(result);

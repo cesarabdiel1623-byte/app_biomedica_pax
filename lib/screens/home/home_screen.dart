@@ -125,10 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ColoredBox(
                 color: Colors.white,
                 child: Center(
-                  child: CircularProgressIndicator(
-                    color: _kPrimary,
-                    strokeWidth: 2.5,
-                  ),
+                  child: CircularProgressIndicator(color: _kPrimary),
                 ),
               ),
             ),
