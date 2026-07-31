@@ -661,7 +661,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
-                        _currentLocation == 'Selecciona tu ubicación'
+                        (_loading || _refreshingHome || _currentLocation == 'Selecciona tu ubicación')
                             ? '¿Dónde enviamos?'
                             : _currentLocation,
                         style: const TextStyle(

@@ -116,8 +116,8 @@ class _RegistrationChecklistScreenState
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         color: isCompleted
             ? const Color(0xFFF0FDF9)
@@ -134,81 +134,93 @@ class _RegistrationChecklistScreenState
           width: isActive ? 1.5 : 1,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Icon circle
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isCompleted
-                  ? _primaryColor.withValues(alpha: 0.1)
-                  : isActive
-                  ? _primaryColor.withValues(alpha: 0.08)
-                  : Colors.grey.withValues(alpha: 0.08),
-            ),
-            child: isCompleted
-                ? const Icon(Icons.check_circle, color: _primaryColor, size: 28)
-                : Icon(
-                    icon,
-                    color: isActive ? _primaryColor : Colors.grey.shade400,
-                    size: 24,
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Icon circle
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isCompleted
+                      ? _primaryColor.withValues(alpha: 0.1)
+                      : isActive
+                      ? _primaryColor.withValues(alpha: 0.08)
+                      : Colors.grey.withValues(alpha: 0.08),
+                ),
+                child: isCompleted
+                    ? const Icon(Icons.check_circle, color: _primaryColor, size: 26)
+                    : Icon(
+                        icon,
+                        color: isActive ? _primaryColor : Colors.grey.shade400,
+                        size: 22,
+                      ),
+              ),
+              const SizedBox(width: 14),
+              // Text
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isCompleted ? completedTitle : title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: isLocked ? Colors.grey.shade400 : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      isCompleted ? completedSubtitle : subtitle,
+                      style: TextStyle(
+                        color: isCompleted ? _primaryColor : Colors.grey.shade500,
+                        fontSize: 13,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (isCompleted)
+                const Icon(Icons.check, color: _primaryColor, size: 22)
+              else if (isLocked)
+                Icon(Icons.lock_outline, color: Colors.grey.shade300, size: 20),
+            ],
           ),
-          const SizedBox(width: 16),
-          // Text
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isCompleted ? completedTitle : title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: isLocked ? Colors.grey.shade400 : Colors.black87,
+          if (isActive) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                height: 36,
+                child: ElevatedButton(
+                  onPressed: () => onTap(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  isCompleted ? completedSubtitle : subtitle,
-                  style: TextStyle(
-                    color: isCompleted ? _primaryColor : Colors.grey.shade500,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Button or lock
-          if (isCompleted)
-            const Icon(Icons.check, color: _primaryColor, size: 22)
-          else if (isActive)
-            SizedBox(
-              height: 36,
-              child: ElevatedButton(
-                onPressed: () => onTap(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: Text(
-                  buttonText,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                  child: Text(
+                    buttonText,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            )
-          else
-            Icon(Icons.lock_outline, color: Colors.grey.shade300, size: 20),
+            ),
+          ],
         ],
       ),
     );

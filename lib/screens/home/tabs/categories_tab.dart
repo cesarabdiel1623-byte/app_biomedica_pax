@@ -129,10 +129,14 @@ class CategoriesTabState extends State<CategoriesTab> {
         ? _categories[_selectedIndex.clamp(0, _categories.length - 1)]
         : null;
 
+    final headerTitle = (_loading || current == null)
+        ? 'Categorías'
+        : current.name;
+
     return Column(
       children: [
         StandardSectionHeader(
-          title: current?.name ?? 'Categorías',
+          title: headerTitle,
           backgroundColor: _kPrimary,
           backTooltip: 'Volver al inicio',
           onBack: () => HomeScreen.showTab(0),

@@ -152,7 +152,7 @@ class UiHelpers {
     String message, {
     String? actionLabel,
     VoidCallback? onAction,
-    double bottomMargin = 24,
+    double bottomMargin = 66,
   }) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -171,17 +171,19 @@ class UiHelpers {
         ),
         duration: const Duration(seconds: 3),
         content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
               Icons.check_circle_rounded,
               color: Color(0xFF16A34A), // Icono verde vibrante
               size: 20,
             ),
-            const SizedBox(width: 12),
-            Expanded(
+            const SizedBox(width: 10),
+            Flexible(
               child: Text(
                 message,
                 maxLines: 2,
+                textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Color(0xFF15803D), // Texto verde oscuro
@@ -209,7 +211,7 @@ class UiHelpers {
   static void showWarningToast(
     BuildContext context,
     String message, {
-    double bottomMargin = 24,
+    double bottomMargin = 66,
   }) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -228,16 +230,18 @@ class UiHelpers {
         ),
         duration: const Duration(seconds: 3),
         content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
               Icons.warning_amber_rounded,
               color: Color(0xFFD97706), // Ámbar alerta vibrante
               size: 20,
             ),
-            const SizedBox(width: 12),
-            Expanded(
+            const SizedBox(width: 10),
+            Flexible(
               child: Text(
                 message,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Color(0xFFB45309), // Texto ámbar oscuro
                   fontSize: 13,
@@ -255,7 +259,7 @@ class UiHelpers {
   static void showErrorToast(
     BuildContext context,
     String message, {
-    double bottomMargin = 24,
+    double bottomMargin = 66,
   }) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -274,16 +278,18 @@ class UiHelpers {
         ),
         duration: const Duration(seconds: 3),
         content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
               Icons.error_outline_rounded,
               color: Color(0xFFEF4444), // Rojo alerta vibrante
               size: 20,
             ),
-            const SizedBox(width: 12),
-            Expanded(
+            const SizedBox(width: 10),
+            Flexible(
               child: Text(
                 message,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Color(0xFF991B1B), // Texto rojo oscuro
                   fontSize: 13,

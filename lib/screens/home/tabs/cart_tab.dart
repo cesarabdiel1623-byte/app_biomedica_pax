@@ -637,10 +637,20 @@ class CartTabState extends State<CartTab> {
 
   @override
   Widget build(BuildContext context) {
+    final titleText = _loading
+        ? 'Carrito'
+        : (_items.isEmpty
+            ? 'Carrito'
+            : 'Carrito (${_items.fold<int>(0, (s, i) => s + i.quantity)})');
+
+    final locationText = (_loading || _currentLocation == 'Selecciona tu ubicación')
+        ? '¿Dónde enviamos?'
+        : _currentLocation;
+
     return Column(
       children: [
         StandardSectionHeader(
-          title: 'Carrito (${_items.fold<int>(0, (s, i) => s + i.quantity)})',
+          title: titleText,
           subtitle: 'Finaliza tu orden de compra',
           backgroundColor: _kPrimary,
           backTooltip: 'Regresar al inicio',
@@ -682,9 +692,7 @@ class CartTabState extends State<CartTab> {
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
-                          _currentLocation == 'Selecciona tu ubicación'
-                              ? '¿Dónde enviamos?'
-                              : _currentLocation,
+                          locationText,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
