@@ -1,0 +1,27 @@
+REPORTE DE AUDITORÍA DE SEGURIDAD Y DIAGNÓSTICO DE PAGOS - GO MEDICAL
+
+Nivel de riesgo global: ALTO (7.8 / 10)
+Veredicto: NO APTO PARA PRODUCCIÓN (Apto únicamente para pruebas técnicas controladas en Sandbox).
+
+Conteo de hallazgos:
+- Críticos: 1
+- Altos: 2
+- Medios: 1
+- Bajos / Informativos: 1
+
+5 Bloqueos principales antes de producción:
+1. Ausencia del código fuente de Edge Functions Deno (create-mp-test-preference, mercado-pago-webhook) y migraciones SQL en el repositorio Git.
+2. Inexistencia de un flujo de preferencia de pago productivo que calcule montos reales desde la base de datos a partir de una orden en PostgreSQL.
+3. Uso de Deep Links con esquema personalizado (gomedical://payment) sin validación de App Links / Universal Links (HTTPS y assetlinks.json).
+4. Necesidad de auditar y verificar bloqueos transaccionales SQL (idempotencia y FOR UPDATE) en la base de datos para prevenir race conditions en webhooks.
+5. Necesidad de restringir RLS en la tabla 'orders' para revocar permisos de UPDATE sobre columnas de pago/estado a usuarios autenticados.
+
+Archivos que necesitas compartir con otro auditor para completar la revisión:
+- supabase/functions/create-mp-test-preference/index.ts
+- supabase/functions/mercado-pago-webhook/index.ts
+- supabase/functions/check-mp-test-payment/index.ts
+- supabase/migrations/*.sql (Definiciones de RLS, triggers y RPC)
+
+Información que faltó revisar:
+- Código `.ts` real desplegado en Supabase Cloud.
+- Archivos de migración de esquema SQL y políticas RLS activas en Supabase.
