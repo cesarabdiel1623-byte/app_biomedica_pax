@@ -591,6 +591,7 @@ class _ProductCard extends StatelessWidget {
   }
 
   Widget _buildStockPill(Product p) {
+    if (!p.trackInventory) return const SizedBox.shrink();
     Color bg;
     Color fg;
     String text;
@@ -599,7 +600,7 @@ class _ProductCard extends StatelessWidget {
         bg = const Color(0xFFFEE2E2);
         fg = const Color(0xFFEF4444);
         text = 'Sin stock';
-      } else if (p.stock! <= 5) {
+      } else if (p.stockStatus == 'low_stock' || p.stock! <= 5) {
         bg = AppColors.accent.withOpacity(0.18);
         fg = const Color(0xFFD97706);
         text = '${p.stock} dispon. (¡Últimas!)';

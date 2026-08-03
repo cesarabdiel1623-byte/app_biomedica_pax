@@ -18,26 +18,39 @@ class ProductService {
 
     try {
       final productIds = products.map((p) => p.id).toList();
-      final stockResponse = await _client
-          .from('inventory_stock')
-          .select('product_id, quantity, current_stock, stock')
-          .inFilter('product_id', productIds);
+      
+      List<dynamic> stockResponse = [];
+      
+      try {
+        stockResponse = await _client
+            .from('product_inventory_availability')
+            .select('product_id, available_stock, stock_status')
+            .inFilter('product_id', productIds);
+      } catch (e) {
+        // Fallback or ignore if the view fails, though it shouldn't
+      }
 
-      final stockMap = <String, double>{};
-      for (final row in stockResponse as List) {
+      final stockMap = <String, Map<String, dynamic>>{};
+      for (final row in stockResponse) {
         final pid = row['product_id'] as String?;
         if (pid == null) continue;
         
-        final quantityStr = row['quantity']?.toString() ?? row['current_stock']?.toString() ?? row['stock']?.toString() ?? '0';
-        final quantity = double.tryParse(quantityStr) ?? 0.0;
-        
-        stockMap[pid] = (stockMap[pid] ?? 0.0) + quantity;
+        stockMap[pid] = {
+          'available_stock': row['available_stock'],
+          'stock_status': row['stock_status'],
+        };
       }
 
       return products.map((p) {
         if (!p.trackInventory) return p;
-        final stockVal = stockMap[p.id]?.round() ?? 0;
-        return p.copyWith(stock: stockVal);
+        if (!stockMap.containsKey(p.id)) return p; // Mantiene null
+
+        final stockData = stockMap[p.id]!;
+        final availableStockStr = stockData['available_stock']?.toString() ?? '0';
+        final stockVal = double.tryParse(availableStockStr)?.round() ?? 0;
+        final stockStatus = stockData['stock_status'] as String?;
+
+        return p.copyWith(stock: stockVal, stockStatus: stockStatus);
       }).toList();
     } catch (e) {
       // In case of error, just return the products safely

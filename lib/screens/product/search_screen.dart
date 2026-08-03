@@ -718,8 +718,22 @@ class _ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imgHeight = isCompact ? 110.0 : 150.0;
-    final stockLabel = (product.trackInventory && (product.stock ?? 0) <= 0) ? 'Sin stock' : 'Disponible';
-    final stockColor = stockLabel == 'Sin stock' ? const Color(0xFFEF4444) : const Color(0xFF16A34A);
+    final stockLabel = !product.trackInventory 
+        ? '' 
+        : (product.stock == null) 
+            ? 'Stock no disponible' 
+            : (product.stock! <= 0 
+                ? 'Sin stock' 
+                : ((product.stockStatus == 'low_stock' || product.stock! <= 5)
+                    ? '${product.stock} dispon. (¡Últimas!)'
+                    : '${product.stock} disponibles'));
+    
+    Color stockColor = const Color(0xFF16A34A);
+    if (stockLabel == 'Sin stock' || stockLabel == 'Stock no disponible') {
+      stockColor = const Color(0xFFEF4444);
+    } else if (product.stockStatus == 'low_stock' || (product.stock != null && product.stock! <= 5)) {
+      stockColor = const Color(0xFFD97706);
+    }
     final titleFontSize = isCompact ? 10.5 : 13.5;
     final oldPriceFontSize = isCompact ? 9.0 : 11.5;
     final priceFontSize = isCompact ? 12.5 : 18.5;
@@ -1024,30 +1038,31 @@ class _ProductCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                  Row(
-                    children: [
-                      Icon(
-                        stockLabel == 'Sin stock'
-                            ? Icons.highlight_off_rounded
-                            : Icons.check_circle_outline_rounded,
-                        size: isCompact ? 10.0 : 12.0,
-                        color: stockColor,
-                      ),
-                      const SizedBox(width: 3),
-                      Expanded(
-                        child: Text(
-                          stockLabel,
-                          style: TextStyle(
-                            fontSize: infoFontSize,
-                            color: stockColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  if (stockLabel.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(
+                          stockLabel == 'Sin stock' || stockLabel == 'Stock no disponible'
+                              ? Icons.highlight_off_rounded
+                              : Icons.check_circle_outline_rounded,
+                          size: isCompact ? 10.0 : 12.0,
+                          color: stockColor,
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            stockLabel,
+                            style: TextStyle(
+                              fontSize: infoFontSize,
+                              color: stockColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),

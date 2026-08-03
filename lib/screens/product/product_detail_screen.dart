@@ -4,6 +4,7 @@ import '../../services/product_service.dart';
 import '../../services/cart_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../home/home_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 const _kPrimary = AppColors.primary;
 const _kGreen = AppColors.secondary;
@@ -43,8 +44,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  Future<bool> _validateStock(Product p) async {
+    if (!p.trackInventory) return true;
+    try {
+      final response = await Supabase.instance.client
+          .from('product_inventory_availability')
+          .select('available_stock, stock_status')
+          .eq('product_id', p.id)
+          .maybeSingle();
+      
+      if (response == null) return true;
+      
+      final availableStockStr = response['available_stock']?.toString() ?? '0';
+      final availableStock = double.tryParse(availableStockStr)?.round() ?? 0;
+      if (availableStock <= 0) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Agotado. Sin stock disponible.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return false;
+      }
+      return true;
+    } catch (e) {
+      return true;
+    }
+  }
+
   Future<void> _buyNow(Product p) async {
     setState(() => _loadingDirectBuy = true);
+    final hasStock = await _validateStock(p);
+    if (!hasStock) {
+      setState(() => _loadingDirectBuy = false);
+      return;
+    }
     try {
       // 1. Add to cart
       await CartService.addToCart(p.id);
@@ -475,6 +511,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     onPressed: _loadingDirectBuy
                         ? null
                         : () async {
+                            final hasStock = await _validateStock(p);
+                            if (!hasStock) return;
                             try {
                               await CartService.addToCart(p.id);
                               if (context.mounted) {
@@ -575,36 +613,42 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final warText = p.warrantyText ?? 'Garantía oficial Go Medical';
 
     // 3. Stock/Availability info
-    Color stockBg;
-    Color stockFg;
-    String stockText;
-    if (p.stock != null) {
-      if (p.stock! <= 0) {
-        stockBg = const Color(0xFFFEE2E2);
-        stockFg = const Color(0xFFEF4444);
-        stockText = 'Sin stock';
-      } else if (p.stock! <= 5) {
-        stockBg = AppColors.accent.withOpacity(0.18);
-        stockFg = const Color(0xFFD97706);
-        stockText = 'Stock disponible: ${p.stock} unidades (¡Pocas piezas!)';
+    Color stockBg = AppColors.softHighlight.withOpacity(0.3);
+    Color stockFg = AppColors.darkTeal;
+    String stockText = 'Stock no administrado';
+    
+    if (p.trackInventory) {
+      if (p.stock != null) {
+        if (p.stock! <= 0) {
+          stockBg = const Color(0xFFFEE2E2);
+          stockFg = const Color(0xFFEF4444);
+          stockText = 'Sin stock';
+        } else if (p.stockStatus == 'low_stock' || p.stock! <= 5) {
+          stockBg = AppColors.accent.withOpacity(0.18);
+          stockFg = const Color(0xFFD97706);
+          stockText = 'Stock disponible: ${p.stock} unidades (¡Pocas piezas!)';
+        } else {
+          stockBg = AppColors.background;
+          stockFg = AppColors.primary;
+          stockText = 'Stock disponible: ${p.stock} unidades';
+        }
       } else {
-        stockBg = AppColors.background;
-        stockFg = AppColors.primary;
-        stockText = 'Stock disponible: ${p.stock} unidades';
+        stockBg = AppColors.softHighlight.withOpacity(0.3);
+        stockFg = AppColors.darkTeal;
+        stockText = 'Stock no disponible';
       }
-    } else {
-      stockBg = AppColors.softHighlight.withOpacity(0.3);
-      stockFg = AppColors.darkTeal;
-      stockText = 'Stock no disponible';
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _pillRow(Icons.local_shipping_outlined, shipText, shipFg, shipBg),
         const SizedBox(height: 8),
         _pillRow(Icons.verified_user_outlined, warText, warFg, warBg),
-        const SizedBox(height: 8),
-        _pillRow(Icons.inventory_2_outlined, stockText, stockFg, stockBg),
+        if (p.trackInventory) ...[
+          const SizedBox(height: 8),
+          _pillRow(Icons.inventory_2_outlined, stockText, stockFg, stockBg),
+        ],
       ],
     );
   }

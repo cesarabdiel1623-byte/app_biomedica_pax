@@ -20,6 +20,7 @@ import '../profile/profile_details_screens.dart';
 import 'address_picker_screen.dart';
 import '../../services/notification_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_background.dart';
 
 // Permite drag con mouse en web (fix para ListView horizontal)
 class _MouseDragScrollBehavior extends MaterialScrollBehavior {
@@ -33,8 +34,8 @@ class _MouseDragScrollBehavior extends MaterialScrollBehavior {
 
 const _kPrimary = AppColors.primary;
 const _kNavy = AppColors.textPrimary;
-const _kGreen = AppColors.secondary;
-const _kRed = AppColors.error;
+const _kGreen = AppColors.success;
+const _kRed = AppColors.danger;
 const _kBg = AppColors.background;
 
 class HomeScreen extends StatefulWidget {
@@ -57,6 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _MarketplaceTab(key: _marketplaceTabKey),
       const _CategoriesTab(),
       _CartTab(key: _cartTabKey),
+      const TicketsListScreen(),
       _ProfileTab(onSignOut: _signOut),
     ]);
     _subscribeToNotifications();
@@ -99,58 +101,81 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: CurvedNavigationBar(
-          index: _currentIndex,
-          height: 60.0,
-          color: AppColors.white,
-          buttonBackgroundColor: _kPrimary,
-          backgroundColor: _kBg,
-          animationDuration: const Duration(milliseconds: 300),
-          items: [
-            Icon(
-              Icons.home,
-              size: 28,
-              color: _currentIndex == 0 ? AppColors.white : AppColors.textSecondary,
-            ),
-            Icon(
-              Icons.grid_view,
-              size: 28,
-              color: _currentIndex == 1 ? AppColors.white : AppColors.textSecondary,
-            ),
-            Icon(
-              Icons.shopping_cart,
-              size: 28,
-              color: _currentIndex == 2 ? AppColors.white : AppColors.textSecondary,
-            ),
-            Icon(
-              Icons.person,
-              size: 28,
-              color: _currentIndex == 3 ? AppColors.white : AppColors.textSecondary,
-            ),
-          ],
-          onTap: (i) {
-            setState(() => _currentIndex = i);
-            if (i == 0) {
-              _marketplaceTabKey.currentState?._load(isLiveSearch: true);
-            } else if (i == 2) {
-              _cartTabKey.currentState?._load();
-            }
-          },
-        ),
+      backgroundColor: Colors.transparent,
+      extendBody: true, // Importante para la navigation flotante
+      body: AppBackground(
+        child: IndexedStack(index: _currentIndex, children: _screens),
       ),
+      bottomNavigationBar: _buildBottomNav(),
     );
   }
+
+  Widget _buildBottomNav() {
+    const items = [
+      _NavItem(icon: Icons.home_rounded, activeIcon: Icons.home_rounded, label: 'Inicio'),
+      _NavItem(icon: Icons.grid_view_rounded, activeIcon: Icons.grid_view_rounded, label: 'Categorías'),
+      _NavItem(icon: Icons.shopping_cart_outlined, activeIcon: Icons.shopping_cart_rounded, label: 'Carrito'),
+      _NavItem(icon: Icons.headset_mic_rounded, activeIcon: Icons.headset_mic_rounded, label: 'Soporte'),
+      _NavItem(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Mi cuenta'),
+    ];
+
+    return CurvedNavigationBar(
+      index: _currentIndex,
+      height: 60.0,
+      color: AppColors.white,
+      backgroundColor: Colors.transparent,
+      buttonBackgroundColor: AppColors.primary,
+      animationDuration: const Duration(milliseconds: 300),
+      items: List.generate(items.length, (i) {
+        final active = _currentIndex == i;
+        if (active) {
+          return Icon(
+            items[i].activeIcon,
+            size: 30,
+            color: Colors.white,
+          );
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: 8.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                items[i].icon,
+                size: 24,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                items[i].label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+      onTap: (index) {
+        setState(() => _currentIndex = index);
+        if (index == 0) {
+          _marketplaceTabKey.currentState?._load(isLiveSearch: true);
+        } else if (index == 2) {
+          _cartTabKey.currentState?._load();
+        }
+      },
+    );
+  }
+}
+
+class _NavItem {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  const _NavItem({required this.icon, required this.activeIcon, required this.label});
 }
 
 // ══════════════════════════════════════════
@@ -246,17 +271,16 @@ class _MarketplaceTabState extends State<_MarketplaceTab> {
   ) {
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 22, 16, 8),
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.primary, size: 19),
-            const SizedBox(width: 8),
             Text(
               title,
               style: const TextStyle(
-                fontSize: 15.0,
+                fontSize: 17,
                 fontWeight: FontWeight.bold,
-                color: AppColors.medicalBlue,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.2,
               ),
             ),
             const Spacer(),
@@ -527,292 +551,460 @@ class _MarketplaceTabState extends State<_MarketplaceTab> {
     );
   }
 
+
   Widget _buildBenefitsRow() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    final benefits = [
+      (Icons.local_shipping_outlined, 'Envíos\na todo el país'),
+      (Icons.security_outlined, 'Compra\nsegura'),
+      (Icons.verified_outlined, 'Garantía\nasegurada'),
+    ];
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textPrimary.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _benefitItem(Icons.local_shipping_outlined, 'Envíos a todo el país'),
-          _benefitItem(Icons.security, 'Compra segura'),
-          _benefitItem(Icons.support_agent, 'Soporte especializado'),
+          Expanded(child: _benefitItem(benefits[0].$1, benefits[0].$2)),
+          Container(width: 1, height: 32, color: AppColors.border.withOpacity(0.6)),
+          Expanded(child: _benefitItem(benefits[1].$1, benefits[1].$2)),
+          Container(width: 1, height: 32, color: AppColors.border.withOpacity(0.6)),
+          Expanded(child: _benefitItem(benefits[2].$1, benefits[2].$2)),
         ],
       ),
     );
   }
 
   Widget _benefitItem(IconData icon, String text) {
-    return Row(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: AppColors.primary),
-        const SizedBox(width: 4),
-        Text(text, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceBlue,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 18, color: AppColors.primary),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 9.5,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+            height: 1.2,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _header() => Container(
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          Color(0xFF3F7373), // Ming
-          Color(0xFF768C45), // Palm Leaf
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.only(
-        bottomLeft: Radius.circular(24),
-        bottomRight: Radius.circular(24),
-      ),
-    ),
-    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+
+  Widget _header() {
+    final user = Supabase.instance.client.auth.currentUser;
+    final name = (user?.userMetadata?['full_name'] as String? ?? '').split(' ').first;
+    final greeting = name.isNotEmpty ? '¡Hola, $name!' : '¡Hola!';
+
+    return Column(
       children: [
-        // Saludo y notificaciones
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '¡Hola!',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Encuentra el equipo ideal',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-              ],
-            ),
-            GestureDetector(
-              onTap: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const NotificationsListScreen()),
-                );
-                final userId = Supabase.instance.client.auth.currentUser?.id;
-                if (userId != null) {
-                  NotificationService.instance.updateUnreadCount(userId);
-                }
-              },
-              child: ValueListenableBuilder<int>(
-                valueListenable: NotificationService.instance.unreadCountNotifier,
-                builder: (context, count, _) {
-                  return Badge(
-                    isLabelVisible: count > 0,
-                    label: Text(count > 99 ? '99+' : count.toString()),
-                    backgroundColor: AppColors.accent,
-                    textColor: Colors.white,
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        // Buscador
+        // Fondo azul superior
         Container(
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(32),
+              bottomRight: Radius.circular(32),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Logo + notificaciones
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Logo texto
+                  RichText(
+                    text: const TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Go',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '+',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' MEDICAL',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Botón notificaciones
+                  GestureDetector(
+                    onTap: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const NotificationsListScreen()),
+                      );
+                      final userId = Supabase.instance.client.auth.currentUser?.id;
+                      if (userId != null) {
+                        NotificationService.instance.updateUnreadCount(userId);
+                      }
+                    },
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: NotificationService.instance.unreadCountNotifier,
+                      builder: (context, count, _) {
+                        return Badge(
+                          isLabelVisible: count > 0,
+                          label: Text(count > 99 ? '99+' : count.toString()),
+                          backgroundColor: AppColors.danger,
+                          textColor: Colors.white,
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.04),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.notifications_outlined,
+                              color: AppColors.primary,
+                              size: 22,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Saludo
+              Text(
+                greeting,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Encuentra el equipo ideal para tu clínica',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white,
+                ),
               ),
             ],
           ),
-          child: TextField(
-            controller: _searchController,
-            textInputAction: TextInputAction.search,
-            onChanged: (val) {
-              setState(() {
-                _searchQuery = val.trim();
-                _showAllProducts = false;
-              });
-              _load(isLiveSearch: true);
-            },
-            onSubmitted: (val) {
-              setState(() {
-                _searchQuery = val.trim();
-                _showAllProducts = false;
-              });
-              _load(isLiveSearch: false);
-            },
-            decoration: InputDecoration(
-              hintText: 'Buscar equipo médico...',
-              hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-              prefixIcon: const Icon(Icons.search, color: AppColors.primary, size: 20),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? InkWell(
-                      onTap: () {
-                        _searchController.clear();
-                        setState(() {
-                          _searchQuery = '';
-                          _showAllProducts = false;
-                        });
-                        _load(isLiveSearch: true);
-                      },
-                      child: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
-                    )
-                  : null,
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-            style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
-          ),
         ),
-        const SizedBox(height: 12),
-        // Location
-        GestureDetector(
-          onTap: () async {
-            final result = await Navigator.of(context).push<ClientAddress>(
-              MaterialPageRoute(builder: (_) => const AddressPickerScreen()),
-            );
-            if (result != null && mounted) {
-              setState(() => _currentLocation = result.displayText);
-            }
-          },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        // Buscador y ubicación
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.location_on, color: Colors.white, size: 16),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  _currentLocation == 'Selecciona tu ubicación' ? '¿Dónde enviamos?' : _currentLocation,
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              // Buscador tipo pill con botón de filtro
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(50),
+                        border: Border.all(color: AppColors.border, width: 1.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.textPrimary.withOpacity(0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        textInputAction: TextInputAction.search,
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val.trim();
+                            _showAllProducts = false;
+                          });
+                          _load(isLiveSearch: true);
+                        },
+                        onSubmitted: (val) {
+                          setState(() {
+                            _searchQuery = val.trim();
+                            _showAllProducts = false;
+                          });
+                          _load(isLiveSearch: false);
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Buscar equipo, marca o modelo...',
+                          hintStyle: const TextStyle(
+                            color: AppColors.textDisabled,
+                            fontSize: 13.5,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: AppColors.textSecondary,
+                            size: 22,
+                          ),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? InkWell(
+                                  onTap: () {
+                                    _searchController.clear();
+                                    setState(() {
+                                      _searchQuery = '';
+                                      _showAllProducts = false;
+                                    });
+                                    _load(isLiveSearch: true);
+                                  },
+                                  child: const Icon(
+                                    Icons.clear_rounded,
+                                    color: AppColors.textSecondary,
+                                    size: 18,
+                                  ),
+                                )
+                              : null,
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Pill ubicación
+              GestureDetector(
+                onTap: () async {
+                  final result = await Navigator.of(context).push<ClientAddress>(
+                    MaterialPageRoute(builder: (_) => const AddressPickerScreen()),
+                  );
+                  if (result != null && mounted) {
+                    setState(() => _currentLocation = result.displayText);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(50),
+                    border: Border.all(color: AppColors.border, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.textPrimary.withOpacity(0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 18),
+                      const SizedBox(width: 6),
+                      const Text(
+                        '¿Dónde enviamos?',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          _currentLocation == 'Selecciona tu ubicación'
+                              ? 'Selecciona tu ubicación'
+                              : _currentLocation,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: AppColors.textSecondary,
+                        size: 16,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 16),
             ],
           ),
         ),
       ],
-    ),
-  );
+    );
+  }
 
   Widget _banner() => const _BannerCarousel();
 
   Widget _quickCats() {
     final cats = [
       {
-        'icon': Icons.medical_services,
+        'icon': Icons.medical_services_rounded,
         'label': 'Equipos',
         'cat': 'equipo_medico',
-        'color': AppColors.primary,
       },
       {
-        'icon': Icons.monitor_heart,
+        'icon': Icons.monitor_heart_rounded,
         'label': 'Ultrasonido',
         'cat': 'ultrasonido_humano',
-        'color': AppColors.secondary,
       },
       {
-        'icon': Icons.pets,
+        'icon': Icons.pets_rounded,
         'label': 'Veterinaria',
         'cat': 'ultrasonido_veterinario',
-        'color': AppColors.secondary,
       },
       {
-        'icon': Icons.water_drop,
+        'icon': Icons.water_drop_rounded,
         'label': 'Consumibles',
         'cat': 'consumible',
-        'color': AppColors.primary,
       },
       {
-        'icon': Icons.build,
+        'icon': Icons.build_rounded,
         'label': 'Refacciones',
         'cat': 'refaccion',
-        'color': AppColors.secondary,
       },
       {
-        'icon': Icons.settings_suggest,
+        'icon': Icons.settings_suggest_rounded,
         'label': 'Servicios',
         'cat': 'servicio',
-        'color': AppColors.secondary,
       },
     ];
-    return SizedBox(
-      height: 96,
-      child: ScrollConfiguration(
-        behavior: _MouseDragScrollBehavior(),
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          itemCount: cats.length,
-          itemBuilder: (_, i) {
-            final c = cats[i];
-            final catKey = c['cat'] as String?;
-            final active = catKey != null && _activeCategory == catKey;
-            final color = c['color'] as Color;
-            return GestureDetector(
-              onTap: () {
-                if (catKey != null) _setCategory(catKey);
-              },
-              child: Container(
-                width: 72,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: active ? color : AppColors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: active ? color : AppColors.border,
-                          width: 1,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+      child: SizedBox(
+        height: 90,
+        child: ScrollConfiguration(
+          behavior: _MouseDragScrollBehavior(),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: cats.length,
+            itemBuilder: (_, i) {
+              final c = cats[i];
+              final catKey = c['cat'] as String?;
+              final active = catKey != null && _activeCategory == catKey;
+              return GestureDetector(
+                onTap: () {
+                  if (catKey != null) _setCategory(catKey);
+                },
+                child: Container(
+                  width: 72,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: active
+                              ? AppColors.primary
+                              : AppColors.surfaceBlue,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: active
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ]
+                              : [
+                                  BoxShadow(
+                                    color: AppColors.textPrimary.withOpacity(0.02),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.02),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        child: Icon(
+                          c['icon'] as IconData,
+                          color: active ? Colors.white : AppColors.primary,
+                          size: 24,
+                        ),
                       ),
-                      child: Icon(
-                        c['icon'] as IconData,
-                        color: active ? Colors.white : color,
-                        size: 22,
+                      const SizedBox(height: 6),
+                      Text(
+                        c['label'] as String,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: active
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                          fontWeight: active
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      c['label'] as String,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: active ? color : AppColors.textSecondary,
-                        fontWeight: active ? FontWeight.bold : FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -857,28 +1049,19 @@ class _BannerCarouselState extends State<_BannerCarousel> {
       'title': 'Equipa tu clínica',
       'subtitle': 'Hasta 20% OFF en equipos seleccionados',
       'cta': 'Ver ofertas',
-      'icon': Icons.local_hospital_outlined,
-      'background': Color(0xFFC5D7D9),
-      'textColor': AppColors.textPrimary,
-      'subColor': AppColors.textSecondary,
+      'icon': Icons.local_hospital_rounded,
     },
     {
       'title': 'Ultrasonido Veterinario',
       'subtitle': 'Nuevos modelos portátiles disponibles',
       'cta': 'Ver catálogo',
-      'icon': Icons.monitor_heart,
-      'background': Color(0xFF768C45),
-      'textColor': AppColors.textPrimary,
-      'subColor': AppColors.textSecondary,
+      'icon': Icons.monitor_heart_rounded,
     },
     {
       'title': 'Envío Express',
       'subtitle': 'Entrega en 24-48 hrs en zona metropolitana',
       'cta': 'Comprar ahora',
-      'icon': Icons.local_shipping_outlined,
-      'background': Color(0xFFF2F1F0),
-      'textColor': AppColors.textPrimary,
-      'subColor': AppColors.textSecondary,
+      'icon': Icons.local_shipping_rounded,
     },
   ];
 
@@ -915,35 +1098,25 @@ class _BannerCarouselState extends State<_BannerCarousel> {
         child: Stack(
           children: [
             ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             child: PageView.builder(
               controller: _controller,
               itemCount: _banners.length,
               onPageChanged: (i) => setState(() => _current = i),
               itemBuilder: (_, i) {
                 final b = _banners[i];
-                final bgColor = b['background'] as Color;
-                final isGradient = b['title'] == 'Ultrasonido Veterinario';
-                final textColor = isGradient ? const Color(0xFF3F7373) : b['textColor'] as Color;
-                final subColor = isGradient ? const Color(0xFF1F2937) : b['subColor'] as Color;
                 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: isGradient ? null : bgColor,
-                    gradient: isGradient 
-                        ? const LinearGradient(
-                            colors: [Color(0xFFC5D7D9), Color(0xFFF2F1F0)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ) 
-                        : null,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppColors.border.withOpacity(0.5),
-                      width: 1,
+                    gradient: const LinearGradient(
+                      colors: [AppColors.white, AppColors.surfaceBlue],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     children: [
@@ -954,18 +1127,18 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                           children: [
                             Text(
                               b['title'] as String,
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 16.5,
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 17,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               b['subtitle'] as String,
-                              style: TextStyle(
-                                color: subColor,
-                                fontSize: 11,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w500,
                                 height: 1.2,
                               ),
@@ -977,25 +1150,25 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: isGradient 
-                                    ? const Color(0xFF3F7373) 
-                                    : ((b['cta'] as String).toLowerCase().contains('comprar')
-                                        ? AppColors.accent
-                                        : AppColors.primary),
+                                gradient: const LinearGradient(
+                                  colors: [AppColors.primary, AppColors.primaryBright],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.04),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
+                                    color: AppColors.primary.withOpacity(0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
                                   ),
                                 ],
                               ),
                               child: Text(
                                 b['cta'] as String,
                                 style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10.5,
+                                  color: AppColors.white,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -1015,19 +1188,23 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                           );
                         },
                         child: Container(
-                          width: 52,
-                          height: 52,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
-                            color: isGradient ? Colors.white : AppColors.primary.withOpacity(0.12),
+                            color: AppColors.white,
                             shape: BoxShape.circle,
-                            boxShadow: isGradient 
-                                ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0,2))]
-                                : null,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.08),
+                                blurRadius: 15,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
                           child: Icon(
                             b['icon'] as IconData,
-                            color: isGradient ? const Color(0xFF3F7373) : AppColors.primary,
-                            size: 26,
+                            color: AppColors.primary,
+                            size: 28,
                           ),
                         ),
                       ),
@@ -1054,8 +1231,8 @@ class _BannerCarouselState extends State<_BannerCarousel> {
                   decoration: BoxDecoration(
                     color: _current == i
                         ? AppColors.primary
-                        : Colors.white.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(3),
+                        : AppColors.border,
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
@@ -1082,12 +1259,12 @@ class _ProductCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border.withOpacity(0.4)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 12,
+              color: AppColors.primary.withOpacity(0.04),
+              blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
@@ -1105,13 +1282,13 @@ class _ProductCard extends StatelessWidget {
                   // Imagen
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
+                      top: Radius.circular(20),
                     ),
                     child: Container(
                       width: double.infinity,
                       height: 140,
-                      color: AppColors.background.withOpacity(0.4),
-                      padding: const EdgeInsets.all(12),
+                      color: AppColors.surfaceBlue,
+                      padding: const EdgeInsets.all(16),
                       child: product.mainImageUrl != null
                           ? Image.network(
                               product.mainImageUrl!,
@@ -1132,13 +1309,13 @@ class _ProductCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.accent,
+                          color: AppColors.warning,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '${product.discountPercent}% OFF',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: AppColors.textPrimary,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
@@ -1170,7 +1347,7 @@ class _ProductCard extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(msg),
-                                backgroundColor: AppColors.error,
+                                backgroundColor: AppColors.danger,
                               ),
                             );
                         }
@@ -1203,7 +1380,7 @@ class _ProductCard extends StatelessWidget {
 
             // ── Info del producto ──────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -1278,14 +1455,14 @@ class _ProductCard extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.softHighlight,
+                            color: AppColors.surfaceBlue,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Text(
                             'Envío gratis',
                             style: TextStyle(
                               fontSize: 9,
-                              color: AppColors.darkTeal,
+                              color: AppColors.primary,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -1302,26 +1479,27 @@ class _ProductCard extends StatelessWidget {
   }
 
   Widget _buildStockPill(Product p) {
+    if (!p.trackInventory) return const SizedBox.shrink();
     Color bg;
     Color fg;
     String text;
     if (p.stock != null) {
       if (p.stock! <= 0) {
-        bg = const Color(0xFFFEE2E2);
-        fg = const Color(0xFFEF4444);
+        bg = AppColors.dangerBg;
+        fg = AppColors.danger;
         text = 'Sin stock';
-      } else if (p.stock! <= 5) {
-        bg = AppColors.accent.withOpacity(0.18);
-        fg = const Color(0xFFD97706);
+      } else if (p.stockStatus == 'low_stock' || p.stock! <= 5) {
+        bg = AppColors.warningBg;
+        fg = AppColors.warning;
         text = '${p.stock} dispon. (¡Últimas!)';
       } else {
-        bg = AppColors.background;
-        fg = AppColors.primary;
+        bg = AppColors.successBg;
+        fg = AppColors.success;
         text = '${p.stock} disponibles';
       }
     } else {
-      bg = AppColors.softHighlight.withOpacity(0.3);
-      fg = AppColors.darkTeal;
+      bg = AppColors.surfaceBlue;
+      fg = AppColors.primary;
       text = 'Stock no disponible';
     }
     return Container(
@@ -1587,13 +1765,13 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                   final catLabel = (cat['label'] as String).replaceAll('\n', ' ');
                   final icon = cat['icon'] as IconData;
                   
-                  // Paleta pastel alternada
+                  // Paleta azul alternada para las cards
                   final colors = [
-                    const Color(0xFFC5D7D9).withOpacity(0.5),
-                    const Color(0xFF768C45).withOpacity(0.3),
+                    AppColors.surfaceBlue,
+                    AppColors.primary.withOpacity(0.08),
                     Colors.white,
-                    const Color(0xFF768C45).withOpacity(0.4),
-                    const Color(0xFFE2E8F0),
+                    AppColors.info.withOpacity(0.1),
+                    AppColors.background,
                   ];
                   final bgColor = colors[index % colors.length];
 
@@ -1612,13 +1790,13 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                     child: Container(
                       decoration: BoxDecoration(
                         color: bgColor,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                         border: bgColor == Colors.white 
-                            ? Border.all(color: const Color(0xFFA8BDBF).withOpacity(0.8), width: 1.5)
+                            ? Border.all(color: AppColors.border, width: 1.5)
                             : null,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.02),
+                            color: AppColors.primary.withOpacity(0.03),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -1647,12 +1825,19 @@ class _CategoriesTabState extends State<_CategoriesTab> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withOpacity(0.7),
                                 shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.primary.withOpacity(0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ],
                               ),
                               child: Icon(
                                 icon,
-                                size: 40,
+                                size: 36,
                                 color: AppColors.primary,
                               ),
                             ),
@@ -2021,17 +2206,17 @@ class _CartTabState extends State<_CartTab> {
                   Text(
                     p.stock! <= 0
                         ? 'Sin stock disponible'
-                        : (p.stock! <= 5
+                        : ((p.stockStatus == 'low_stock' || p.stock! <= 5)
                               ? '¡Pocas piezas disponibles!'
                               : 'Disponible'),
                     style: TextStyle(
                       fontSize: 11,
                       color: p.stock! <= 0
                           ? AppColors.error
-                          : (p.stock! <= 5
+                          : ((p.stockStatus == 'low_stock' || p.stock! <= 5)
                                 ? AppColors.accent
                                 : AppColors.textSecondary),
-                      fontWeight: p.stock! <= 5
+                      fontWeight: (p.stockStatus == 'low_stock' || p.stock! <= 5)
                           ? FontWeight.bold
                           : FontWeight.w500,
                     ),
@@ -2356,10 +2541,7 @@ class _TicketsListScreenState extends State<TicketsListScreen>
                 children: [
                   Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: _kNavy),
-                        onPressed: () => Navigator.pop(context),
-                      ),
+                      const SizedBox(width: 16),
                       const Icon(
                         Icons.support_agent,
                         color: _kPrimary,
@@ -2368,7 +2550,7 @@ class _TicketsListScreenState extends State<TicketsListScreen>
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
-                          'Mis Tickets de Servicio',
+                          'Soporte',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -2794,7 +2976,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFF3F7373), Color(0xFF768C45), Color(0xFFC5D7D9)],
+                    colors: [AppColors.primary, AppColors.primaryBright],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -2892,7 +3074,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: AppColors.primary.withOpacity(0.06),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -2958,7 +3140,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: AppColors.primary.withOpacity(0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -3197,9 +3379,9 @@ class _ProfileTabState extends State<_ProfileTab> {
           const SizedBox(height: 6),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11.5,
-              color: Colors.grey.shade600,
+              color: AppColors.textSecondary,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -3215,11 +3397,11 @@ class _ProfileTabState extends State<_ProfileTab> {
     padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
     child: Text(
       label.toUpperCase(),
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 10.5,
         letterSpacing: 1.1,
         fontWeight: FontWeight.w700,
-        color: Colors.grey.shade500,
+        color: AppColors.textDisabled,
       ),
     ),
   );
@@ -3319,17 +3501,17 @@ class _ProfileTabState extends State<_ProfileTab> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1F2937),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 Text(
                   subtitle,
-                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                 ),
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+          const Icon(Icons.chevron_right, color: AppColors.textDisabled, size: 20),
         ],
       ),
     ),

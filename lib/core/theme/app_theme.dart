@@ -7,33 +7,36 @@ class AppTheme {
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         primary: AppColors.primary,
-        secondary: AppColors.secondary,
+        secondary: AppColors.primaryBright,
         surface: AppColors.white,
-        error: AppColors.error,
+        error: AppColors.danger,
         onPrimary: AppColors.white,
-        onSecondary: AppColors.textPrimary,
+        onSecondary: AppColors.white,
         onSurface: AppColors.textPrimary,
         outline: AppColors.border,
       ),
       useMaterial3: true,
       scaffoldBackgroundColor: AppColors.background,
 
-      // AppBar Theme (Luminosa y moderna)
+      // AppBar — limpia, blanca con separación suave
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
-        centerTitle: true,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        shadowColor: AppColors.border,
+        surfaceTintColor: Colors.transparent,
         iconTheme: IconThemeData(color: AppColors.primary),
         titleTextStyle: TextStyle(
           color: AppColors.textPrimary,
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          letterSpacing: 0.2,
+          letterSpacing: 0.1,
         ),
       ),
 
-      // Botones Elevados (Primary)
+      // Botones primarios — gradiente azul encapsulado en color sólido
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -51,7 +54,7 @@ class AppTheme {
         ),
       ),
 
-      // Botones Secundarios (Outlined)
+      // Botones Outlined
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
@@ -68,7 +71,7 @@ class AppTheme {
         ),
       ),
 
-      // Botones de Texto
+      // Botones de texto
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
@@ -79,49 +82,49 @@ class AppTheme {
         ),
       ),
 
-      // Campos de Texto (Inputs)
+      // Inputs — tipo pill
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(50),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(50),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          borderRadius: BorderRadius.circular(50),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.error),
+          borderRadius: BorderRadius.circular(50),
+          borderSide: const BorderSide(color: AppColors.danger),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 20,
-          vertical: 18,
+          vertical: 16,
         ),
         labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
         hintStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
       ),
 
-      // Tarjetas (Cards)
+      // Cards — suaves con borde sutil
       cardTheme: CardThemeData(
         color: AppColors.white,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shadowColor: AppColors.primary.withOpacity(0.04),
+        shadowColor: AppColors.primary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: AppColors.border, width: 1),
         ),
       ),
 
-      // Chips (Categorías y Filtros)
+      // Chips
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.secondary.withOpacity(0.15),
+        backgroundColor: AppColors.surfaceBlue,
         disabledColor: Colors.grey.shade100,
         selectedColor: AppColors.primary,
         secondarySelectedColor: AppColors.primary,
@@ -142,7 +145,7 @@ class AppTheme {
         ),
       ),
 
-      // Hojas de Diálogo Modal Inferior (Bottom Sheets)
+      // Bottom Sheets
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.white,
         surfaceTintColor: Colors.transparent,
@@ -152,7 +155,7 @@ class AppTheme {
         ),
       ),
 
-      // Diálogos (Alerts)
+      // Dialogs
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.white,
         surfaceTintColor: Colors.transparent,
@@ -171,7 +174,7 @@ class AppTheme {
         ),
       ),
 
-      // Pestañas (TabBar)
+      // TabBar
       tabBarTheme: TabBarThemeData(
         indicatorColor: AppColors.primary,
         labelColor: AppColors.primary,
@@ -182,7 +185,7 @@ class AppTheme {
         dividerColor: AppColors.border,
       ),
 
-      // Botón de Acción Flotante (FAB)
+      // FAB
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
@@ -190,14 +193,14 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
 
-      // Divisores (Dividers)
+      // Dividers
       dividerTheme: const DividerThemeData(
         color: AppColors.border,
         thickness: 1,
         space: 1,
       ),
 
-      // Barra de Navegación Inferior (Fallback por si no se usa curved)
+      // BottomNavigationBar fallback
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.white,
         selectedItemColor: AppColors.primary,
@@ -206,7 +209,7 @@ class AppTheme {
         elevation: 8,
       ),
 
-      // Íconos
+      // Iconos
       iconTheme: const IconThemeData(color: AppColors.primary),
     );
   }

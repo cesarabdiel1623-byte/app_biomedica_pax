@@ -33,6 +33,7 @@ class Product {
   final List<ProductMedia> images;
   final List<ProductSpec> specs;
   final int? stock;
+  final String? stockStatus;
 
   Product({
     required this.id,
@@ -63,9 +64,11 @@ class Product {
     this.images = const [],
     this.specs = const [],
     this.stock,
+    this.stockStatus,
   });
   Product copyWith({
     int? stock,
+    String? stockStatus,
   }) {
     return Product(
       id: this.id,
@@ -96,6 +99,7 @@ class Product {
       images: this.images,
       specs: this.specs,
       stock: stock ?? this.stock,
+      stockStatus: stockStatus ?? this.stockStatus,
     );
   }
 
@@ -124,14 +128,14 @@ class Product {
 
     int? stockVal;
     if (json['track_inventory'] == true) {
-      double sum = 0.0;
       final stockList = json['inventory_stock'] as List?;
       if (stockList != null) {
+        double sum = 0.0;
         for (final s in stockList) {
           sum += _toDouble(s['quantity']);
         }
+        stockVal = sum.round();
       }
-      stockVal = sum.round();
     }
 
     return Product(
