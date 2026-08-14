@@ -154,6 +154,35 @@ class _ProductCardState extends State<ProductCard> {
                   ),
                   const SizedBox(height: 5),
 
+                  if (product.hasDiscount) ...[
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            product.formattedOldPrice,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF9CA3AF),
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '-${product.discountPercent}%',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF16A34A),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 1),
+                  ],
+
                   Text(
                     product.formattedPrice,
                     style: const TextStyle(
@@ -179,25 +208,19 @@ class _ProductCardState extends State<ProductCard> {
                   if (product.shippingInfo != null)
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.local_shipping_outlined,
                           size: 12,
-                          color: product.hasFreeShipping
-                              ? _kGreen
-                              : const Color(0xFF6B7280),
+                          color: Color(0xFF6B7280),
                         ),
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
                             product.shippingInfo!,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 11,
-                              color: product.hasFreeShipping
-                                  ? _kGreen
-                                  : const Color(0xFF6B7280),
-                              fontWeight: product.hasFreeShipping
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
+                              color: Color(0xFF6B7280),
+                              fontWeight: FontWeight.normal,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

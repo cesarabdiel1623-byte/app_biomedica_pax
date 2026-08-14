@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'auth_identity_service.dart';
+
 // ──────────────────────────────────────────────
 // CONSTANTS
 // ──────────────────────────────────────────────
@@ -38,7 +40,7 @@ class NotificationService {
   final StreamController<String?> _notificationTapController =
       StreamController<String?>.broadcast();
 
-  StreamSubscription<List<Map<String, dynamic>>>? _sub;
+  final List<StreamSubscription<List<Map<String, dynamic>>>> _subs = [];
   String? _pendingTapPayload;
 
   Stream<String?> get notificationTapStream =>
@@ -52,7 +54,9 @@ class NotificationService {
 
   /// IDs of unread notifications already known at startup — we skip showing
   /// a banner for these so the user isn't spammed on every app launch.
-  List<String> _seenIds = [];
+  final Set<String> _seenIds = <String>{};
+  final Map<String, Map<String, dynamic>> _latestRowsById =
+      <String, Map<String, dynamic>>{};
 
   // ────────────────────────────────────────────
   // INIT — call once from main() before runApp
@@ -145,47 +149,68 @@ class NotificationService {
   Future<void> startListening(String userId) async {
     stopListening();
 
+    final ownerIds = await _notificationOwnerIds(userId);
+
     // Fetch initial count before stream emits (avoids momentary 0 flash)
     await updateUnreadCount(userId);
 
-    bool isFirstEmit = true;
+    final initializedOwners = <String>{};
 
     try {
-      _sub = Supabase.instance.client
-          .from('notifications')
-          .stream(primaryKey: ['id'])
-          .eq('user_id', userId)
-          .listen(
-            (List<Map<String, dynamic>> rows) {
-              // ── Count unread ──────────────────────────────────────────
-              final unread = rows.where((r) => r['is_read'] == false).toList();
-              unreadCountNotifier.value = unread.length;
-
-              // ── Detect brand-new inserts ──────────────────────────────
-              final currentUnreadIds = unread
-                  .map((r) => r['id'].toString())
-                  .toList();
-
-              if (!isFirstEmit) {
-                // Any id that wasn't in our previous snapshot is a new insert
-                for (final row in unread) {
-                  final id = row['id'].toString();
-                  if (!_seenIds.contains(id)) {
-                    final title =
-                        row['title'] as String? ?? 'Nueva Notificación';
-                    final body = row['body'] as String? ?? '';
-                    showHeadsUp(title, body, payload: id);
+      for (final ownerId in ownerIds) {
+        final sub = Supabase.instance.client
+            .from('notifications')
+            .stream(primaryKey: ['id'])
+            .eq('user_id', ownerId)
+            .listen(
+              (List<Map<String, dynamic>> rows) {
+                _latestRowsById.removeWhere(
+                  (_, row) => row['user_id']?.toString() == ownerId,
+                );
+                for (final row in rows) {
+                  final id = row['id']?.toString();
+                  if (id != null && id.isNotEmpty) {
+                    _latestRowsById[id] = row;
                   }
                 }
-              }
 
-              _seenIds = currentUnreadIds;
-              isFirstEmit = false;
-            },
-            onError: (Object err) {
-              debugPrint('[NotificationService] Stream error: $err');
-            },
-          );
+                // ── Count unread ──────────────────────────────────────────
+                final unread = _latestRowsById.values
+                    .where((r) => r['is_read'] == false)
+                    .toList();
+                unreadCountNotifier.value = unread.length;
+
+                // ── Detect brand-new inserts ──────────────────────────────
+                final currentUnreadIds = unread.map((r) => r['id'].toString());
+
+                if (initializedOwners.contains(ownerId)) {
+                  // Any id that wasn't in our previous snapshot is a new insert
+                  final ownerUnread = rows
+                      .where((r) => r['is_read'] == false)
+                      .toList();
+                  for (final row in ownerUnread) {
+                    final id = row['id']?.toString();
+                    if (id == null || id.isEmpty) continue;
+                    if (!_seenIds.contains(id)) {
+                      final title =
+                          row['title']?.toString() ?? 'Nueva Notificación';
+                      final body = row['body']?.toString() ?? '';
+                      showHeadsUp(title, body, payload: id);
+                    }
+                  }
+                }
+
+                _seenIds
+                  ..clear()
+                  ..addAll(currentUnreadIds);
+                initializedOwners.add(ownerId);
+              },
+              onError: (Object err) {
+                debugPrint('[NotificationService] Stream error: $err');
+              },
+            );
+        _subs.add(sub);
+      }
     } catch (e) {
       debugPrint('[NotificationService] startListening error: $e');
     }
@@ -193,9 +218,25 @@ class NotificationService {
 
   /// Cancels the stream subscription and resets internal state.
   void stopListening() {
-    _sub?.cancel();
-    _sub = null;
+    for (final sub in _subs) {
+      unawaited(sub.cancel());
+    }
+    _subs.clear();
     _seenIds.clear();
+    _latestRowsById.clear();
+  }
+
+  Future<List<String>> _notificationOwnerIds(String userId) async {
+    final ids = <String>{userId};
+    try {
+      final clientId = await AuthIdentityService.getEffectiveClientId();
+      if (clientId != null && clientId.trim().isNotEmpty) {
+        ids.add(clientId.trim());
+      }
+    } catch (e) {
+      debugPrint('[NotificationService] client_id lookup skipped: $e');
+    }
+    return ids.toList(growable: false);
   }
 
   // ────────────────────────────────────────────
@@ -205,10 +246,11 @@ class NotificationService {
   /// One-shot query to refresh the unread count (used on app resume).
   Future<void> updateUnreadCount(String userId) async {
     try {
+      final ownerIds = await _notificationOwnerIds(userId);
       final rows = await Supabase.instance.client
           .from('notifications')
           .select('id')
-          .eq('user_id', userId)
+          .inFilter('user_id', ownerIds)
           .eq('is_read', false);
       unreadCountNotifier.value = (rows as List).length;
     } catch (e) {

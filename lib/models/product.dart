@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/price_formatter.dart';
+
 /// Product model matching the REAL Supabase `products` table schema.
 ///
 /// Categories (ENUM): equipo_medico, ultrasonido_humano, consumible, refaccion, servicio
@@ -170,24 +172,52 @@ class Product {
     // filtered with the database clock.
     final promoList = json['active_product_promotions'] as List?;
     ActiveProductPromotion? activePromo;
-    double calculatedUnitPrice = _toDouble(json['unit_price_mxn']);
+    final rawBaseUnitPrice = _toDouble(json['unit_price_mxn']);
+    double calculatedUnitPrice = roundCommercialAmount(rawBaseUnitPrice);
     double? calculatedOldPrice;
 
     if (promoList != null && promoList.isNotEmpty) {
-      activePromo = ActiveProductPromotion.fromJson(
-        promoList.first as Map<String, dynamic>,
-      );
-      calculatedOldPrice = calculatedUnitPrice;
+      final promotions = promoList
+          .whereType<Map>()
+          .map(
+            (promo) => ActiveProductPromotion.fromJson(
+              Map<String, dynamic>.from(promo),
+            ),
+          )
+          .toList();
 
-      final val = activePromo.discountValue;
-      if (activePromo.discountType == 'percentage') {
-        calculatedUnitPrice = calculatedUnitPrice * (1 - val / 100);
-      } else if (activePromo.discountType == 'fixed_amount') {
-        calculatedUnitPrice = calculatedUnitPrice - val;
-      } else if (activePromo.discountType == 'promotional_price') {
-        calculatedUnitPrice = val;
+      if (promotions.isNotEmpty) {
+        double effectivePrice = calculatedUnitPrice;
+        for (final promotion in promotions) {
+          final serverPrice = promotion.promotionalPriceMxn;
+          double candidate;
+          if (serverPrice != null) {
+            candidate = serverPrice;
+          } else if (promotion.discountType == 'percentage') {
+            candidate = rawBaseUnitPrice * (1 - promotion.discountValue / 100);
+          } else if (promotion.discountType == 'fixed_amount') {
+            candidate = rawBaseUnitPrice - promotion.discountValue;
+          } else if (promotion.discountType == 'promotional_price') {
+            candidate = promotion.discountValue;
+          } else {
+            candidate = rawBaseUnitPrice;
+          }
+
+          final commercialCandidate = roundCommercialAmount(
+            candidate.clamp(0.0, rawBaseUnitPrice).toDouble(),
+          );
+          if (commercialCandidate < effectivePrice) {
+            effectivePrice = commercialCandidate;
+            activePromo = promotion;
+          }
+        }
+
+        activePromo ??= promotions.first;
+        calculatedOldPrice = roundCommercialAmount(
+          activePromo.originalPriceMxn ?? rawBaseUnitPrice,
+        );
+        calculatedUnitPrice = effectivePrice;
       }
-      if (calculatedUnitPrice < 0) calculatedUnitPrice = 0.0;
     }
 
     final int parsedSalesCount = _toInt(json['sales_count']) ?? 0;
@@ -260,12 +290,12 @@ class Product {
         .join(' ');
   }
 
-  /// Formatted price
-  String get formattedPrice => '\$${_formatMoney(unitPriceMxn)}';
+  /// Formatted price for catalog display, matching the admin convention.
+  String get formattedPrice => formatCommercialPrice(unitPriceMxn);
 
-  /// Formatted old price
+  /// Formatted old price for catalog display, matching the admin convention.
   String get formattedOldPrice =>
-      oldPrice != null ? '\$${_formatMoney(oldPrice!)}' : '';
+      oldPrice != null ? formatCommercialPrice(oldPrice!) : '';
 
   /// Shipping text with icon
   bool get hasFreeShipping =>
@@ -287,18 +317,6 @@ class Product {
       return parsed?.round();
     }
     return null;
-  }
-
-  static String _formatMoney(double value) {
-    final parts = value.toStringAsFixed(2).split('.');
-    final intPart = parts[0];
-    final decPart = parts[1];
-    final buffer = StringBuffer();
-    for (int i = 0; i < intPart.length; i++) {
-      if (i > 0 && (intPart.length - i) % 3 == 0) buffer.write(',');
-      buffer.write(intPart[i]);
-    }
-    return '$buffer.$decPart';
   }
 }
 
@@ -361,16 +379,22 @@ class ProductSpec {
 
 class ActiveProductPromotion {
   final String productId;
+  final double? originalPriceMxn;
+  final double? promotionalPriceMxn;
   final String discountType; // percentage, fixed_amount, promotional_price
   final double discountValue;
+  final String? computedStatus;
   final String? campaignName;
   final String? promotionName;
   final DateTime? endsAt;
 
   ActiveProductPromotion({
     required this.productId,
+    this.originalPriceMxn,
+    this.promotionalPriceMxn,
     required this.discountType,
     required this.discountValue,
+    this.computedStatus,
     this.campaignName,
     this.promotionName,
     this.endsAt,
@@ -379,8 +403,15 @@ class ActiveProductPromotion {
   factory ActiveProductPromotion.fromJson(Map<String, dynamic> json) {
     return ActiveProductPromotion(
       productId: json['product_id'] as String,
+      originalPriceMxn: json['original_price_mxn'] != null
+          ? _toDouble(json['original_price_mxn'])
+          : null,
+      promotionalPriceMxn: json['promotional_price_mxn'] != null
+          ? _toDouble(json['promotional_price_mxn'])
+          : null,
       discountType: json['discount_type'] as String,
       discountValue: _toDouble(json['discount_value']),
+      computedStatus: json['computed_status'] as String?,
       campaignName: json['campaign_name'] as String?,
       promotionName: json['promotion_name'] as String?,
       endsAt: json['ends_at'] != null

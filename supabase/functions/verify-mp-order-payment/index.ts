@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { triggerPaidOrderFulfillment } from "../_shared/paid_order_fulfillment.ts";
 
 const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
@@ -25,6 +26,22 @@ function requiredEnv(name: string): string {
     throw new Error(`Missing environment variable: ${name}`);
   }
   return value;
+}
+
+function getString(source: Record<string, unknown> | null | undefined, key: string): string | null {
+  if (!source) return null;
+  const value = source[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function getReconciledPaymentStatus(source: unknown): string | null {
+  if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+  const result = source as Record<string, unknown>;
+  return getString(result, "payment_status") ?? getString(result, "status");
+}
+
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
 }
 
 Deno.serve(async (request: Request): Promise<Response> => {
@@ -96,6 +113,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     // Si la orden ya está pagada en la BD, responder inmediatamente
     if (order.payment_status === "approved" || order.status === "paid") {
+      await triggerPaidOrderFulfillment(order.id);
       return jsonResponse({
         order_id: order.id,
         payment_status: "approved",
@@ -155,7 +173,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     if (approvedPayment) {
       // Conciliar mediante RPC
-      const { error: rpcError } = await supabaseAdmin.rpc(
+      const { data: reconciliationResult, error: rpcError } = await supabaseAdmin.rpc(
         "reconcile_mercado_pago_payment",
         {
           p_payment_id: String(approvedPayment.id),
@@ -175,9 +193,21 @@ Deno.serve(async (request: Request): Promise<Response> => {
         },
       );
 
-      if (!rpcError) {
+      const reconciledOrderId =
+        reconciliationResult && typeof reconciliationResult === "object" && !Array.isArray(reconciliationResult)
+          ? getString(reconciliationResult as Record<string, unknown>, "order_id")
+          : null;
+      const reconciledPaymentStatus = getReconciledPaymentStatus(reconciliationResult);
+
+      if (
+        !rpcError &&
+        reconciledOrderId &&
+        isUuidLike(reconciledOrderId) &&
+        reconciledPaymentStatus === "approved"
+      ) {
+        await triggerPaidOrderFulfillment(reconciledOrderId);
         return jsonResponse({
-          order_id: order.id,
+          order_id: reconciledOrderId,
           payment_status: "approved",
           order_status: "paid",
           confirmed: true,

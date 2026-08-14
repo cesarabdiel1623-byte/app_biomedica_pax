@@ -191,11 +191,48 @@ class _NotificationsLoadingBody extends StatelessWidget {
 }
 
 class _NotificationsListScreenState extends State<NotificationsListScreen> {
-  List<dynamic> _notifications = [];
+  List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
   bool _refreshing = false;
   String? _error;
   bool _initialNotificationHandled = false;
+
+  Map<String, dynamic> _stringKeyedMap(Map<dynamic, dynamic> source) {
+    return source.map((key, value) {
+      final normalizedValue = value is Map
+          ? _stringKeyedMap(value)
+          : value is List
+          ? value
+                .map((item) => item is Map ? _stringKeyedMap(item) : item)
+                .toList()
+          : value;
+      return MapEntry(key.toString(), normalizedValue);
+    });
+  }
+
+  List<Map<String, dynamic>> _stringKeyedNotificationList(dynamic response) {
+    if (response is! List) return const [];
+    return response
+        .whereType<Map>()
+        .map((item) => _stringKeyedMap(item))
+        .toList();
+  }
+
+  Future<List<String>> _notificationOwnerIds() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) throw Exception('No autenticado');
+    final ids = <String>{userId};
+    try {
+      final clientId = await AuthIdentityService.getEffectiveClientId();
+      if (clientId != null && clientId.trim().isNotEmpty) {
+        ids.add(clientId.trim());
+      }
+    } catch (_) {
+      // Some historical notification rows are keyed by auth user id; keep that
+      // path working even if the business client relation cannot be resolved.
+    }
+    return ids.toList(growable: false);
+  }
 
   @override
   void initState() {
@@ -212,18 +249,17 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       });
     }
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) throw Exception('No autenticado');
+      final ownerIds = await _notificationOwnerIds();
 
       final response = await Supabase.instance.client
           .from('notifications')
           .select('*')
-          .eq('user_id', userId)
+          .inFilter('user_id', ownerIds)
           .order('created_at', ascending: false);
 
       if (mounted) {
         setState(() {
-          _notifications = response as List;
+          _notifications = _stringKeyedNotificationList(response);
           _loading = false;
         });
         _openInitialNotificationIfNeeded();
@@ -264,9 +300,7 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     );
     if (index == -1) return;
     _initialNotificationHandled = true;
-    final notification = Map<String, dynamic>.from(
-      _notifications[index] as Map,
-    );
+    final notification = Map<String, dynamic>.from(_notifications[index]);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _handleNotificationTap(notification);
     });
@@ -279,17 +313,16 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     if (unreadCount == 0) return;
     setState(() {
       _notifications = _notifications
-          .map((item) => {...item as Map, 'is_read': true})
+          .map((item) => {...item, 'is_read': true})
           .toList();
     });
     NotificationService.instance.unreadCountNotifier.value = 0;
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
+      final ownerIds = await _notificationOwnerIds();
       await Supabase.instance.client
           .from('notifications')
           .update({'is_read': true})
-          .eq('user_id', userId)
+          .inFilter('user_id', ownerIds)
           .eq('is_read', false);
     } catch (_) {
       await _loadNotifications();
@@ -298,13 +331,12 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
 
   Future<void> _markAsRead(String id) async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
-      if (userId == null) return;
+      final ownerIds = await _notificationOwnerIds();
       await Supabase.instance.client
           .from('notifications')
           .update({'is_read': true})
           .eq('id', id)
-          .eq('user_id', userId);
+          .inFilter('user_id', ownerIds);
     } catch (_) {}
   }
 
@@ -377,10 +409,7 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
             (n) => n['id']?.toString() == id,
           );
           if (idx != -1) {
-            _notifications[idx] = {
-              ..._notifications[idx] as Map,
-              'is_read': true,
-            };
+            _notifications[idx] = {..._notifications[idx], 'is_read': true};
           }
         });
       }
@@ -452,7 +481,10 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     if (title.toLowerCase().contains('cotiza') ||
         body.toLowerCase().contains('cotiza')) {
       await _navigateToQuotesList();
+      return;
     }
+
+    await _showNotificationDetails(title: title, body: body);
   }
 
   String? _notificationValue(
@@ -463,7 +495,7 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     for (final containerKey in const ['data', 'metadata', 'payload']) {
       final value = notification[containerKey];
       if (value is Map) {
-        sources.add(Map<String, dynamic>.from(value));
+        sources.add(_stringKeyedMap(value));
       }
     }
     for (final source in sources) {
@@ -473,6 +505,30 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       }
     }
     return null;
+  }
+
+  Future<void> _showNotificationDetails({
+    required String title,
+    required String body,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title.isEmpty ? 'Notificación' : title),
+          content: Text(
+            body.isEmpty ? 'Esta notificación no incluye más detalles.' : body,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Route<void> _showDestinationLoading() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../utils/ui_helpers.dart';
 import 'step_1_email.dart';
 import 'step_2_name.dart';
 import 'step_3_phone.dart';
@@ -116,15 +117,15 @@ class _RegistrationChecklistScreenState
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: isCompleted
             ? const Color(0xFFF0FDF9)
             : isActive
             ? Colors.white
             : const Color(0xFFFAFAFA),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isCompleted
               ? _primaryColor.withValues(alpha: 0.3)
@@ -142,8 +143,8 @@ class _RegistrationChecklistScreenState
             children: [
               // Icon circle
               Container(
-                width: 44,
-                height: 44,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: isCompleted
@@ -153,14 +154,18 @@ class _RegistrationChecklistScreenState
                       : Colors.grey.withValues(alpha: 0.08),
                 ),
                 child: isCompleted
-                    ? const Icon(Icons.check_circle, color: _primaryColor, size: 26)
+                    ? const Icon(
+                        Icons.check_circle,
+                        color: _primaryColor,
+                        size: 22,
+                      )
                     : Icon(
                         icon,
                         color: isActive ? _primaryColor : Colors.grey.shade400,
-                        size: 22,
+                        size: 18,
                       ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               // Text
               Expanded(
                 child: Column(
@@ -169,51 +174,53 @@ class _RegistrationChecklistScreenState
                     Text(
                       isCompleted ? completedTitle : title,
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: isLocked ? Colors.grey.shade400 : Colors.black87,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Text(
                       isCompleted ? completedSubtitle : subtitle,
                       style: TextStyle(
-                        color: isCompleted ? _primaryColor : Colors.grey.shade500,
-                        fontSize: 13,
-                        height: 1.3,
+                        color: isCompleted
+                            ? _primaryColor
+                            : Colors.grey.shade500,
+                        fontSize: 12,
+                        height: 1.2,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               if (isCompleted)
-                const Icon(Icons.check, color: _primaryColor, size: 22)
+                const Icon(Icons.check, color: _primaryColor, size: 20)
               else if (isLocked)
-                Icon(Icons.lock_outline, color: Colors.grey.shade300, size: 20),
+                Icon(Icons.lock_outline, color: Colors.grey.shade300, size: 18),
             ],
           ),
           if (isActive) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
               child: SizedBox(
-                height: 36,
+                height: 32,
                 child: ElevatedButton(
                   onPressed: () => onTap(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primaryColor,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: Text(
                     buttonText,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -304,13 +311,16 @@ class _RegistrationChecklistScreenState
               Expanded(
                 child: Center(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     child: FadeTransition(
                       opacity: _fadeAnim,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 480),
                         child: Container(
-                          padding: const EdgeInsets.all(28),
+                          padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(20),
@@ -327,22 +337,22 @@ class _RegistrationChecklistScreenState
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Text(
-                                'Tus datos',
+                                'Completa tus datos',
                                 style: TextStyle(
-                                  fontSize: 22,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.black87,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 2),
                               Text(
-                                'Valida tus datos para crear tu cuenta de forma segura.',
+                                'Ingresa la información requerida para crear tu cuenta de forma segura.',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   color: Colors.grey.shade600,
                                 ),
                               ),
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 14),
 
                               // Step 1: Email
                               _buildStepItem(
@@ -351,7 +361,7 @@ class _RegistrationChecklistScreenState
                                 title: 'Validar e-mail',
                                 completedTitle: 'E-mail validado',
                                 subtitle: 'Lo usarás para recuperar tu cuenta.',
-                                completedSubtitle: _userEmail,
+                                completedSubtitle: 'Verificado',
                                 isCompleted: _emailValidated,
                                 buttonText: 'Validar',
                                 onTap: () async {
@@ -379,7 +389,7 @@ class _RegistrationChecklistScreenState
                                 title: 'Completar nombre',
                                 completedTitle: 'Nombre completado',
                                 subtitle: 'Elige cómo quieres que te llamemos.',
-                                completedSubtitle: _userName,
+                                completedSubtitle: 'Guardado',
                                 isCompleted: _nameCompleted,
                                 onTap: () async {
                                   final result = await Navigator.of(context)
@@ -406,7 +416,10 @@ class _RegistrationChecklistScreenState
                                 title: 'Validar teléfono',
                                 completedTitle: 'Teléfono validado',
                                 subtitle: 'Servirá para ingresar a tu cuenta.',
-                                completedSubtitle: _userPhone,
+                                completedSubtitle:
+                                    _userPhone.startsWith('Omitido')
+                                    ? 'Omitido por ahora'
+                                    : 'Validado',
                                 isCompleted: _phoneValidated,
                                 buttonText: 'Validar',
                                 onTap: () async {
@@ -428,6 +441,19 @@ class _RegistrationChecklistScreenState
                                             'Omitido - verificar después';
                                       }
                                     });
+                                    if (mounted) {
+                                      if (result['skipped'] == true) {
+                                        UiHelpers.showFloatingSuccessToast(
+                                          context,
+                                          'Verificación de teléfono omitida por ahora.',
+                                        );
+                                      } else {
+                                        UiHelpers.showFloatingSuccessToast(
+                                          context,
+                                          '¡Teléfono validado con éxito!',
+                                        );
+                                      }
+                                    }
                                   }
                                 },
                               ),
@@ -439,7 +465,7 @@ class _RegistrationChecklistScreenState
                                 title: 'Crear contraseña',
                                 completedTitle: 'Contraseña creada',
                                 subtitle: 'Servirá para ingresar a tu cuenta.',
-                                completedSubtitle: '••••••••',
+                                completedSubtitle: 'Guardada',
                                 isCompleted: _passwordCreated,
                                 buttonText: 'Crear',
                                 onTap: () async {
@@ -455,15 +481,24 @@ class _RegistrationChecklistScreenState
                                   if (result != null &&
                                       result['success'] == true) {
                                     setState(() => _passwordCreated = true);
+                                    if (mounted) {
+                                      UiHelpers.showFloatingSuccessToast(
+                                        context,
+                                        '¡Contraseña creada con éxito!',
+                                      );
+                                    }
                                   }
                                 },
                               ),
 
                               // Terms & Conditions (only when all steps are done)
                               if (_allCompleted) ...[
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 10),
                                 Container(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF8FAFC),
                                     borderRadius: BorderRadius.circular(12),
@@ -478,8 +513,8 @@ class _RegistrationChecklistScreenState
                                         CrossAxisAlignment.start,
                                     children: [
                                       SizedBox(
-                                        width: 24,
-                                        height: 24,
+                                        width: 22,
+                                        height: 22,
                                         child: Checkbox(
                                           value: _termsAccepted,
                                           activeColor: _primaryColor,
@@ -496,7 +531,7 @@ class _RegistrationChecklistScreenState
                                           },
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
+                                      const SizedBox(width: 10),
                                       Expanded(
                                         child: GestureDetector(
                                           onTap: () => setState(
@@ -506,9 +541,9 @@ class _RegistrationChecklistScreenState
                                           child: RichText(
                                             text: TextSpan(
                                               style: const TextStyle(
-                                                fontSize: 13,
+                                                fontSize: 12,
                                                 color: Colors.black87,
-                                                height: 1.4,
+                                                height: 1.3,
                                               ),
                                               children: [
                                                 const TextSpan(
@@ -542,10 +577,10 @@ class _RegistrationChecklistScreenState
                                     ],
                                   ),
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 12),
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 52,
+                                  height: 48,
                                   child: ElevatedButton(
                                     onPressed: _termsAccepted
                                         ? () async {
@@ -577,13 +612,13 @@ class _RegistrationChecklistScreenState
                                           Colors.grey.shade500,
                                       elevation: 0,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(30),
+                                        borderRadius: BorderRadius.circular(24),
                                       ),
                                     ),
                                     child: const Text(
                                       'Continuar',
                                       style: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),

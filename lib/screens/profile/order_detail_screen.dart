@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/product_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/review_service.dart';
+import '../../services/tracking_service.dart';
 import '../../models/product.dart';
+import '../../models/tracking_info.dart';
 import '../../utils/ui_helpers.dart';
 import '../product/write_review_screen.dart';
 import 'profile_helpers.dart';
@@ -19,6 +23,8 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   List<dynamic> _items = [];
   Map<String, ProductReview> _reviewsByProductId = {};
+  OrderShipment? _shipment;
+  bool _expandedEvents = false;
   bool _loading = true;
   String? _error;
 
@@ -30,19 +36,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _loadItems() async {
     try {
+      final orderId = widget.order['id'] as String;
       final response = await Supabase.instance.client
           .from('order_items')
           .select(
             '*, products(brand, product_media(${ProductService.publicMediaColumns}))',
           )
-          .eq('order_id', widget.order['id']);
+          .eq('order_id', orderId);
 
       final clientReviews = await ReviewService.getClientReviews();
+      final shipment = await TrackingService.getShipmentForOrder(orderId);
 
       if (mounted) {
         setState(() {
           _items = response as List;
           _reviewsByProductId = {for (var r in clientReviews) r.productId: r};
+          _shipment = shipment;
           _loading = false;
         });
       }
@@ -126,17 +135,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
 
     int currentStep = 0;
-    if (status == 'shipped') {
-      currentStep = 1;
-    } else if (status == 'delivered') {
-      currentStep = 2;
+    final shippingStatus = _shipment?.shippingStatus.toLowerCase();
+
+    if (shippingStatus != null) {
+      if (shippingStatus == 'pending' || shippingStatus == 'label_created') {
+        currentStep = 0;
+      } else if (shippingStatus == 'ready_to_ship' ||
+          shippingStatus == 'picked_up' ||
+          shippingStatus == 'in_transit' ||
+          shippingStatus == 'out_for_delivery') {
+        currentStep = 1;
+      } else if (shippingStatus == 'delivered') {
+        currentStep = 2;
+      }
+    } else {
+      if (status == 'shipped') {
+        currentStep = 1;
+      } else if (status == 'delivered') {
+        currentStep = 2;
+      }
     }
 
     final steps = [
-      {'label': 'En bodega', 'desc': 'Preparando envío'},
+      {
+        'label': _shipment != null ? 'Guía lista' : 'En bodega',
+        'desc': _shipment != null ? _shipment!.statusLabel : 'Preparando envío',
+      },
       {'label': 'En proceso', 'desc': 'En camino'},
       {'label': 'Entregado', 'desc': '¡Entregado!'},
     ];
+
+    final hasTrackingInfo =
+        _shipment != null &&
+        (_shipment!.trackingNumber != null || _shipment!.carrier != null);
+    final events = _shipment?.events ?? [];
 
     return Container(
       width: double.infinity,
@@ -156,13 +188,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Seguimiento del envío',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: kNavy,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Expanded(
+                child: Text(
+                  'Seguimiento del envío',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: kNavy,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (_shipment != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _shipment!.statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _shipment!.statusLabel,
+                    style: TextStyle(
+                      color: _shipment!.statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 20),
 
@@ -288,6 +347,233 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               );
             }),
           ),
+
+          if (hasTrackingInfo) ...[
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kPrimary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.local_shipping,
+                    color: kPrimary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_shipment!.carrierDisplayName}${_shipment!.serviceName != null ? ' - ${_shipment!.serviceName}' : ''}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: kNavy,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (_shipment!.trackingNumber != null) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Guía: ${_shipment!.trackingNumber}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade700,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () {
+                                Clipboard.setData(
+                                  ClipboardData(
+                                    text: _shipment!.trackingNumber!,
+                                  ),
+                                );
+                                UiHelpers.showFloatingSuccessToast(
+                                  context,
+                                  '¡Número de guía copiado!',
+                                );
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.all(4.0),
+                                child: Icon(
+                                  Icons.copy_rounded,
+                                  size: 14,
+                                  color: kPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (_shipment!.estimatedDelivery != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Entrega estimada: ${_shipment!.estimatedDelivery!.day}/${_shipment!.estimatedDelivery!.month}/${_shipment!.estimatedDelivery!.year}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: kGreen,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (_shipment!.trackingUrl != null &&
+                _shipment!.trackingUrl!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final url = _shipment!.trackingUrl;
+                    if (url != null && url.isNotEmpty) {
+                      final uri = Uri.tryParse(url);
+                      if (uri != null) {
+                        try {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        } catch (_) {
+                          if (context.mounted) {
+                            UiHelpers.showFloatingSuccessToast(
+                              context,
+                              'Enlace de rastreo: $url',
+                            );
+                          }
+                        }
+                      }
+                    }
+                  },
+                  icon: const Icon(
+                    Icons.open_in_new,
+                    size: 16,
+                    color: kPrimary,
+                  ),
+                  label: const Text(
+                    'Rastrear envío en paquetería',
+                    style: TextStyle(
+                      color: kPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: kPrimary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+            ],
+          ],
+
+          if (events.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () {
+                setState(() => _expandedEvents = !_expandedEvents);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Historial de eventos (${events.length})',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: kNavy,
+                      ),
+                    ),
+                    Icon(
+                      _expandedEvents
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      color: Colors.grey,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_expandedEvents)
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: events.length,
+                itemBuilder: (ctx, idx) {
+                  final ev = events[idx];
+                  final evDate =
+                      '${ev.eventAt.day}/${ev.eventAt.month} ${ev.eventAt.hour.toString().padLeft(2, '0')}:${ev.eventAt.minute.toString().padLeft(2, '0')}';
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.radio_button_checked,
+                          size: 14,
+                          color: kPrimary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                ev.description ?? ev.status,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              if (ev.location != null)
+                                Text(
+                                  ev.location!,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          evDate,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
         ],
       ),
     );
@@ -596,9 +882,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 ],
                               ),
                               const Divider(height: 20, thickness: 0.5),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                runSpacing: 4,
                                 children: [
                                   TextButton.icon(
                                     onPressed: () async {

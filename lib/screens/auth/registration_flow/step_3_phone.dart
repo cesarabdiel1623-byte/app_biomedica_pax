@@ -287,6 +287,8 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
         TextField(
           controller: _phoneController,
           keyboardType: TextInputType.phone,
+          maxLines: 1,
+          textInputAction: TextInputAction.done,
           decoration: InputDecoration(
             labelText: 'Número de teléfono',
             prefixIcon: const Icon(Icons.phone_outlined, color: _primaryColor),
@@ -295,7 +297,6 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: _primaryColor, width: 2),
             ),
-            hintText: '55 1234 5678',
           ),
         ),
         const SizedBox(height: 28),
@@ -328,46 +329,20 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        // Skip button for development / when SMS limit is reached
+        // Skip button
         TextButton(
-          onPressed: () {
+          onPressed: () async {
             final navigator = Navigator.of(context);
-            showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Omitir verificación'),
-                content: const Text(
-                  '¿Deseas continuar sin verificar tu teléfono?\n\nPodrás verificarlo después desde tu perfil.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancelar'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () async {
-                      // Save skip flag in user metadata
-                      try {
-                        await Supabase.instance.client.auth.updateUser(
-                          UserAttributes(data: {'phone_skipped': true}),
-                        );
-                      } catch (_) {}
-                      Navigator.pop(ctx); // close dialog
-                      navigator.pop({
-                        'success': true,
-                        'phone': 'Omitido',
-                        'skipped': true,
-                      }); // return to checklist
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryColor,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Omitir'),
-                  ),
-                ],
-              ),
-            );
+            try {
+              await Supabase.instance.client.auth.updateUser(
+                UserAttributes(data: {'phone_skipped': true}),
+              );
+            } catch (_) {}
+            navigator.pop({
+              'success': true,
+              'phone': 'Omitido',
+              'skipped': true,
+            });
           },
           child: Text(
             'Omitir por ahora',

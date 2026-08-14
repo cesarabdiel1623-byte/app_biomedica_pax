@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { triggerPaidOrderFulfillment } from "../_shared/paid_order_fulfillment.ts";
 
 type WebhookBody = {
   type?: string;
@@ -40,6 +41,22 @@ function requiredEnv(name: string): string {
     throw new Error(`Missing environment variable: ${name}`);
   }
   return value;
+}
+
+function getString(source: Record<string, unknown> | null | undefined, key: string): string | null {
+  if (!source) return null;
+  const value = source[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function getReconciledPaymentStatus(source: unknown): string | null {
+  if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+  const result = source as Record<string, unknown>;
+  return getString(result, "payment_status") ?? getString(result, "status");
+}
+
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
 }
 
 function parseSignature(value: string): ParsedSignature | null {
@@ -398,6 +415,28 @@ Deno.serve(async (request: Request): Promise<Response> => {
       payment_id: paymentId,
       result: reconciliationResult,
     });
+
+    const reconciledOrderId =
+      reconciliationResult && typeof reconciliationResult === "object" && !Array.isArray(reconciliationResult)
+        ? getString(reconciliationResult as Record<string, unknown>, "order_id")
+        : null;
+    const reconciledPaymentStatus = getReconciledPaymentStatus(reconciliationResult);
+
+    if (
+      reconciledOrderId &&
+      isUuidLike(reconciledOrderId) &&
+      reconciledPaymentStatus === "approved"
+    ) {
+      const fulfillmentResult = await triggerPaidOrderFulfillment(
+        reconciledOrderId,
+      );
+      console.log("Post-payment fulfillment triggered", {
+        trace_id: traceId,
+        payment_id: paymentId,
+        order_id: reconciledOrderId,
+        ok: fulfillmentResult.ok === true,
+      });
+    }
 
     return jsonResponse({ received: true, reconciled: true });
   } catch (error) {

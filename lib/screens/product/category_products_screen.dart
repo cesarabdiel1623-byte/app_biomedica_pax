@@ -289,8 +289,8 @@ class _ProductCardState extends State<_ProductCard> {
                         ),
                         child: Text(
                           product.activePromotion?.campaignName != null
-                              ? '${product.activePromotion!.campaignName!.toUpperCase()} · ${product.discountPercent}% OFF'
-                              : '${product.discountPercent}% OFF',
+                              ? '${product.activePromotion!.campaignName!.toUpperCase()} · -${product.discountPercent}%'
+                              : '-${product.discountPercent}%',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 9,
@@ -342,7 +342,7 @@ class _ProductCardState extends State<_ProductCard> {
                             borderRadius: BorderRadius.circular(3),
                           ),
                           child: Text(
-                            '${product.discountPercent}% OFF',
+                            '-${product.discountPercent}%',
                             style: const TextStyle(
                               fontSize: 10,
                               color: _kGreen,
@@ -398,25 +398,19 @@ class _ProductCardState extends State<_ProductCard> {
                   if (product.shippingInfo != null)
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.local_shipping_outlined,
                           size: 12,
-                          color: product.hasFreeShipping
-                              ? _kGreen
-                              : const Color(0xFF6B7280),
+                          color: Color(0xFF6B7280),
                         ),
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
                             product.shippingInfo!,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 11,
-                              color: product.hasFreeShipping
-                                  ? _kGreen
-                                  : const Color(0xFF6B7280),
-                              fontWeight: product.hasFreeShipping
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
+                              color: Color(0xFF6B7280),
+                              fontWeight: FontWeight.normal,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

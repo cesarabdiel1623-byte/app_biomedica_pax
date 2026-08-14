@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/cart_service.dart';
+import '../../../utils/price_formatter.dart';
 import '../../../services/address_service.dart';
 import '../../../utils/ui_helpers.dart';
 import '../../../widgets/standard_section_header.dart';
@@ -21,13 +22,24 @@ class CartTabState extends State<CartTab> {
   bool _loading = true;
   String _currentLocation = 'Selecciona tu ubicación';
   Set<String> _selectedItemIds = {};
+  CartPricingAmounts? _cartPricingAmounts;
+  bool _syncingCouponState = false;
+  final Set<String> _notifiedStaleCouponKeys = {};
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
+
+  bool get _isFullCartSelected =>
+      _items.isNotEmpty && _selectedItemIds.length == _items.length;
+
+  void _clearCartPricingAmounts() {
+    _cartPricingAmounts = null;
+  }
 
   void _removeItem(int index, CartItem item, {bool fromSwipe = false}) async {
     final removedItem = item;
     final int originalIndex = index;
 
     setState(() {
+      _clearCartPricingAmounts();
       _selectedItemIds.remove(removedItem.id);
       _items.removeAt(originalIndex);
     });
@@ -54,6 +66,7 @@ class CartTabState extends State<CartTab> {
       load(showSpinner: false);
     } catch (e) {
       setState(() {
+        _clearCartPricingAmounts();
         _items.insert(originalIndex, removedItem);
         _selectedItemIds.add(removedItem.id);
       });
@@ -89,12 +102,19 @@ class CartTabState extends State<CartTab> {
     _loadLocation();
     try {
       final items = await CartService.getCartItems();
+      final couponCleanup = items.isNotEmpty
+          ? await CartService.clearInvalidPersistedCouponIfAny()
+          : null;
       if (mounted) {
         setState(() {
           _items = items;
           _selectedItemIds = items.map((i) => i.id).toSet();
+          _cartPricingAmounts = couponCleanup?.amounts;
           _loading = false;
         });
+        if (couponCleanup?.removed == true) {
+          _showStaleCouponRemovedNotice(couponCleanup!);
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _loading = false);
@@ -105,10 +125,14 @@ class CartTabState extends State<CartTab> {
       .where((i) => _selectedItemIds.contains(i.id))
       .fold(0, (s, i) => s + i.subtotal);
   double get _iva => _subtotal * 0.16;
+  double get _couponDiscountAmount =>
+      _isFullCartSelected ? (_cartPricingAmounts?.couponDiscount ?? 0.0) : 0.0;
+
+  static const double freeShippingThreshold = 5000.0;
 
   double get _shippingFee {
     if (_subtotal <= 0) return 0.0;
-    return _subtotal >= 2000 ? 0.0 : 80.0;
+    return _subtotal >= freeShippingThreshold ? 0.0 : 0.0;
   }
 
   double get _savings {
@@ -150,7 +174,12 @@ class CartTabState extends State<CartTab> {
     return d;
   }
 
-  double get _total => (_subtotal + _shippingFee).clamp(0.0, double.infinity);
+  double get _total {
+    if (_isFullCartSelected && _cartPricingAmounts != null) {
+      return _cartPricingAmounts!.total.clamp(0.0, double.infinity);
+    }
+    return (_subtotal + _shippingFee).clamp(0.0, double.infinity);
+  }
 
   int get _totalQty => _items
       .where((i) => _selectedItemIds.contains(i.id))
@@ -166,24 +195,65 @@ class CartTabState extends State<CartTab> {
   );
 
   String _fmt(double v) {
-    final parts = v.toStringAsFixed(2).split('.');
-    final buf = StringBuffer();
-    for (int i = 0; i < parts[0].length; i++) {
-      if (i > 0 && (parts[0].length - i) % 3 == 0) buf.write(',');
-      buf.write(parts[0][i]);
-    }
-    return '\$$buf.${parts[1]}';
+    return formatCommercialPrice(v);
   }
 
   Future<void> _showCouponDialog() async {
     final changed = await showDialog<bool>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => const _CartCouponDialog(),
+      builder: (_) => _CartCouponDialog(
+        onPricingChanged: (amounts) {
+          if (!mounted) return;
+          setState(() => _cartPricingAmounts = amounts);
+        },
+      ),
     );
 
     if (changed == true && mounted) {
-      await load(showSpinner: false);
+      setState(() {});
+    }
+  }
+
+  void _showStaleCouponRemovedNotice(StaleCartCouponCleanupResult result) {
+    if (!mounted || !result.removed) return;
+    final key = '${result.code ?? ''}:${result.reason ?? ''}';
+    if (_notifiedStaleCouponKeys.contains(key)) return;
+    _notifiedStaleCouponKeys.add(key);
+
+    final code = result.code?.trim().isNotEmpty == true
+        ? result.code!.trim()
+        : 'guardado';
+    final message = result.reason == 'not_combinable'
+        ? 'El cupón $code no se puede combinar con la promoción activa y fue retirado del carrito.'
+        : 'El cupón $code ya no aplica a este carrito y fue retirado.';
+
+    UiHelpers.showWarningToast(context, message, bottomMargin: 88);
+  }
+
+  Future<bool> _syncPersistedCouponBeforeCheckout() async {
+    if (_syncingCouponState) return false;
+    setState(() => _syncingCouponState = true);
+    try {
+      final cleanup = await CartService.clearInvalidPersistedCouponIfAny();
+      if (!mounted) return false;
+      setState(() => _cartPricingAmounts = cleanup.amounts);
+      if (cleanup.removed) {
+        _showStaleCouponRemovedNotice(cleanup);
+      }
+      return true;
+    } catch (_) {
+      if (mounted) {
+        UiHelpers.showErrorToast(
+          context,
+          'No se pudo sincronizar el carrito. Inténtalo de nuevo.',
+        );
+      }
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() => _syncingCouponState = false);
+      }
     }
   }
 
@@ -199,10 +269,10 @@ class CartTabState extends State<CartTab> {
           builder: (BuildContext context, StateSetter setModalState) {
             final double origSubtotal = _originalSubtotal;
             final double subtotal = _subtotal;
-            final double shipping = _shippingFee;
             final double prodDiscount = _productDiscountAmount;
+            final double couponDiscount = _couponDiscountAmount;
             final double total = _total;
-            final double savings = _savings;
+            final double savings = _savings + couponDiscount;
             final int qty = _totalQty;
             final bool hasUnavailableSelected = _hasUnavailableSelected;
 
@@ -238,12 +308,15 @@ class CartTabState extends State<CartTab> {
                     ),
                     const SizedBox(height: 16),
 
-                    if (subtotal > 0 && subtotal < 2000) ...[
+                    if (subtotal > 0 && subtotal < freeShippingThreshold) ...[
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           LinearProgressIndicator(
-                            value: (subtotal / 2000).clamp(0.0, 1.0),
+                            value: (subtotal / freeShippingThreshold).clamp(
+                              0.0,
+                              1.0,
+                            ),
                             backgroundColor: Colors.grey.shade100,
                             color: _kPrimary,
                             minHeight: 4,
@@ -251,7 +324,7 @@ class CartTabState extends State<CartTab> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Agrega ${_fmt(2000 - subtotal)} más para tener envío gratis',
+                            'Agrega ${_fmt(freeShippingThreshold - subtotal)} más para tener envío gratis',
                             style: TextStyle(
                               fontSize: 11.5,
                               color: Colors.grey.shade600,
@@ -264,11 +337,7 @@ class CartTabState extends State<CartTab> {
 
                     _summaryRow('Productos ($qty)', _fmt(origSubtotal)),
                     const SizedBox(height: 10),
-                    _summaryRow(
-                      'Envío',
-                      shipping <= 0 ? 'Gratis' : _fmt(shipping),
-                      color: shipping <= 0 ? const Color(0xFF16A34A) : null,
-                    ),
+                    _summaryRow('Envío', 'Por calcular'),
 
                     if (prodDiscount > 0) ...[
                       const SizedBox(height: 10),
@@ -292,6 +361,11 @@ class CartTabState extends State<CartTab> {
                           ),
                         ],
                       ),
+                    ],
+
+                    if (couponDiscount > 0) ...[
+                      const SizedBox(height: 10),
+                      _discountRow('Descuento de cupón', couponDiscount),
                     ],
 
                     const SizedBox(height: 16),
@@ -450,7 +524,10 @@ class CartTabState extends State<CartTab> {
     );
   }
 
-  void _showCheckoutBottomSheet() {
+  Future<void> _showCheckoutBottomSheet() async {
+    final synced = await _syncPersistedCouponBeforeCheckout();
+    if (!synced || !mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -458,7 +535,10 @@ class CartTabState extends State<CartTab> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => CheckoutSheet(
+        cartId: _items.isNotEmpty ? _items.first.cartId : '',
+        subtotal: _subtotal,
         total: _total,
+        cartPricingAmounts: _isFullCartSelected ? _cartPricingAmounts : null,
         onSuccess: () {
           load();
         },
@@ -469,6 +549,7 @@ class CartTabState extends State<CartTab> {
   Widget _buildStickyFooter() {
     final qty = _totalQty;
     final hasUnavailableSelected = _hasUnavailableSelected;
+    final totalSavings = _savings + _couponDiscountAmount;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -548,7 +629,7 @@ class CartTabState extends State<CartTab> {
                               alignment: Alignment.centerLeft,
                               child: Row(
                                 children: [
-                                  if (_savings > 0) ...[
+                                  if (totalSavings > 0) ...[
                                     Text(
                                       _fmt(_originalTotal),
                                       style: TextStyle(
@@ -576,10 +657,10 @@ class CartTabState extends State<CartTab> {
                                 ],
                               ),
                             ),
-                            if (_savings > 0) ...[
+                            if (totalSavings > 0) ...[
                               const SizedBox(height: 2),
                               Text(
-                                'Ahorras ${_fmt(_savings)}',
+                                'Ahorras ${_fmt(totalSavings)}',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: Color(0xFF16A34A),
@@ -640,10 +721,11 @@ class CartTabState extends State<CartTab> {
     final titleText = _loading
         ? 'Carrito'
         : (_items.isEmpty
-            ? 'Carrito'
-            : 'Carrito (${_items.fold<int>(0, (s, i) => s + i.quantity)})');
+              ? 'Carrito'
+              : 'Carrito (${_items.fold<int>(0, (s, i) => s + i.quantity)})');
 
-    final locationText = (_loading || _currentLocation == 'Selecciona tu ubicación')
+    final locationText =
+        (_loading || _currentLocation == 'Selecciona tu ubicación')
         ? '¿Dónde enviamos?'
         : _currentLocation;
 
@@ -916,6 +998,10 @@ class CartTabState extends State<CartTab> {
           ),
           const SizedBox(height: 16),
           _summaryRow('Productos ($_totalQty)', _fmt(_subtotal)),
+          if (_couponDiscountAmount > 0) ...[
+            const SizedBox(height: 8),
+            _discountRow('Descuento de cupón', _couponDiscountAmount),
+          ],
           const SizedBox(height: 8),
           _summaryRow('IVA (16%)', _fmt(_iva)),
           const SizedBox(height: 16),
@@ -1063,29 +1149,46 @@ class CartTabState extends State<CartTab> {
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Text(
-                                  p?.formattedPrice ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                                if (p != null && p.hasDiscount) ...[
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    p.formattedOldPrice,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade400,
-                                      decoration: TextDecoration.lineThrough,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                            Text(
+                              p?.formattedPrice ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
                             ),
+                            if (p != null && p.hasDiscount)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 1),
+                                child: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        p.formattedOldPrice,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 10.5,
+                                          color: Colors.grey.shade400,
+                                          decoration:
+                                              TextDecoration.lineThrough,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      '-${p.discountPercent}%',
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        color: Color(0xFF16A34A),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             if (p != null) ...[
                               const SizedBox(height: 5),
                               Row(
@@ -1136,6 +1239,7 @@ class CartTabState extends State<CartTab> {
                                   onTap: () async {
                                     if (item.quantity <= 1) return;
                                     setState(() {
+                                      _clearCartPricingAmounts();
                                       item.quantity--;
                                     });
                                     try {
@@ -1146,6 +1250,7 @@ class CartTabState extends State<CartTab> {
                                       load(showSpinner: false);
                                     } catch (e) {
                                       setState(() {
+                                        _clearCartPricingAmounts();
                                         item.quantity++;
                                       });
                                       if (context.mounted) {
@@ -1191,6 +1296,7 @@ class CartTabState extends State<CartTab> {
                                           final stock = p?.stock ?? 999;
                                           if (item.quantity >= stock) return;
                                           setState(() {
+                                            _clearCartPricingAmounts();
                                             item.quantity++;
                                           });
                                           try {
@@ -1201,6 +1307,7 @@ class CartTabState extends State<CartTab> {
                                             load(showSpinner: false);
                                           } catch (e) {
                                             setState(() {
+                                              _clearCartPricingAmounts();
                                               item.quantity--;
                                             });
                                             if (context.mounted) {
@@ -1307,10 +1414,32 @@ class CartTabState extends State<CartTab> {
       ],
     );
   }
+
+  Widget _discountRow(String label, double amount) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+        ),
+        Text(
+          '-${_fmt(amount)}',
+          style: const TextStyle(
+            fontSize: 14,
+            color: Color(0xFF16A34A),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _CartCouponDialog extends StatefulWidget {
-  const _CartCouponDialog();
+  const _CartCouponDialog({required this.onPricingChanged});
+
+  final ValueChanged<CartPricingAmounts?> onPricingChanged;
 
   @override
   State<_CartCouponDialog> createState() => _CartCouponDialogState();
@@ -1343,6 +1472,9 @@ class _CartCouponDialogState extends State<_CartCouponDialog> {
     try {
       final result = await CartService.applyCartCoupon(_codeController.text);
       if (!mounted) return;
+      if (result.valid) {
+        widget.onPricingChanged(result.amounts);
+      }
       setState(() {
         _loading = false;
         _success = result.valid;
@@ -1367,9 +1499,10 @@ class _CartCouponDialogState extends State<_CartCouponDialog> {
     });
 
     try {
-      await CartService.removeCartCoupon();
+      final amounts = await CartService.removeCartCoupon();
       if (!mounted) return;
       _codeController.clear();
+      widget.onPricingChanged(amounts);
       setState(() {
         _loading = false;
         _success = true;

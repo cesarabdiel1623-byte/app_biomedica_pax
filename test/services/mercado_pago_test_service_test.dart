@@ -23,7 +23,12 @@ void main() {
       );
 
       expect(
-        service.startTestPayment(),
+        service.startTestPayment(
+          cartId: 'test-cart-id',
+          addressId: 'address-1',
+          quotationId: 'quotation-1',
+          rateId: 'rate-1',
+        ),
         throwsA(
           isA<Exception>().having(
             (e) => e.toString(),
@@ -75,7 +80,7 @@ void main() {
       );
 
       await expectLater(
-        service.startTestPayment(),
+        service.startTestPayment(cartId: 'test-cart-id'),
         throwsA(
           isA<Exception>().having(
             (e) => e.toString(),
@@ -86,13 +91,54 @@ void main() {
       );
     });
 
-    test('envía body vacío', () async {
-      Map<String, dynamic>? sentBody;
+    test(
+      'envía selección de envío sin identidad ni totales del cliente',
+      () async {
+        Map<String, dynamic>? sentBody;
+        final service = MercadoPagoTestService(
+          SupabaseClient('https://example.com', 'anon-key'),
+          sessionGetter: _fakeSession,
+          invokePreference: (body) async {
+            sentBody = body;
+            return <String, dynamic>{
+              'checkout_url':
+                  'https://www.mercadopago.com.mx/checkout/v1/redirect',
+            };
+          },
+          openCheckout: (_) async {},
+        );
+
+        await service.startTestPayment(
+          cartId: 'test-cart-id',
+          addressId: 'address-1',
+          quotationId: 'quotation-1',
+          rateId: 'rate-1',
+          notes: 'Entregar en recepción',
+        );
+
+        expect(sentBody, isNotNull);
+        expect(sentBody!['cart_id'], 'test-cart-id');
+        expect(sentBody!['address_id'], 'address-1');
+        expect(sentBody!['skydropx_quotation_id'], 'quotation-1');
+        expect(sentBody!['skydropx_rate_id'], 'rate-1');
+        expect(sentBody!['notes'], 'Entregar en recepción');
+        expect(sentBody!.containsKey('user_id'), isFalse);
+        expect(sentBody!.containsKey('profile_id'), isFalse);
+        expect(sentBody!.containsKey('client_id'), isFalse);
+        expect(sentBody!.containsKey('payment_total'), isFalse);
+        expect(sentBody!.containsKey('product_subtotal'), isFalse);
+        expect(sentBody!.containsKey('customer_shipping_amount'), isFalse);
+        expect(sentBody!.containsKey('unit_price'), isFalse);
+      },
+    );
+
+    test('rechaza pago sin selección de envío', () async {
+      var invoked = false;
       final service = MercadoPagoTestService(
         SupabaseClient('https://example.com', 'anon-key'),
         sessionGetter: _fakeSession,
-        invokePreference: (body) async {
-          sentBody = body;
+        invokePreference: (_) async {
+          invoked = true;
           return <String, dynamic>{
             'checkout_url':
                 'https://www.mercadopago.com.mx/checkout/v1/redirect',
@@ -101,10 +147,18 @@ void main() {
         openCheckout: (_) async {},
       );
 
-      await service.startTestPayment();
+      await expectLater(
+        service.startTestPayment(cartId: 'test-cart-id'),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('opción de envío válida'),
+          ),
+        ),
+      );
 
-      expect(sentBody, isNotNull);
-      expect(sentBody, isEmpty);
+      expect(invoked, isFalse);
     });
 
     test('previene doble apertura', () async {
@@ -118,10 +172,20 @@ void main() {
         openCheckout: (_) => completer.future,
       );
 
-      final firstCall = service.startTestPayment();
+      final firstCall = service.startTestPayment(
+        cartId: 'test-cart-id',
+        addressId: 'address-1',
+        quotationId: 'quotation-1',
+        rateId: 'rate-1',
+      );
 
       await expectLater(
-        service.startTestPayment(),
+        service.startTestPayment(
+          cartId: 'test-cart-id',
+          addressId: 'address-1',
+          quotationId: 'quotation-1',
+          rateId: 'rate-1',
+        ),
         throwsA(
           isA<Exception>().having(
             (e) => e.toString(),
@@ -145,7 +209,12 @@ void main() {
       );
 
       await expectLater(
-        service.startTestPayment(),
+        service.startTestPayment(
+          cartId: 'test-cart-id',
+          addressId: 'address-1',
+          quotationId: 'quotation-1',
+          rateId: 'rate-1',
+        ),
         throwsA(
           isA<Exception>().having(
             (e) => e.toString(),

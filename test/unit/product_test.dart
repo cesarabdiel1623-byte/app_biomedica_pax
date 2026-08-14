@@ -186,26 +186,52 @@ void main() {
       expect(p.categoryLabel, 'Equipo Medico');
     });
 
-    test('formattedPrice and formattedOldPrice format currency correct', () {
-      final p = Product(
-        id: '1',
-        sku: 'S1',
-        name: 'P1',
-        category: 'equipo_medico',
-        application: 'general',
-        unitPriceMxn: 1250.50,
-        costPriceMxn: 80.0,
-        oldPrice: 1500.0,
-        currency: 'MXN',
-        unit: 'pz',
-        isActive: true,
-        requiresSerial: false,
-        trackInventory: true,
-        createdAt: DateTime.now(),
-      );
-      expect(p.formattedPrice, '\$1,250.50');
-      expect(p.formattedOldPrice, '\$1,500.00');
-    });
+    test(
+      'formattedPrice and formattedOldPrice match admin rounded display',
+      () {
+        final p = Product(
+          id: '1',
+          sku: 'S1',
+          name: 'P1',
+          category: 'equipo_medico',
+          application: 'general',
+          unitPriceMxn: 1250.50,
+          costPriceMxn: 80.0,
+          oldPrice: 1500.0,
+          currency: 'MXN',
+          unit: 'pz',
+          isActive: true,
+          requiresSerial: false,
+          trackInventory: true,
+          createdAt: DateTime.now(),
+        );
+        expect(p.formattedPrice, '\$1,251 MXN');
+        expect(p.formattedOldPrice, '\$1,500 MXN');
+      },
+    );
+
+    test(
+      'formattedPrice rounds catalog decimals like the admin product grid',
+      () {
+        final p = Product(
+          id: '2',
+          sku: 'REFA1114',
+          name: 'Banco de baterías para ventilador Vela',
+          category: 'refaccion',
+          application: 'general',
+          unitPriceMxn: 14025.61,
+          costPriceMxn: 9000.0,
+          currency: 'MXN',
+          unit: 'pieza',
+          isActive: true,
+          requiresSerial: false,
+          trackInventory: true,
+          createdAt: DateTime.now(),
+        );
+
+        expect(p.formattedPrice, '\$14,026 MXN');
+      },
+    );
   });
 
   group('Product Unit Tests - JSON Parsing & Promotions', () {
@@ -362,6 +388,33 @@ void main() {
       final p = Product.fromJson(json);
       // Verifica que el salesCount se lee directo de la BD sin modificar
       expect(p.salesCount, 120);
+    });
+
+    test('Product.fromJson parses stock from product_inventory relation', () {
+      final json = {
+        'id': 'stock-product',
+        'sku': 'SKU-STOCK',
+        'name': 'Producto con inventario',
+        'category': 'refaccion',
+        'application': 'general',
+        'unit_price_mxn': 3403.28,
+        'cost_price_mxn': 2000.0,
+        'currency': 'MXN',
+        'unit': 'pieza',
+        'is_active': true,
+        'requires_serial': false,
+        'track_inventory': true,
+        'created_at': '2026-01-01T00:00:00Z',
+        'product_inventory': [
+          {'current_stock': 7, 'minimum_stock': 2},
+        ],
+      };
+
+      final product = Product.fromJson(json);
+
+      expect(product.stock, 7);
+      expect(product.minimumStock, 2);
+      expect(product.stockStatusLabel, 'Disponible');
     });
   });
 }

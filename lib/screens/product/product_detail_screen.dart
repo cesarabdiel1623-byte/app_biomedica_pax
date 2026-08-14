@@ -281,11 +281,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
       // 2. Fetch cart items to get accurate total
       final items = await CartService.getCartItems();
+      final couponCleanup = items.isNotEmpty
+          ? await CartService.clearInvalidPersistedCouponIfAny()
+          : null;
       final subtotal = items.fold<double>(0, (s, i) => s + i.subtotal);
       final total = subtotal * 1.16;
 
       if (!mounted) return;
       setState(() => _loadingDirectBuy = false);
+
+      if (couponCleanup?.removed == true) {
+        final code = couponCleanup!.code?.trim().isNotEmpty == true
+            ? couponCleanup.code!.trim()
+            : 'guardado';
+        UiHelpers.showWarningToast(
+          context,
+          couponCleanup.reason == 'not_combinable'
+              ? 'El cupón $code no se puede combinar con la promoción activa y fue retirado del carrito.'
+              : 'El cupón $code ya no aplica a este carrito y fue retirado.',
+          bottomMargin: 88,
+        );
+      }
 
       // 3. Show CheckoutSheet
       showModalBottomSheet(
@@ -295,7 +311,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         builder: (ctx) => CheckoutSheet(
+          cartId: items.isNotEmpty ? items.first.cartId : '',
+          subtotal: subtotal,
           total: total,
+          cartPricingAmounts: couponCleanup?.amounts,
           onSuccess: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -971,7 +990,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       if (p.hasDiscount) ...[
                         const SizedBox(width: 10),
                         Text(
-                          '${p.discountPercent}% OFF',
+                          '-${p.discountPercent}%',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -1161,7 +1180,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           Padding(
                             padding: const EdgeInsets.only(left: 12),
                             child: Text(
-                              p.stock == null ? 'por confirmar' : 'disponible',
+                              _stockQuantityLabel(p),
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.grey.shade500,
@@ -2167,6 +2186,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
     final millones = count / 1000000;
     return '+${millones.toStringAsFixed(1)} M vendidos';
+  }
+
+  String _stockQuantityLabel(Product p) {
+    final stock = p.stock;
+    if (stock == null) return 'por confirmar';
+    if (stock == 1) return '1 disponible';
+    return '$stock disponibles';
   }
 }
 

@@ -40,7 +40,13 @@ class MercadoPagoTestService {
     'mpago.la',
   };
 
-  Future<void> startTestPayment() async {
+  Future<void> startTestPayment({
+    required String cartId,
+    String? addressId,
+    String? quotationId,
+    String? rateId,
+    String? notes,
+  }) async {
     final session = (_sessionGetter ?? _defaultSessionGetter).call();
     if (session == null) {
       throw Exception('Debes iniciar sesión para realizar el pago de prueba.');
@@ -52,10 +58,29 @@ class MercadoPagoTestService {
       );
     }
 
+    if (addressId == null ||
+        addressId.isEmpty ||
+        quotationId == null ||
+        quotationId.isEmpty ||
+        rateId == null ||
+        rateId.isEmpty) {
+      throw Exception(
+        'Debes seleccionar una opción de envío válida para continuar al pago.',
+      );
+    }
+
     _isOpening = true;
     try {
+      final payload = <String, dynamic>{
+        'cart_id': cartId,
+        'address_id': addressId,
+        'skydropx_quotation_id': quotationId,
+        'skydropx_rate_id': rateId,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      };
+
       final data = await (_invokePreference ?? _invokeCreatePreference).call(
-        <String, dynamic>{},
+        payload,
       );
 
       if (data is! Map) {

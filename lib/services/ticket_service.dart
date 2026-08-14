@@ -157,14 +157,16 @@ class TicketService {
     if (reference == null || reference.trim().isEmpty) return null;
     final value = reference.trim();
     final storageReference = _parseStorageReference(value);
-    if (storageReference == null) return null;
+    if (storageReference == null) {
+      return UiHelpers.sanitizeTrustedRemoteUrl(value);
+    }
 
     try {
       return await _db.storage
           .from(storageReference.bucket)
           .createSignedUrl(storageReference.path, 60 * 60);
     } catch (_) {
-      return null;
+      return UiHelpers.sanitizeTrustedRemoteUrl(value);
     }
   }
 
@@ -180,6 +182,18 @@ class TicketService {
   static _StorageAttachment? _parseStorageReference(String reference) {
     final uri = Uri.tryParse(reference);
     if (uri == null) return null;
+    final normalizedReference = reference
+        .replaceAll('\\', '/')
+        .replaceFirst(RegExp(r'^/+'), '');
+
+    if (!uri.hasScheme && normalizedReference.isNotEmpty) {
+      final path = normalizedReference.startsWith('$_attachmentBucket/')
+          ? normalizedReference.substring(_attachmentBucket.length + 1)
+          : normalizedReference;
+      if (_isSafeStoragePath(path)) {
+        return _StorageAttachment(bucket: _attachmentBucket, path: path);
+      }
+    }
 
     if (uri.scheme == 'storage' && uri.host == _attachmentBucket) {
       final path = uri.path.replaceFirst(RegExp(r'^/+'), '');
@@ -215,7 +229,8 @@ class TicketService {
       return false;
     }
     final segments = path.split('/');
-    return segments.length == 2 &&
+    return segments.length >= 2 &&
+        segments.length <= 8 &&
         segments.every((segment) => segment.trim().isNotEmpty);
   }
 

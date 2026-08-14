@@ -13,6 +13,7 @@ import 'screens/profile/notifications_screen.dart';
 import 'screens/auth/registration_flow/registration_checklist_screen.dart';
 import 'services/notification_service.dart';
 import 'services/quote_service.dart';
+import 'services/cart_service.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -123,6 +124,11 @@ class _GoMedicalAppState extends State<GoMedicalApp> {
 
   void _showPaymentResult(PaymentTestResult result) {
     if (_isNavigatingPaymentResult) return;
+
+    if (result == PaymentTestResult.success ||
+        result == PaymentTestResult.pending) {
+      CartService.clearLocalCartCache();
+    }
 
     final navigator = appNavigatorKey.currentState;
     if (navigator == null) {

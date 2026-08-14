@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
+import '../utils/price_formatter.dart';
 import 'auth_identity_service.dart';
 import 'product_service.dart';
 import 'quote_service.dart';
@@ -20,9 +21,77 @@ class CartItem {
     this.product,
   });
 
-  double get subtotal => (product?.unitPriceMxn ?? 0) * quantity;
+  double get subtotal => roundFinancialAmount(
+    roundFinancialAmount(product?.unitPriceMxn ?? 0) * quantity,
+  );
   double get subtotalWithIva => subtotal * 1.16;
   double get ivaAmount => subtotal * 0.16;
+}
+
+class CartPricingAmounts {
+  final double itemsSubtotal;
+  final double productDiscount;
+  final double eligibleSubtotal;
+  final double couponDiscount;
+  final double tax;
+  final double total;
+  final String currency;
+
+  const CartPricingAmounts({
+    required this.itemsSubtotal,
+    required this.productDiscount,
+    required this.eligibleSubtotal,
+    required this.couponDiscount,
+    required this.tax,
+    required this.total,
+    required this.currency,
+  });
+
+  double get effectiveItemsSubtotal => roundFinancialAmount(
+    (itemsSubtotal - productDiscount).clamp(0.0, double.infinity),
+  );
+
+  static double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.trim()) ?? 0.0;
+    return 0.0;
+  }
+
+  static CartPricingAmounts? fromRpc(dynamic response) {
+    dynamic normalized = response;
+    if (normalized is List && normalized.isNotEmpty) {
+      normalized = normalized.first;
+    }
+
+    if (normalized is! Map) return null;
+
+    final root = Map<String, dynamic>.from(normalized);
+    final rawAmounts = root['amounts'];
+    final amounts = rawAmounts is Map
+        ? Map<String, dynamic>.from(rawAmounts)
+        : root;
+
+    if (!amounts.containsKey('total')) return null;
+
+    return CartPricingAmounts(
+      itemsSubtotal: roundFinancialAmount(_toDouble(amounts['items_subtotal'])),
+      productDiscount: roundFinancialAmount(
+        _toDouble(amounts['product_discount']),
+      ),
+      eligibleSubtotal: roundFinancialAmount(
+        _toDouble(amounts['eligible_subtotal']),
+      ),
+      couponDiscount: roundFinancialAmount(
+        _toDouble(amounts['coupon_discount']),
+      ),
+      tax: roundFinancialAmount(_toDouble(amounts['tax'])),
+      total: roundFinancialAmount(_toDouble(amounts['total'])),
+      currency: amounts['currency']?.toString().trim().isNotEmpty == true
+          ? amounts['currency'].toString().trim()
+          : 'MXN',
+    );
+  }
 }
 
 class CartCouponResult {
@@ -30,12 +99,14 @@ class CartCouponResult {
   final String? reason;
   final String message;
   final Map<String, dynamic> data;
+  final CartPricingAmounts? amounts;
 
   const CartCouponResult({
     required this.valid,
     required this.message,
     this.reason,
     this.data = const {},
+    this.amounts,
   });
 
   factory CartCouponResult.fromRpc(dynamic response) {
@@ -68,8 +139,35 @@ class CartCouponResult {
       reason: reason == null || reason.isEmpty ? null : reason,
       message: message,
       data: data,
+      amounts: CartPricingAmounts.fromRpc(data),
     );
   }
+
+  CartCouponResult withAmounts(CartPricingAmounts? nextAmounts) {
+    return CartCouponResult(
+      valid: valid,
+      reason: reason,
+      message: message,
+      data: data,
+      amounts: nextAmounts ?? amounts,
+    );
+  }
+}
+
+class StaleCartCouponCleanupResult {
+  final bool removed;
+  final String? code;
+  final String? reason;
+  final String? message;
+  final CartPricingAmounts? amounts;
+
+  const StaleCartCouponCleanupResult({
+    required this.removed,
+    this.code,
+    this.reason,
+    this.message,
+    this.amounts,
+  });
 }
 
 /// Service for managing server-side cart using `carts` + `cart_items` tables
@@ -167,6 +265,12 @@ class CartService {
     return cart['id'] as String;
   }
 
+  static String? _readCouponCode(Map<String, dynamic> cart) {
+    final code = cart['applied_coupon_code']?.toString().trim();
+    if (code != null && code.isNotEmpty) return code;
+    return null;
+  }
+
   /// Validates and applies a coupon exclusively through the backend contract.
   static Future<CartCouponResult> applyCartCoupon(String code) async {
     final normalizedCode = code.trim();
@@ -179,9 +283,9 @@ class CartService {
       'apply_cart_coupon',
       params: {'p_cart_id': cartId, 'p_code': normalizedCode},
     );
-    final result = CartCouponResult.fromRpc(response);
-    if (result.valid) {
-      await getCartPricing();
+    var result = CartCouponResult.fromRpc(response);
+    if (result.valid && result.amounts == null) {
+      result = result.withAmounts(await getCartPricingAmounts());
     }
     return result;
   }
@@ -193,10 +297,55 @@ class CartService {
     return _client.rpc('get_cart_pricing', params: {'p_cart_id': cartId});
   }
 
-  static Future<void> removeCartCoupon() async {
+  static Future<CartPricingAmounts?> getCartPricingAmounts() async {
+    return CartPricingAmounts.fromRpc(await getCartPricing());
+  }
+
+  static Future<CartPricingAmounts?> removeCartCoupon() async {
     final cartId = await _requireActiveCartId();
     await _client.rpc('remove_cart_coupon', params: {'p_cart_id': cartId});
-    await getCartPricing();
+    return getCartPricingAmounts();
+  }
+
+  static Future<StaleCartCouponCleanupResult>
+  clearInvalidPersistedCouponIfAny() async {
+    final cartId = await _requireActiveCartId();
+    final cart = await _client
+        .from('carts')
+        .select('applied_coupon_id, applied_coupon_code')
+        .eq('id', cartId)
+        .maybeSingle();
+
+    if (cart == null) {
+      return const StaleCartCouponCleanupResult(removed: false);
+    }
+
+    final persistedCode = _readCouponCode(Map<String, dynamic>.from(cart));
+    final hasPersistedCoupon =
+        persistedCode != null || cart['applied_coupon_id'] != null;
+    if (!hasPersistedCoupon) {
+      return const StaleCartCouponCleanupResult(removed: false);
+    }
+
+    final pricingResponse = await getCartPricing();
+    final pricingResult = CartCouponResult.fromRpc(pricingResponse);
+    if (pricingResult.valid) {
+      return StaleCartCouponCleanupResult(
+        removed: false,
+        code: persistedCode,
+        amounts: pricingResult.amounts,
+      );
+    }
+
+    await _client.rpc('remove_cart_coupon', params: {'p_cart_id': cartId});
+    final refreshedAmounts = await getCartPricingAmounts();
+    return StaleCartCouponCleanupResult(
+      removed: true,
+      code: persistedCode,
+      reason: pricingResult.reason,
+      message: pricingResult.message,
+      amounts: refreshedAmounts,
+    );
   }
 
   /// Get all items in the active cart with product details
@@ -476,5 +625,9 @@ class CartService {
       total += _toInt(item['quantity']);
     }
     return total;
+  }
+
+  static void clearLocalCartCache() {
+    _cartQuantitiesLocalCache.clear();
   }
 }

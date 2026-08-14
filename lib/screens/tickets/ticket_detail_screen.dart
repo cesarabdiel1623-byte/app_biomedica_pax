@@ -1766,7 +1766,16 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem>
     final trustedAttachmentUrl = UiHelpers.sanitizeTrustedRemoteUrl(
       msg.attachmentUrl,
     );
-    final hasCaption = msg.message.isNotEmpty && msg.message != 'Envío de foto';
+    final messageText = msg.message.trim();
+    final displayMessage = messageText.isNotEmpty
+        ? messageText
+        : (msg.attachmentUrl != null
+              ? 'No se pudo cargar el adjunto.'
+              : 'Mensaje sin contenido.');
+    final hasCaption =
+        messageText.isNotEmpty &&
+        messageText != 'Envío de foto' &&
+        messageText != 'Envío de imagen';
 
     Widget timeRow({bool light = true}) {
       return Row(
@@ -1961,7 +1970,7 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem>
                     children: [
                       Expanded(
                         child: Text(
-                          msg.message,
+                          displayMessage,
                           style: TextStyle(
                             color: isMe
                                 ? Colors.white
@@ -2007,7 +2016,7 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem>
           children: [
             ?senderLabel,
             Text(
-              msg.message,
+              displayMessage,
               style: TextStyle(
                 color: isMe ? Colors.white : const Color(0xFF0F172A),
                 fontSize: 13,

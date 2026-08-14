@@ -15,7 +15,6 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
   bool _isLoading = false;
   bool _obscure1 = true;
   bool _obscure2 = true;
-  bool _passwordSaved = false;
 
   static const _primaryColor = Color(0xFF0D9488);
   static const _greyBg = Color(0xFFF8FAFC);
@@ -77,10 +76,9 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
         UserAttributes(password: _passwordController.text),
       );
 
-      setState(() {
-        _passwordSaved = true;
-        _isLoading = false;
-      });
+      if (mounted) {
+        Navigator.of(context).pop({'success': true});
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -188,9 +186,7 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
                             ),
                           ],
                         ),
-                        child: _passwordSaved
-                            ? _buildSuccessView()
-                            : _buildPasswordForm(),
+                        child: _buildPasswordForm(),
                       ),
                     ),
                   ),
@@ -339,59 +335,6 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
                     'Crear contraseña',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                   ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSuccessView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            color: _primaryColor.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.check_circle, color: _primaryColor, size: 48),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Creaste tu contraseña',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Asegúrate de recordarla, la necesitarás para ingresar a tu cuenta.',
-          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 32),
-        SizedBox(
-          height: 52,
-          child: ElevatedButton(
-            onPressed: () => Navigator.of(context).pop({'success': true}),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-            ),
-            child: const Text(
-              'Continuar',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-            ),
           ),
         ),
       ],

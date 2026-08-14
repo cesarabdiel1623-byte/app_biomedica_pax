@@ -38,14 +38,14 @@ void main() {
     expect(find.text('Ultrasonido Portátil Chison'), findsOneWidget);
 
     // 2. Verify formatted price is rendered
-    expect(find.text('\$120,000.00'), findsOneWidget);
+    expect(find.text('\$120,000 MXN'), findsOneWidget);
 
     // 3. Verify stock label
     expect(find.text('Disponible'), findsOneWidget);
   });
 
   testWidgets(
-    'ProductCard renders campaign badge from activePromotion and hides bottom discount badges',
+    'ProductCard renders active promotion price, original price and discount',
     (WidgetTester tester) async {
       final product = Product(
         id: 'prod-discount',
@@ -85,11 +85,10 @@ void main() {
       expect(find.text('BUEN FIN'), findsOneWidget);
 
       // Verify current price is rendered
-      expect(find.text('\$350.00'), findsOneWidget);
+      expect(find.text('\$350 MXN'), findsOneWidget);
 
-      // Verify old price is NOT rendered on the card (moved exclusively to product details)
-      expect(find.text('\$500.00'), findsNothing);
-      expect(find.text('30% OFF'), findsNothing);
+      expect(find.text('\$500 MXN'), findsOneWidget);
+      expect(find.text('-30%'), findsOneWidget);
     },
   );
 

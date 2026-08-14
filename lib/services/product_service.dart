@@ -57,21 +57,30 @@ class ProductService {
     sort_order
   ''';
 
+  static const publicInventoryColumns = '''
+    current_stock,
+    minimum_stock
+  ''';
+
   static const publicPromotionColumns = '''
     product_id,
+    original_price_mxn,
+    promotional_price_mxn,
     discount_type,
     discount_value,
+    computed_status,
     campaign_name,
     ends_at
   ''';
 
   /// Public product contract used by mobile screens.
-  /// Inventory internals are intentionally excluded; use availability_status.
+  /// Reads only stock counters needed by the app; Supabase remains authoritative.
   static const publicProductSelect =
       '''
     $publicProductColumns,
     product_media($publicMediaColumns),
     product_specs($publicSpecColumns),
+    product_inventory($publicInventoryColumns),
     active_product_promotions($publicPromotionColumns)
   ''';
 
@@ -198,6 +207,7 @@ class ProductService {
         .select('''$publicProductColumns,
           product_media($publicMediaColumns),
           product_specs($publicSpecColumns),
+          product_inventory($publicInventoryColumns),
           active_product_promotions!inner($publicPromotionColumns)''')
         .eq('is_active', true)
         .eq('active_product_promotions.id', promotionId)

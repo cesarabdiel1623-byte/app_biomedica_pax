@@ -148,13 +148,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       title: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            o['order_number'] ?? 'Pedido',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: kNavy,
+                          Expanded(
+                            child: Text(
+                              o['order_number'] ?? 'Pedido',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: kNavy,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,

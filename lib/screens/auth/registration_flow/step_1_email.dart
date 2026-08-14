@@ -166,6 +166,11 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                             TextField(
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
+                              maxLines: 1,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              scrollPadding: const EdgeInsets.all(20),
+                              textInputAction: TextInputAction.done,
                               decoration: InputDecoration(
                                 labelText: 'Correo electrónico',
                                 prefixIcon: const Icon(
