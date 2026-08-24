@@ -27,17 +27,26 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     _loadFavorites();
   }
 
-  Future<void> _loadFavorites() async {
-    setState(() => _loading = true);
+  Future<void> _loadFavorites({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() => _loading = true);
+    }
     try {
-      final list = await FavoriteService.getFavorites();
-      setState(() {
-        _favorites = list;
-      });
+      final results = await Future.wait([
+        FavoriteService.getFavorites().timeout(const Duration(seconds: 30)),
+        Future.delayed(const Duration(seconds: 2)),
+      ]);
+      if (mounted) {
+        setState(() {
+          _favorites = results[0] as List<Product>;
+        });
+      }
     } catch (e) {
-      print('Error al obtener favoritos: $e');
+      debugPrint('Error al obtener favoritos: $e');
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -134,9 +143,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           : _favorites.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
-              onRefresh: _loadFavorites,
+              onRefresh: () => _loadFavorites(showSpinner: false),
               color: _kPrimary,
               child: ListView.builder(
+                physics: UiHelpers.refreshScrollPhysics,
                 padding: const EdgeInsets.all(16),
                 itemCount: _favorites.length,
                 itemBuilder: (context, index) {
@@ -264,32 +274,31 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         ),
                         const SizedBox(height: 2),
                       ],
-                      // Current price + discount percentage
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            product.formattedPrice,
-                            style: const TextStyle(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF111827),
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          if (hasDiscount) ...[
-                            const SizedBox(width: 6),
-                            Text(
-                              '${product.discountPercent}% OFF',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF16A34A),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ],
+                      // Current price and discount stay on separate lines on narrow cards.
+                      Text(
+                        product.formattedPrice,
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF111827),
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      if (hasDiscount) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${product.discountPercent}% OFF',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF16A34A),
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       // Shipping Info
                       if (product.hasFreeShipping)

@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'step_1_otp.dart';
 
 class Step1EmailScreen extends StatefulWidget {
   const Step1EmailScreen({super.key});
@@ -11,48 +9,20 @@ class Step1EmailScreen extends StatefulWidget {
 
 class _Step1EmailScreenState extends State<Step1EmailScreen> {
   final _emailController = TextEditingController();
-  bool _isLoading = false;
 
   static const _primaryColor = Color(0xFF0D9488);
   static const _greyBg = Color(0xFFF8FAFC);
 
-  Future<void> _sendOTP() async {
+  void _continueWithEmail() {
     final email = _emailController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
+    if (email.isEmpty || !email.contains('@') || !email.contains('.')) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ingresa un correo electrónico válido')),
       );
       return;
     }
 
-    setState(() => _isLoading = true);
-
-    try {
-      await Supabase.instance.client.auth.signInWithOtp(
-        email: email,
-        shouldCreateUser: true,
-      );
-
-      if (mounted) {
-        final success = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(builder: (context) => Step1OtpScreen(email: email)),
-        );
-        if (success == true && mounted) {
-          Navigator.of(context).pop({'success': true, 'email': email});
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al enviar código: $e'),
-            backgroundColor: Colors.red.shade600,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    Navigator.of(context).pop({'success': true, 'email': email});
   }
 
   @override
@@ -92,7 +62,7 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                     ),
                     const Expanded(
                       child: Text(
-                        'Validar E-mail',
+                        'Ingresar E-mail',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -155,7 +125,7 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Te enviaremos un código de 6 dígitos para confirmarlo.',
+                              'Servirá como tu usuario de acceso para Go Medical.',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey.shade600,
@@ -171,6 +141,7 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                               enableSuggestions: false,
                               scrollPadding: const EdgeInsets.all(20),
                               textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _continueWithEmail(),
                               decoration: InputDecoration(
                                 labelText: 'Correo electrónico',
                                 prefixIcon: const Icon(
@@ -193,33 +164,22 @@ class _Step1EmailScreenState extends State<Step1EmailScreen> {
                             SizedBox(
                               height: 52,
                               child: ElevatedButton(
-                                onPressed: _isLoading ? null : _sendOTP,
+                                onPressed: _continueWithEmail,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _primaryColor,
                                   foregroundColor: Colors.white,
-                                  disabledBackgroundColor: _primaryColor
-                                      .withValues(alpha: 0.6),
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(30),
                                   ),
                                 ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Enviar código de confirmación',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                child: const Text(
+                                  'Continuar',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                           ],

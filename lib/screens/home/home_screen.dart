@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../auth/login_screen.dart';
 import '../../services/notification_service.dart';
-import '../tickets/tickets_list_screen.dart';
 import 'tabs/marketplace_tab.dart';
 import 'tabs/categories_tab.dart';
 import 'tabs/cart_tab.dart';
@@ -28,6 +27,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [];
   final GlobalKey<MarketplaceTabState> _marketplaceTabKey =
       GlobalKey<MarketplaceTabState>();
+  final GlobalKey<CategoriesTabState> _categoriesTabKey =
+      GlobalKey<CategoriesTabState>();
   final GlobalKey<CartTabState> _cartTabKey = GlobalKey<CartTabState>();
 
   @override
@@ -39,9 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
         key: _marketplaceTabKey,
         onInitialLoadComplete: _finishInitialLoad,
       ),
-      const CategoriesTab(),
+      CategoriesTab(key: _categoriesTabKey),
       CartTab(key: _cartTabKey),
-      const TicketsListScreen(),
       ProfileTab(onSignOut: _signOut),
     ]);
     _subscribeToNotifications();
@@ -92,10 +92,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void setTab(int index) {
     setState(() => _currentIndex = index);
-    if (index == 2) {
-      _cartTabKey.currentState?.load();
-    } else if (index == 0) {
-      _marketplaceTabKey.currentState?.load(isLiveSearch: true);
+    _reloadSelectedTab(index);
+  }
+
+  void _reloadSelectedTab(int index) {
+    if (index == 0) {
+      _marketplaceTabKey.currentState?.load(showSpinner: false);
+    } else if (index == 1) {
+      _categoriesTabKey.currentState?.reload(showSpinner: false);
+    } else if (index == 2) {
+      _cartTabKey.currentState?.load(showSpinner: false);
     }
   }
 
@@ -108,95 +114,71 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          IndexedStack(
-            index: _currentIndex,
-            children: List.generate(
-              _screens.length,
-              (index) => TickerMode(
-                enabled: _currentIndex == index,
-                child: _screens[index],
-              ),
-            ),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: List.generate(
+          _screens.length,
+          (index) => TickerMode(
+            enabled: _currentIndex == index,
+            child: _screens[index],
           ),
-          if (_initializing)
-            const Positioned.fill(
-              child: ColoredBox(
-                color: Colors.white,
-                child: Center(
-                  child: CircularProgressIndicator(color: _kPrimary),
-                ),
-              ),
-            ),
-        ],
+        ),
       ),
-      bottomNavigationBar: _initializing
-          ? null
-          : Container(
-              decoration: BoxDecoration(
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  splashColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
-                  hoverColor: Colors.transparent,
-                  focusColor: Colors.transparent,
-                ),
-                child: BottomNavigationBar(
-                  currentIndex: _currentIndex,
-                  onTap: (i) {
-                    setState(() => _currentIndex = i);
-                    if (i == 0) {
-                      _marketplaceTabKey.currentState?.load(isLiveSearch: true);
-                    } else if (i == 2) {
-                      _cartTabKey.currentState?.load();
-                    }
-                  },
-                  type: BottomNavigationBarType.fixed,
-                  selectedItemColor: _kPrimary,
-                  unselectedItemColor: Colors.grey.shade500,
-                  selectedFontSize: 11,
-                  unselectedFontSize: 10,
-                  backgroundColor: Colors.white,
-                  elevation: 0,
-                  items: const [
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.home_outlined),
-                      activeIcon: Icon(Icons.home),
-                      label: 'Inicio',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.grid_view_outlined),
-                      activeIcon: Icon(Icons.grid_view),
-                      label: 'Categorías',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.shopping_cart_outlined),
-                      activeIcon: Icon(Icons.shopping_cart),
-                      label: 'Carrito',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.support_agent_outlined),
-                      activeIcon: Icon(Icons.support_agent),
-                      label: 'Soporte',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.person_outline),
-                      activeIcon: Icon(Icons.person),
-                      label: 'Perfil',
-                    ),
-                  ],
-                ),
-              ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
             ),
+          ],
+        ),
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            focusColor: Colors.transparent,
+          ),
+          child: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (i) {
+              setState(() => _currentIndex = i);
+              _reloadSelectedTab(i);
+            },
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: _kPrimary,
+            unselectedItemColor: Colors.grey.shade500,
+            selectedFontSize: 11,
+            unselectedFontSize: 10,
+            backgroundColor: Colors.white,
+            elevation: 0,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home),
+                label: 'Inicio',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.grid_view_outlined),
+                activeIcon: Icon(Icons.grid_view),
+                label: 'Categorías',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.shopping_cart_outlined),
+                activeIcon: Icon(Icons.shopping_cart),
+                label: 'Carrito',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline),
+                activeIcon: Icon(Icons.person),
+                label: 'Perfil',
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

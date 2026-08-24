@@ -81,56 +81,54 @@ void main() {
         ),
       );
 
-      // Verify campaign badge text (rendered inside MarqueeText)
-      expect(find.text('BUEN FIN'), findsOneWidget);
+      // Verify discount badge and discount pill text
+      expect(find.text('-30%'), findsNWidgets(2));
 
       // Verify current price is rendered
       expect(find.text('\$350 MXN'), findsOneWidget);
 
       expect(find.text('\$500 MXN'), findsOneWidget);
-      expect(find.text('-30%'), findsOneWidget);
     },
   );
 
-  testWidgets(
-    'ProductCard renders MÁS VENDIDO badge and condition badge when applicable',
-    (WidgetTester tester) async {
-      // Uses salesCount: 120 which matches the real Ultrasonido animal value in the DB.
-      // The card shows MÁS VENDIDO badge when salesCount >= 50 (no activePromotion needed).
-      final product = Product(
-        id: 'prod-best',
-        sku: 'SKU-BEST',
-        name: 'Gel USG 5L',
-        category: 'consumible',
-        application: 'general',
-        unitPriceMxn: 350.00,
-        costPriceMxn: 200.00,
-        currency: 'MXN',
-        unit: 'pieza',
-        isActive: true,
-        requiresSerial: false,
-        trackInventory: true,
-        currentStock: 10,
-        minimumStock: 2,
-        createdAt: DateTime.now(),
-        salesCount: 120,
-        productCondition: 'preowned',
-      );
+  testWidgets('ProductCard renders MÁS VENDIDO badge when applicable', (
+    WidgetTester tester,
+  ) async {
+    // Uses salesCount: 120 which matches the real Ultrasonido animal value in the DB.
+    // The card shows MÁS VENDIDO badge when salesCount >= 50 (no activePromotion needed).
+    final product = Product(
+      id: 'prod-best',
+      sku: 'SKU-BEST',
+      name: 'Gel USG 5L',
+      category: 'consumible',
+      application: 'general',
+      unitPriceMxn: 350.00,
+      costPriceMxn: 200.00,
+      currency: 'MXN',
+      unit: 'pieza',
+      isActive: true,
+      requiresSerial: false,
+      trackInventory: true,
+      currentStock: 10,
+      minimumStock: 2,
+      createdAt: DateTime.now(),
+      salesCount: 120,
+      productCondition: 'preowned',
+    );
 
-      // Build the widget
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SizedBox(width: 200, child: ProductCard(product: product)),
-          ),
+    // Build the widget
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(width: 200, child: ProductCard(product: product)),
         ),
-      );
+      ),
+    );
 
-      // Verify best seller badge
-      expect(find.text('MÁS VENDIDO'), findsOneWidget);
+    // Verify best seller badge
+    expect(find.text('MÁS VENDIDO'), findsOneWidget);
 
-      // Verify condition badge
-      expect(find.text('Seminuevo'), findsOneWidget);
-    },
-  );
+    // Home cards keep the same compact product layout used by catalog cards.
+    expect(find.text('Seminuevo'), findsNothing);
+  });
 }

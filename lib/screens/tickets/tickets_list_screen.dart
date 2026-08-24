@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/service_ticket.dart';
 import '../../services/ticket_service.dart';
+import '../../services/auth_identity_service.dart';
+import '../../utils/ui_helpers.dart';
+import '../../utils/service_ticket_card_presentation.dart';
+import '../profile/maintenance_screen.dart';
 import 'ticket_detail_screen.dart';
 import '../home/widgets/staggered_fade_slide.dart';
 import '../home/home_screen.dart';
@@ -49,31 +53,61 @@ class _TicketsListScreenState extends State<TicketsListScreen>
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool showSpinner = true}) async {
     if (!mounted) return;
     setState(() {
-      if (_tickets.isEmpty) {
+      if (showSpinner) {
         _loading = true;
       }
       _error = null;
     });
     try {
-      final data = await TicketService.getMyTickets();
+      final results = await Future.wait([
+        TicketService.getMyTickets().timeout(const Duration(seconds: 30)),
+        if (showSpinner) Future.delayed(const Duration(seconds: 2)),
+      ]);
+      final data = results[0] as List<ServiceTicket>;
       if (mounted) {
         setState(() {
           _tickets = data;
           _loading = false;
+          _error = null;
         });
         for (final ticket in data) {
           TicketService.markMessagesAsDelivered(ticket.id);
         }
       }
     } catch (e) {
+      debugPrint('TicketsListScreen load failed: ${e.runtimeType}: $e');
       if (mounted) {
         setState(() {
           _error = e.toString();
           _loading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _openCreateService() async {
+    try {
+      final clientId = await AuthIdentityService.requireLinkedClientId();
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MaintenanceScreen(clientId: clientId),
+        ),
+      );
+      if (mounted) {
+        _load(showSpinner: false);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al abrir solicitud: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -119,12 +153,20 @@ class _TicketsListScreenState extends State<TicketsListScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openCreateService,
+        backgroundColor: _kPrimary,
+        foregroundColor: Colors.white,
+        elevation: 3,
+        shape: const CircleBorder(),
+        child: const Icon(Icons.add, color: Colors.white, size: 26),
+      ),
       body: Column(
         children: [
           StandardSectionHeader(
-            title: 'Mis Tickets de Servicio',
+            title: 'Servicios',
             subtitle: !_loading && _error == null
-                ? '${_tickets.length} ticket${_tickets.length != 1 ? 's' : ''} encontrado${_tickets.length != 1 ? 's' : ''}'
+                ? '${_tickets.length} servicio${_tickets.length != 1 ? 's' : ''} registrado${_tickets.length != 1 ? 's' : ''}'
                 : null,
             backgroundColor: _kPrimary,
             onBack: () {
@@ -161,7 +203,10 @@ class _TicketsListScreenState extends State<TicketsListScreen>
                   )
                 : RefreshIndicator(
                     color: _kPrimary,
-                    onRefresh: _load,
+                    backgroundColor: Colors.white,
+                    displacement: 42,
+                    triggerMode: RefreshIndicatorTriggerMode.onEdge,
+                    onRefresh: () => _load(showSpinner: false),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 350),
                       switchInCurve: Curves.easeOutCubic,
@@ -186,13 +231,13 @@ class _TicketsListScreenState extends State<TicketsListScreen>
                       child: _error != null
                           ? SingleChildScrollView(
                               key: const ValueKey('error'),
-                              physics: const AlwaysScrollableScrollPhysics(),
+                              physics: UiHelpers.refreshScrollPhysics,
                               child: _buildError(),
                             )
                           : _filtered.isEmpty
                           ? SingleChildScrollView(
                               key: const ValueKey('empty'),
-                              physics: const AlwaysScrollableScrollPhysics(),
+                              physics: UiHelpers.refreshScrollPhysics,
                               child: SizedBox(
                                 height:
                                     MediaQuery.of(context).size.height * 0.6,
@@ -201,12 +246,12 @@ class _TicketsListScreenState extends State<TicketsListScreen>
                             )
                           : ListView.builder(
                               key: ValueKey('list-$_filterStatus'),
-                              physics: const AlwaysScrollableScrollPhysics(),
+                              physics: UiHelpers.refreshScrollPhysics,
                               padding: const EdgeInsets.fromLTRB(
                                 12,
                                 12,
                                 12,
-                                20,
+                                80,
                               ),
                               itemCount: _filtered.length,
                               itemBuilder: (_, i) => StaggeredFadeSlide(
@@ -229,29 +274,54 @@ class _TicketsListScreenState extends State<TicketsListScreen>
   }
 
   Widget _buildEmpty() => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.assignment_outlined, size: 52, color: Colors.grey.shade400),
-        const SizedBox(height: 12),
-        const Text(
-          'Sin tickets en este estado',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Tus reportes de servicio aparecerán aquí.',
-          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-        ),
-      ],
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.build_circle_outlined,
+            size: 56,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Sin servicios en este estado',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Tus reportes y solicitudes de servicio aparecerán aquí.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+          const SizedBox(height: 18),
+          ElevatedButton(
+            onPressed: _openCreateService,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              elevation: 0,
+            ),
+            child: const Text(
+              'Solicitar Servicio',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 
   Widget _buildError() => LoadErrorState(
     error: _error,
     onRetry: _load,
-    genericTitle: 'Error al cargar tickets',
-    genericMessage: 'No pudimos obtener tus tickets por el momento.',
+    genericTitle: 'Error al cargar servicios',
+    genericMessage: 'No pudimos obtener tus servicios por el momento.',
   );
 }
 
@@ -268,142 +338,133 @@ class _TicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final title = serviceTicketCardTitle(ticket);
+    final preview = serviceTicketCardPreview(ticket);
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 0,
-      color: Colors.white,
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => TicketDetailScreen(ticketId: ticket.id),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    ticket.ticketNumber,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E3A5F),
-                      fontSize: 13.5,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => TicketDetailScreen(ticketId: ticket.id),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      ticket.ticketNumber,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E3A5F),
+                        fontSize: 13.5,
+                      ),
                     ),
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          ticket.statusLabel,
-                          style: TextStyle(
-                            color: color,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 3.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        ticket.statusLabel,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Badge circular translúcido de prioridad
-                      Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: priorityColor.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: priorityColor.withValues(alpha: 0.25),
-                            width: 1,
-                          ),
-                        ),
-                        child: Icon(
-                          ticket.priority == 'critical'
-                              ? Icons.gavel_rounded
-                              : ticket.priority == 'high'
-                              ? Icons.warning_amber_rounded
-                              : ticket.priority == 'medium'
-                              ? Icons.flag_rounded
-                              : Icons.info_outline_rounded,
-                          color: priorityColor,
-                          size: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                ticket.title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: Colors.black87,
+                    ),
+                  ],
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              if (ticket.description != null && ticket.description!.isNotEmpty)
+                const SizedBox(height: 8),
                 Text(
-                  ticket.description!,
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 12,
-                    height: 1.3,
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14.5,
+                    color: Color(0xFF0F172A),
+                    height: 1.25,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-              const Divider(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _metaChip(
-                    ticket.priority == 'critical'
-                        ? Icons.gavel_rounded
-                        : ticket.priority == 'high'
-                        ? Icons.warning_amber_rounded
-                        : ticket.priority == 'medium'
-                        ? Icons.flag_rounded
-                        : Icons.info_outline_rounded,
-                    'Urgencia: ${ticket.priorityLabel}',
-                    priorityColor,
-                  ),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 12,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDate(ticket.createdAt),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade400,
-                        ),
-                      ),
-                    ],
+                if (preview.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    preview,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12.5,
+                      height: 1.35,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ),
-            ],
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _metaChip(
+                      ticket.priority == 'critical'
+                          ? Icons.gavel_rounded
+                          : ticket.priority == 'high'
+                          ? Icons.warning_amber_rounded
+                          : ticket.priority == 'medium'
+                          ? Icons.flag_rounded
+                          : Icons.info_outline_rounded,
+                      'Urgencia: ${ticket.priorityLabel}',
+                      priorityColor,
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today_outlined,
+                          size: 12,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDate(ticket.createdAt),
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

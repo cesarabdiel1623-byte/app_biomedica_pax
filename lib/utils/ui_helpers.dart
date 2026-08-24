@@ -5,6 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 
 class UiHelpers {
+  static const ScrollPhysics refreshScrollPhysics =
+      AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics());
+
   static const int maxUploadImageBytes = 8 * 1024 * 1024;
   static const Set<String> allowedImageExtensions = {
     'jpg',
@@ -552,6 +555,10 @@ class UiHelpers {
     double? height,
     BoxFit fit = BoxFit.contain,
     double iconSize = 32,
+    int? cacheWidth,
+    int? cacheHeight,
+    bool gaplessPlayback = false,
+    Duration fadeInDuration = Duration.zero,
   }) {
     final trustedUrl = sanitizeTrustedRemoteUrl(url);
     if (trustedUrl == null) {
@@ -571,11 +578,27 @@ class UiHelpers {
 
     return Image.network(
       trustedUrl,
+      key: ValueKey<String>('network-image:$trustedUrl'),
       width: width,
       height: height,
       fit: fit,
-      gaplessPlayback: true,
+      cacheWidth: cacheWidth,
+      cacheHeight: cacheHeight,
+      gaplessPlayback: gaplessPlayback,
       filterQuality: FilterQuality.medium,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (frame == null || fadeInDuration == Duration.zero) {
+          return child;
+        }
+        return TweenAnimationBuilder<double>(
+          key: ValueKey<String>('network-image-fade:$trustedUrl'),
+          tween: Tween<double>(begin: 0, end: 1),
+          duration: fadeInDuration,
+          child: child,
+          builder: (context, opacity, image) =>
+              Opacity(opacity: opacity, child: image),
+        );
+      },
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
         return Container(
@@ -598,7 +621,7 @@ class UiHelpers {
           color: const Color(0xFFF1F5F9),
           child: Center(
             child: Icon(
-              Icons.medical_services_outlined,
+              Icons.image_not_supported_outlined,
               color: Colors.grey.shade300,
               size: iconSize,
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart' as google_sign_in_lib;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/registration_gate_service.dart';
 import '../../utils/constants.dart';
 import '../home/home_screen.dart';
 import 'registration_flow/registration_checklist_screen.dart';
@@ -72,10 +73,19 @@ class _LoginScreenState extends State<LoginScreen>
         password: _passwordController.text.trim(),
       );
 
+      final gateState = await RegistrationGateService.evaluateGateState();
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        if (Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => gateState == RegistrationGateState.complete
+                  ? const HomeScreen()
+                  : const RegistrationChecklistScreen(),
+            ),
+          );
+        }
       }
     } on AuthException catch (error) {
       String message = error.message;

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/product.dart';
 import '../../models/quote_item.dart';
-import '../../services/auth_identity_service.dart';
 import '../../services/quote_service.dart';
 import 'product_detail_screen.dart';
 import '../../utils/ui_helpers.dart';
@@ -30,14 +28,23 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
-    final items = await QuoteService.getQuoteItems();
-    if (mounted) {
-      setState(() {
-        _items = items;
-        _loading = false;
-      });
+  Future<void> _load({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() => _loading = true);
+    }
+    try {
+      final results = await Future.wait([
+        QuoteService.getQuoteItems().timeout(const Duration(seconds: 30)),
+        if (showSpinner) Future.delayed(const Duration(seconds: 2)),
+      ]);
+      if (mounted) {
+        setState(() {
+          _items = results[0] as List<QuoteItem>;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -228,8 +235,9 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
         Expanded(
           child: RefreshIndicator(
             color: _kPrimary,
-            onRefresh: _load,
+            onRefresh: () => _load(showSpinner: false),
             child: ListView.builder(
+              physics: UiHelpers.refreshScrollPhysics,
               padding: const EdgeInsets.all(12),
               itemCount: _items.length,
               itemBuilder: (context, index) {
@@ -460,18 +468,8 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
   }
 
   Widget _buildBottomSummary() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: SafeArea(
         child: SizedBox(
           width: double.infinity,
@@ -522,13 +520,6 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
   final _messageController = TextEditingController();
 
   bool _loading = false;
-  bool _fetchingProfile = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _prefillFromSession();
-  }
 
   @override
   void dispose() {
@@ -538,79 +529,6 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
     _companyController.dispose();
     _messageController.dispose();
     super.dispose();
-  }
-
-  Future<void> _prefillFromSession() async {
-    final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) return;
-
-    setState(() => _fetchingProfile = true);
-
-    // Initial prefill from auth metadata
-    if (mounted) {
-      _emailController.text = user.email ?? '';
-      _phoneController.text = user.phone ?? '';
-      _nameController.text =
-          user.userMetadata?['full_name'] as String? ??
-          user.userMetadata?['name'] as String? ??
-          '';
-    }
-
-    try {
-      final effectiveClientId =
-          await AuthIdentityService.requireLinkedClientId();
-
-      // 1. Fetch from clients table
-      final clientData = await client
-          .from('clients')
-          .select('contact_name, email, contact_phone, business_name')
-          .eq('id', effectiveClientId)
-          .maybeSingle();
-
-      if (clientData != null && mounted) {
-        if (clientData['contact_name'] != null &&
-            (clientData['contact_name'] as String).isNotEmpty) {
-          _nameController.text = clientData['contact_name'] as String;
-        }
-        if (clientData['email'] != null &&
-            (clientData['email'] as String).isNotEmpty) {
-          _emailController.text = clientData['email'] as String;
-        }
-        if (clientData['contact_phone'] != null &&
-            (clientData['contact_phone'] as String).isNotEmpty) {
-          _phoneController.text = clientData['contact_phone'] as String;
-        }
-        if (clientData['business_name'] != null &&
-            (clientData['business_name'] as String).isNotEmpty) {
-          _companyController.text = clientData['business_name'] as String;
-        }
-      }
-    } catch (_) {}
-
-    try {
-      // 2. Fetch from profiles table
-      final profileData = await client
-          .from('profiles')
-          .select('full_name, phone')
-          .eq('id', user.id)
-          .maybeSingle();
-
-      if (profileData != null && mounted) {
-        if (profileData['full_name'] != null &&
-            (profileData['full_name'] as String).isNotEmpty) {
-          _nameController.text = profileData['full_name'] as String;
-        }
-        if (profileData['phone'] != null &&
-            (profileData['phone'] as String).isNotEmpty) {
-          _phoneController.text = profileData['phone'] as String;
-        }
-      }
-    } catch (_) {}
-
-    if (mounted) {
-      setState(() => _fetchingProfile = false);
-    }
   }
 
   Future<void> _submit() async {
@@ -686,30 +604,6 @@ class _QuoteFormSheetState extends State<_QuoteFormSheet> {
               style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 16),
-            if (_fetchingProfile)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: _kPrimary,
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Text(
-                        'Cargando información del perfil...',
-                        style: TextStyle(fontSize: 13, color: _kNavy),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             Form(
               key: _formKey,
               child: Column(

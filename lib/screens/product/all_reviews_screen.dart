@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/review_service.dart';
+import '../../utils/ui_helpers.dart';
 import '../../widgets/review_video_tile.dart';
 
 class AllProductReviewsScreen extends StatefulWidget {
@@ -32,8 +33,10 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
     _loadReviews();
   }
 
-  Future<void> _loadReviews() async {
-    setState(() => _loading = true);
+  Future<void> _loadReviews({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() => _loading = true);
+    }
     try {
       final list = await ReviewService.getReviews(widget.productId);
       setState(() {
@@ -137,9 +140,10 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
 
                   Expanded(
                     child: RefreshIndicator(
-                      onRefresh: _loadReviews,
+                      onRefresh: () => _loadReviews(showSpinner: false),
                       color: _kPrimary,
                       child: ListView(
+                        physics: UiHelpers.refreshScrollPhysics,
                         padding: const EdgeInsets.all(16),
                         children: [
                           if (_reviews.isNotEmpty) ...[

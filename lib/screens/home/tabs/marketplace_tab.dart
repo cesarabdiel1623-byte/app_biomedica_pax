@@ -14,6 +14,7 @@ import '../../product/category_products_screen.dart';
 import '../../product/category_catalog_screen.dart';
 import '../../product/search_screen.dart';
 import '../../product/quote_cart_screen.dart';
+import '../../product/promotion_products_screen.dart';
 import '../../profile/notifications_screen.dart';
 import '../address_picker_screen.dart';
 import '../home_screen.dart';
@@ -60,7 +61,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
   bool _cardsInitialLoadDone = false;
   bool _initialLoadReported = false;
   final _searchController = TextEditingController();
-  String _searchQuery = '';
+  final String _searchQuery = '';
 
   @override
   void initState() {
@@ -138,7 +139,9 @@ class MarketplaceTabState extends State<MarketplaceTab> {
 
   Future<void> _loadCatalogCategories() async {
     try {
-      final categories = await CatalogService.getCategories();
+      final categories = await CatalogService.getCategories().timeout(
+        const Duration(seconds: 30),
+      );
       if (mounted) {
         setState(() => _catalogCategories = categories);
       }
@@ -182,12 +185,12 @@ class MarketplaceTabState extends State<MarketplaceTab> {
 
   Future<void> _refreshHome() async {
     if (_refreshingHome) return;
-    setState(() => _refreshingHome = true);
+    setState(() {
+      _refreshingHome = true;
+      _bannerRefreshToken++;
+    });
     try {
-      await Future.wait([load(isLiveSearch: true), _loadCatalogCategories()]);
-      if (mounted) {
-        setState(() => _bannerRefreshToken++);
-      }
+      await load(showSpinner: false);
     } finally {
       if (mounted) {
         setState(() => _refreshingHome = false);
@@ -195,13 +198,18 @@ class MarketplaceTabState extends State<MarketplaceTab> {
     }
   }
 
-  Future<void> load({bool isLiveSearch = false}) async {
+  Future<void> load({
+    bool isLiveSearch = false,
+    bool showSpinner = true,
+  }) async {
     try {
-      if (!isLiveSearch) {
+      if (showSpinner && !isLiveSearch) {
         setState(() {
           _loading = true;
           _error = null;
         });
+      } else if (_error != null) {
+        setState(() => _error = null);
       }
       CatalogCategory? selectedCategory;
       for (final category in _catalogCategories) {
@@ -211,27 +219,40 @@ class MarketplaceTabState extends State<MarketplaceTab> {
         }
       }
 
-      List<Product> p;
+      Future<List<Product>> fetchFuture;
       if (_searchQuery.isNotEmpty) {
-        p = await ProductService.searchProducts(_searchQuery);
-        if (_activeCategory != null) {
-          p = p.where((item) {
-            if (selectedCategory != null) {
-              return item.categoryId == selectedCategory.id ||
-                  (item.categoryId == null &&
-                      item.category == selectedCategory.productCategoryKey);
-            }
-            return item.category == _activeCategory;
-          }).toList();
-        }
+        fetchFuture = ProductService.searchProducts(_searchQuery).then((
+          products,
+        ) {
+          if (_activeCategory != null) {
+            return products.where((item) {
+              if (selectedCategory != null) {
+                return item.categoryId == selectedCategory.id ||
+                    (item.categoryId == null &&
+                        item.category == selectedCategory.productCategoryKey);
+              }
+              return item.category == _activeCategory;
+            }).toList();
+          }
+          return products;
+        });
       } else {
-        p = selectedCategory != null
-            ? await ProductService.getProductsByCatalogCategory(
+        fetchFuture = selectedCategory != null
+            ? ProductService.getProductsByCatalogCategory(
                 categoryId: selectedCategory.id,
                 legacyCategory: selectedCategory.productCategoryKey,
               )
-            : await ProductService.getAllProducts(category: _activeCategory);
+            : ProductService.getAllProducts(category: _activeCategory);
       }
+
+      final results = await Future.wait([
+        fetchFuture.timeout(const Duration(seconds: 30)),
+        _loadCatalogCategories(),
+        if (showSpinner && !isLiveSearch)
+          Future.delayed(const Duration(seconds: 3)),
+      ]);
+
+      final p = results[0] as List<Product>;
       if (!_productsInitialLoadDone && mounted) {
         await _precacheInitialProductImages(p);
       }
@@ -239,6 +260,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
         setState(() {
           _products = p;
           _loading = false;
+          _error = null;
         });
       }
     } catch (e) {
@@ -337,7 +359,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
   Widget _horizontalProductList(List<Product> list) {
     return SliverToBoxAdapter(
       child: SizedBox(
-        height: 320,
+        height: 336,
         child: ScrollConfiguration(
           behavior: MouseDragScrollBehavior(),
           child: ListView.builder(
@@ -362,9 +384,8 @@ class MarketplaceTabState extends State<MarketplaceTab> {
 
   @override
   Widget build(BuildContext context) {
-    final topInset = MediaQuery.of(context).padding.top;
     final isHomeLanding = _searchQuery.isEmpty && _activeCategory == null;
-
+    final isOffline = _error != null && UiHelpers.isNetworkError(_error);
     final promoProducts = _products.where((p) => p.hasDiscount).toList();
     final categorySections = _catalogCategories
         .map(
@@ -382,137 +403,172 @@ class MarketplaceTabState extends State<MarketplaceTab> {
         )
         .where((section) => section.products.isNotEmpty)
         .toList();
-    final showHomeModules = !_loading && !_refreshingHome && _error == null;
+
     return ColoredBox(
       color: Colors.white,
-      child: RefreshIndicator(
-        color: _kPrimary,
-        backgroundColor: Colors.white,
-        edgeOffset: topInset + 150,
-        displacement: 42,
-        triggerMode: RefreshIndicatorTriggerMode.onEdge,
-        onRefresh: _refreshHome,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(child: _header()),
-            SliverToBoxAdapter(
-              child: Offstage(
-                offstage: !showHomeModules,
-                child: ColoredBox(
-                  color: Colors.white,
-                  child: BannerCarousel(
-                    refreshToken: _bannerRefreshToken,
-                    onInitialLoadComplete: _markBannerInitialLoadDone,
-                  ),
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Offstage(
-                offstage: !showHomeModules,
-                child: ColoredBox(
-                  color: Colors.white,
-                  child: PromotionCardsSection(
-                    refreshToken: _bannerRefreshToken,
-                    onInitialLoadComplete: _markCardsInitialLoadDone,
-                  ),
-                ),
-              ),
-            ),
-            if (showHomeModules && _hasQuickCategories())
-              SliverToBoxAdapter(child: _quickCats()),
-
-            if (_refreshingHome || _loading)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _MarketplaceLoadingBody(),
-              )
-            else if (_error != null)
-              SliverFillRemaining(
-                child: LoadErrorState(
-                  error: _error,
-                  onRetry: _refreshHome,
-                  genericTitle: 'Error al cargar productos',
-                  genericMessage:
-                      'No pudimos cargar el catálogo por el momento.',
-                ),
-              )
-            else if (_products.isEmpty)
-              const SliverFillRemaining(
-                child: Center(
-                  child: Text('No hay productos en esta categoría'),
-                ),
-              )
-            else ...[
-              if (isHomeLanding) ...[
-                if (promoProducts.isNotEmpty) ...[
-                  _sectionHeader(
-                    Icons.local_offer,
-                    'Promociones del Día',
-                    const Color(0xFFEF4444),
-                    () {
-                      setState(() {
-                        _activeCategory = null;
-                        _searchQuery = '';
-                      });
-                    },
-                  ),
-                  _horizontalProductList(promoProducts),
-                ],
-
-                for (
-                  var index = 0;
-                  index < categorySections.length;
-                  index++
-                ) ...[
-                  _sectionHeader(
-                    _categoryIcon(categorySections[index].category.slug),
-                    categorySections[index].category.name,
-                    _categoryColor(index),
-                    () =>
-                        _openCategoryProducts(categorySections[index].category),
-                  ),
-                  _horizontalProductList(categorySections[index].products),
-                ],
-
-                const SliverToBoxAdapter(child: SizedBox(height: 32)),
-              ] else ...[
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: Text(
-                      _activeCategory != null
-                          ? _catLabel(_activeCategory!)
-                          : 'Resultados de búsqueda',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: _kNavy,
-                      ),
-                    ),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  sliver: SliverGrid(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisExtent: 315,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
+      child: Column(
+        children: [
+          _header(),
+          Expanded(
+            child: _loading
+                ? const _MarketplaceLoadingBody()
+                : isOffline
+                ? RefreshIndicator(
+                    color: _kPrimary,
+                    backgroundColor: Colors.white,
+                    displacement: 42,
+                    triggerMode: RefreshIndicatorTriggerMode.onEdge,
+                    onRefresh: _refreshHome,
+                    child: ListView(
+                      physics: UiHelpers.refreshScrollPhysics,
+                      children: [
+                        SizedBox(
+                          height: MediaQuery.of(context).size.height - 240,
+                          child: LoadErrorState(
+                            error: _error,
+                            onRetry: _refreshHome,
+                            genericTitle: 'Error al cargar productos',
+                            genericMessage:
+                                'No pudimos cargar el catálogo por el momento.',
+                          ),
                         ),
-                    delegate: SliverChildBuilderDelegate(
-                      (ctx, i) => ProductCard(product: _products[i]),
-                      childCount: _products.length,
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    color: _kPrimary,
+                    backgroundColor: Colors.white,
+                    displacement: 42,
+                    triggerMode: RefreshIndicatorTriggerMode.onEdge,
+                    onRefresh: _refreshHome,
+                    child: CustomScrollView(
+                      physics: UiHelpers.refreshScrollPhysics,
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: ColoredBox(
+                            color: Colors.white,
+                            child: BannerCarousel(
+                              refreshToken: _bannerRefreshToken,
+                              onInitialLoadComplete: _markBannerInitialLoadDone,
+                            ),
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: ColoredBox(
+                            color: Colors.white,
+                            child: PromotionCardsSection(
+                              refreshToken: _bannerRefreshToken,
+                              onInitialLoadComplete: _markCardsInitialLoadDone,
+                            ),
+                          ),
+                        ),
+                        if (_hasQuickCategories())
+                          SliverToBoxAdapter(child: _quickCats()),
+                        if (_error != null)
+                          SliverFillRemaining(
+                            child: LoadErrorState(
+                              error: _error,
+                              onRetry: _refreshHome,
+                              genericTitle: 'Error al cargar productos',
+                              genericMessage:
+                                  'No pudimos cargar el catálogo por el momento.',
+                            ),
+                          )
+                        else if (_products.isEmpty)
+                          const SliverFillRemaining(
+                            child: Center(
+                              child: Text('No hay productos en esta categoría'),
+                            ),
+                          )
+                        else ...[
+                          if (isHomeLanding) ...[
+                            if (promoProducts.isNotEmpty) ...[
+                              _sectionHeader(
+                                Icons.local_offer,
+                                'Promociones del Día',
+                                const Color(0xFFEF4444),
+                                () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => PromotionProductsScreen(
+                                        title: 'Promociones del Día',
+                                        initialProducts: promoProducts,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              _horizontalProductList(promoProducts),
+                            ],
+                            for (
+                              var index = 0;
+                              index < categorySections.length;
+                              index++
+                            ) ...[
+                              _sectionHeader(
+                                _categoryIcon(
+                                  categorySections[index].category.slug,
+                                ),
+                                categorySections[index].category.name,
+                                _categoryColor(index),
+                                () => _openCategoryProducts(
+                                  categorySections[index].category,
+                                ),
+                              ),
+                              _horizontalProductList(
+                                categorySections[index].products,
+                              ),
+                            ],
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 32),
+                            ),
+                          ] else ...[
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  12,
+                                  16,
+                                  8,
+                                ),
+                                child: Text(
+                                  _activeCategory != null
+                                      ? _catLabel(_activeCategory!)
+                                      : 'Resultados de búsqueda',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: _kNavy,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SliverPadding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              sliver: SliverGrid(
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      mainAxisExtent: 315,
+                                      mainAxisSpacing: 8,
+                                      crossAxisSpacing: 8,
+                                    ),
+                                delegate: SliverChildBuilderDelegate(
+                                  (ctx, i) =>
+                                      ProductCard(product: _products[i]),
+                                  childCount: _products.length,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -661,7 +717,8 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
-                        (_loading || _refreshingHome || _currentLocation == 'Selecciona tu ubicación')
+                        (_loading ||
+                                _currentLocation == 'Selecciona tu ubicación')
                             ? '¿Dónde enviamos?'
                             : _currentLocation,
                         style: const TextStyle(
@@ -763,7 +820,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
             final category = categories[index];
             final categoryKey = category.productCategoryKey;
             final active = _activeCategory == categoryKey;
-            final color = _categoryColor(_catalogCategories.indexOf(category));
+            const color = Color(0xFF9CA3AF);
             final label = category.name;
             return Padding(
               padding: EdgeInsets.only(
@@ -784,19 +841,17 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                         width: active ? 44 : 42,
                         height: active ? 44 : 42,
                         decoration: BoxDecoration(
-                          color: active
-                              ? _kPrimary
-                              : color.withValues(alpha: 0.10),
+                          color: color.withValues(alpha: active ? 0.16 : 0.10),
                           borderRadius: BorderRadius.circular(12),
-                          border: active
-                              ? null
-                              : Border.all(
-                                  color: color.withValues(alpha: 0.22),
-                                ),
+                          border: Border.all(
+                            color: color.withValues(
+                              alpha: active ? 0.38 : 0.22,
+                            ),
+                          ),
                         ),
                         child: Icon(
                           _categoryIcon(category.slug),
-                          color: active ? Colors.white : color,
+                          color: color,
                           size: 22,
                         ),
                       ),
@@ -807,7 +862,9 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: active ? _kPrimary : const Color(0xFF374151),
+                          color: active
+                              ? const Color(0xFF6B7280)
+                              : const Color(0xFF374151),
                           fontSize: 10.5,
                           fontWeight: active
                               ? FontWeight.w800
@@ -821,7 +878,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                         width: active ? 24 : 0,
                         height: 3,
                         decoration: BoxDecoration(
-                          color: active ? _kPrimary : Colors.transparent,
+                          color: active ? color : Colors.transparent,
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),

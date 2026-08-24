@@ -103,9 +103,9 @@ class _PromotionCardsSectionState extends State<PromotionCardsSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return _buildLoading();
-    if (_failed) return _buildError();
     if (_cards.isEmpty) return const SizedBox.shrink();
+    if (_loading && _cards.isEmpty) return _buildLoading();
+    if (_failed && _cards.isEmpty) return _buildError();
 
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 6),
@@ -154,9 +154,15 @@ class _PromotionCardsSectionState extends State<PromotionCardsSection> {
     final textColor = _parseColor(creative.textColor, _kNavy);
     final accent = _parseColor(creative.accentColor, _kPrimary);
     final isBackground = displayCard.assetRole?.toLowerCase() == 'background';
+    final isSquareRender = creative.isFinalRender ||
+        (displayCard.assetRole?.toLowerCase() == 'final_render');
+    final cardWidth = isSquareRender ? 184.0 : 292.0;
+    final imageFit = isSquareRender
+        ? BoxFit.cover
+        : (isBackground ? BoxFit.cover : BoxFit.contain);
 
     return SizedBox(
-      width: 292,
+      width: cardWidth,
       child: Material(
         color: background,
         clipBehavior: Clip.antiAlias,
@@ -177,7 +183,7 @@ class _PromotionCardsSectionState extends State<PromotionCardsSection> {
             children: [
               Image.network(
                 displayCard.imageUrl,
-                fit: isBackground ? BoxFit.cover : BoxFit.contain,
+                fit: imageFit,
                 filterQuality: FilterQuality.high,
                 semanticLabel: creative.selectedAsset?.altText,
                 loadingBuilder: (context, child, progress) {

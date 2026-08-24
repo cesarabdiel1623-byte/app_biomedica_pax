@@ -70,14 +70,17 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
   Future<void> _savePassword() async {
     if (!_allValid) return;
 
+    final password = _passwordController.text;
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(password: _passwordController.text),
-      );
+      if (Supabase.instance.client.auth.currentUser != null) {
+        await Supabase.instance.client.auth.updateUser(
+          UserAttributes(password: password),
+        );
+      }
 
       if (mounted) {
-        Navigator.of(context).pop({'success': true});
+        Navigator.of(context).pop({'success': true, 'password': password});
       }
     } catch (e) {
       if (mounted) {
@@ -88,6 +91,7 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
           ),
         );
       }
+    } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }

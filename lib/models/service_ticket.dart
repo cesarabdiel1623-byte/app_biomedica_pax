@@ -1,3 +1,5 @@
+import '../utils/service_ticket_type.dart';
+
 class ServiceTicket {
   final String id;
   final String ticketNumber;
@@ -29,6 +31,14 @@ class ServiceTicket {
   final String? serviceLocation;
   final String? errorCode;
   final String? productId;
+  final String? equipmentBrand;
+  final String? equipmentModel;
+  final String? serialNumber;
+  final String? institution;
+  final String? department;
+  final String? equipmentOperating;
+  final String? failureDescription;
+  final Map<String, dynamic>? intakeDetails;
 
   // Relations (loaded via join)
   final String? clientName;
@@ -63,6 +73,14 @@ class ServiceTicket {
     this.serviceLocation,
     this.errorCode,
     this.productId,
+    this.equipmentBrand,
+    this.equipmentModel,
+    this.serialNumber,
+    this.institution,
+    this.department,
+    this.equipmentOperating,
+    this.failureDescription,
+    this.intakeDetails,
     this.clientName,
     this.equipmentName,
   });
@@ -75,8 +93,10 @@ class ServiceTicket {
       clientName = c['business_name'] as String? ?? c['trade_name'] as String?;
     }
 
-    // equipment_units no se hace join (schema variable); se muestra el ID si existe
-    final String? equipmentName = null;
+    final rawIntakeDetails = json['intake_details'];
+    final intakeDetails = rawIntakeDetails is Map
+        ? Map<String, dynamic>.from(rawIntakeDetails)
+        : null;
 
     return ServiceTicket(
       id: json['id'] as String,
@@ -116,8 +136,16 @@ class ServiceTicket {
       serviceLocation: json['service_location'] as String?,
       errorCode: json['error_code'] as String?,
       productId: json['product_id'] as String?,
+      equipmentBrand: json['equipment_brand'] as String?,
+      equipmentModel: json['equipment_model'] as String?,
+      serialNumber: json['serial_number'] as String?,
+      institution: json['institution'] as String?,
+      department: json['department'] as String?,
+      equipmentOperating: _parseEquipmentOperating(json['equipment_operating']),
+      failureDescription: json['failure_description'] as String?,
+      intakeDetails: intakeDetails,
       clientName: clientName,
-      equipmentName: equipmentName,
+      equipmentName: json['equipment_name'] as String?,
     );
   }
 
@@ -155,27 +183,43 @@ class ServiceTicket {
   }
 
   String get typeLabel {
-    final normalizedTitle = title.toLowerCase();
-    if (normalizedTitle.startsWith('reparación:')) {
-      return 'Reparación';
-    }
-    if (normalizedTitle.startsWith('soporte técnico:')) {
-      return 'Soporte técnico';
-    }
+    return ServiceTicketType.label(type, title: title);
+  }
 
-    switch (type) {
-      case 'correctivo':
-        return 'Correctivo';
-      case 'preventivo':
-        return 'Preventivo';
-      case 'instalacion':
-        return 'Instalación';
-      case 'garantia':
-        return 'Garantía';
-      case 'otro':
-        return 'Otro';
+  String? get equipmentSummary {
+    if (equipmentName != null && equipmentName!.trim().isNotEmpty) {
+      return equipmentName!.trim();
+    }
+    final parts = [equipmentBrand, equipmentModel]
+        .whereType<String>()
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (parts.isNotEmpty) {
+      return parts.join(' ');
+    }
+    return title.trim().isNotEmpty ? title.trim() : null;
+  }
+
+  static String? _parseEquipmentOperating(dynamic value) {
+    if (value == null) return null;
+    if (value is bool) return value ? 'Sí' : 'No';
+    final text = value.toString().trim();
+    if (text.isEmpty) return null;
+    switch (text.toLowerCase()) {
+      case 'true':
+      case 't':
+      case '1':
+      case 'si':
+      case 'sí':
+        return 'Sí';
+      case 'false':
+      case 'f':
+      case '0':
+      case 'no':
+        return 'No';
       default:
-        return type;
+        return text;
     }
   }
 }

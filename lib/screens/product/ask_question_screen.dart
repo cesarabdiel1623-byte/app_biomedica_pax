@@ -209,10 +209,7 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.5,
-                          ),
+                          child: CircularProgressIndicator(color: Colors.white),
                         )
                       : const Text(
                           'Enviar pregunta',

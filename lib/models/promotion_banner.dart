@@ -129,6 +129,8 @@ class PromotionBanner {
   final List<PromotionBannerAsset> assets;
 
   factory PromotionBanner.fromJson(Map<String, dynamic> json) {
+    final layoutConfig = _asMap(json['layout_config']);
+    final ctaConfig = _asMap(layoutConfig?['cta']);
     return PromotionBanner(
       creativeId: (json['creative_id'] ?? json['id'] ?? '').toString(),
       productPromotionId: json['product_promotion_id'] as String?,
@@ -140,8 +142,28 @@ class PromotionBanner {
       subheadline: json['subheadline'] as String?,
       badgeText: json['badge_text'] as String?,
       ctaText: json['cta_text'] as String?,
-      ctaAction: json['cta_action'] as String?,
-      ctaTarget: json['cta_target']?.toString(),
+      ctaAction: _firstString([
+        json['cta_action'],
+        json['action_type'],
+        ctaConfig?['action'],
+        ctaConfig?['route'],
+        ctaConfig?['target_type'],
+      ]),
+      ctaTarget: _firstString([
+        json['cta_target'],
+        json['action_target_id'],
+        json['target_id'],
+        json['destination_id'],
+        ctaConfig?['target_id'],
+        ctaConfig?['target'],
+        ctaConfig?['route_target'],
+        ctaConfig?['subcategory_id'],
+        ctaConfig?['category_id'],
+        ctaConfig?['product_id'],
+        ctaConfig?['promotion_id'],
+        json['action_url'],
+        json['destination_url'],
+      ]),
       priority: (json['priority'] as num?)?.toInt() ?? 0,
       productId: json['product_id'] as String?,
       promotionId: json['promotion_id'] as String?,
@@ -161,7 +183,7 @@ class PromotionBanner {
       secondaryColor: json['secondary_color'] as String?,
       textColor: json['text_color'] as String?,
       accentColor: json['accent_color'] as String?,
-      layoutConfig: _asMap(json['layout_config']),
+      layoutConfig: layoutConfig,
       assets: _parseAssets(json['assets']),
     );
   }
@@ -188,10 +210,26 @@ class PromotionBanner {
   }
 
   bool get isFinalRender {
-    final role = selectedAsset?.role?.toLowerCase();
-    return role == 'final_render' ||
-        rendererType?.toLowerCase() == 'raster' ||
-        rendererType?.toLowerCase() == 'final_render';
+    return _isFinalImageToken(selectedAsset?.role) ||
+        _isFinalImageToken(rendererType);
+  }
+
+  bool get isHeroBanner => placement?.trim().toLowerCase() == 'hero_banner';
+
+  bool get isManualFinalHeroRender {
+    if (!isHeroBanner) return false;
+    return isFinalRender || _isFinalImageToken(designMode);
+  }
+
+  static bool _isFinalImageToken(String? value) {
+    final token = value?.trim().toLowerCase();
+    return token == 'final_render' ||
+        token == 'manual' ||
+        token == 'manual_upload' ||
+        token == 'image' ||
+        token == 'final_image' ||
+        token == 'uploaded_image' ||
+        token == 'raster';
   }
 
   static int _deviceRank(String? scope) {
@@ -210,6 +248,12 @@ class PromotionBanner {
   static int _roleRank(String? role) {
     switch (role?.toLowerCase()) {
       case 'final_render':
+      case 'manual':
+      case 'manual_upload':
+      case 'image':
+      case 'final_image':
+      case 'uploaded_image':
+      case 'raster':
         return 0;
       case 'background':
         return 1;
@@ -274,6 +318,14 @@ class PromotionBanner {
   static double? _asDouble(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '');
+  }
+
+  static String? _firstString(Iterable<dynamic> values) {
+    for (final value in values) {
+      final text = value?.toString().trim();
+      if (text != null && text.isNotEmpty) return text;
+    }
+    return null;
   }
 }
 

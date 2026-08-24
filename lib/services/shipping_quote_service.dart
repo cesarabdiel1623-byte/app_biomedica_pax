@@ -87,10 +87,17 @@ class ShippingQuoteResult {
           (json['cheapest_valid_rate_total'] as num?)?.toDouble() ?? 0.0,
       quotationId: json['quotation_id']?.toString() ?? '',
       rates: rawRates
-          .whereType<Map<String, dynamic>>()
-          .map(ShippingRate.fromJson)
+          .whereType<Map>()
+          .map((rate) => ShippingRate.fromJson(Map<String, dynamic>.from(rate)))
           .toList(),
     );
+  }
+
+  bool get isStillProcessing {
+    final normalizedError = error?.toLowerCase();
+    final normalizedMessage = message?.toLowerCase() ?? '';
+    return normalizedError == 'quotation_still_processing' ||
+        normalizedMessage.contains('procesando');
   }
 }
 
@@ -101,28 +108,59 @@ class ShippingQuoteService {
     required String cartId,
     String? addressId,
   }) async {
-    final response = await _supabase.functions.invoke(
-      'skydropx-mobile-quote',
-      body: {
-        'cart_id': cartId,
-        if (addressId != null && addressId.isNotEmpty) 'address_id': addressId,
-      },
-    );
-
-    if (response.status >= 400 && response.data is Map<String, dynamic>) {
-      return ShippingQuoteResult.fromJson(
-        response.data as Map<String, dynamic>,
+    try {
+      final response = await _supabase.functions.invoke(
+        'skydropx-mobile-quote',
+        body: {
+          'cart_id': cartId,
+          if (addressId != null && addressId.isNotEmpty)
+            'address_id': addressId,
+        },
       );
+
+      final responseData = _asStringMap(response.data);
+      if (responseData != null) {
+        return ShippingQuoteResult.fromJson(responseData);
+      }
+
+      throw Exception(
+        'Error al comunicarse con el servicio de cotización de envío.',
+      );
+    } catch (error) {
+      final details = _extractFunctionDetails(error);
+      if (details != null) {
+        return ShippingQuoteResult.fromJson(details);
+      }
+
+      throw Exception(_friendlyMessageFromError(error));
+    }
+  }
+
+  static Map<String, dynamic>? _asStringMap(Object? data) {
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+    return null;
+  }
+
+  static Map<String, dynamic>? _extractFunctionDetails(Object error) {
+    try {
+      final details = (error as dynamic).details;
+      return _asStringMap(details);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _friendlyMessageFromError(Object error) {
+    final text = error.toString().toLowerCase();
+    if (text.contains('socketexception') ||
+        text.contains('clientexception') ||
+        text.contains('network') ||
+        text.contains('timeout')) {
+      return 'No se pudo cotizar el envío. Revisa tu conexión e intenta nuevamente.';
     }
 
-    if (response.data is Map<String, dynamic>) {
-      return ShippingQuoteResult.fromJson(
-        response.data as Map<String, dynamic>,
-      );
-    }
-
-    throw Exception(
-      'Error al comunicarse con el servicio de cotización de envío.',
-    );
+    return 'No se pudo cotizar el envío. Intenta nuevamente.';
   }
 }

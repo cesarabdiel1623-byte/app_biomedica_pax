@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/catalog_category.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
+import '../../utils/ui_helpers.dart';
 import '../../widgets/load_error_state.dart';
 import '../home/widgets/product_card.dart';
 
@@ -29,17 +30,25 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
     _loadProducts();
   }
 
-  Future<void> _loadProducts() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadProducts({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    } else {
+      setState(() => _error = null);
+    }
 
     try {
-      final products = await ProductService.getProductsByCatalogCategory(
-        categoryId: widget.category.id,
-        legacyCategory: widget.category.productCategoryKey,
-      );
+      final results = await Future.wait([
+        ProductService.getProductsByCatalogCategory(
+          categoryId: widget.category.id,
+          legacyCategory: widget.category.productCategoryKey,
+        ).timeout(const Duration(seconds: 30)),
+        if (showSpinner) Future.delayed(const Duration(seconds: 2)),
+      ]);
+      final products = results[0] as List<Product>;
       if (!mounted) return;
       setState(() {
         _products = products;
@@ -68,17 +77,12 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
           tooltip: 'Regresar',
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: _loading
-            ? const SizedBox.shrink()
-            : Text(
-                widget.category.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+        title: Text(
+          widget.category.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
       ),
       body: _buildBody(),
     );
@@ -86,7 +90,10 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _kPrimary));
+      return const ColoredBox(
+        color: Colors.white,
+        child: Center(child: CircularProgressIndicator(color: _kPrimary)),
+      );
     }
 
     if (_error != null) {
@@ -101,9 +108,12 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
     if (_products.isEmpty) {
       return RefreshIndicator(
         color: _kPrimary,
-        onRefresh: _loadProducts,
+        backgroundColor: Colors.white,
+        displacement: 42,
+        triggerMode: RefreshIndicatorTriggerMode.onEdge,
+        onRefresh: () => _loadProducts(showSpinner: false),
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: UiHelpers.refreshScrollPhysics,
           children: [
             SizedBox(height: MediaQuery.sizeOf(context).height * 0.22),
             Icon(
@@ -135,9 +145,12 @@ class _CategoryCatalogScreenState extends State<CategoryCatalogScreen> {
     final sections = _buildSections();
     return RefreshIndicator(
       color: _kPrimary,
-      onRefresh: _loadProducts,
+      backgroundColor: Colors.white,
+      displacement: 42,
+      triggerMode: RefreshIndicatorTriggerMode.onEdge,
+      onRefresh: () => _loadProducts(showSpinner: false),
       child: ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: UiHelpers.refreshScrollPhysics,
         padding: const EdgeInsets.only(top: 8, bottom: 24),
         itemCount: sections.length,
         itemBuilder: (context, index) => _ProductSection(

@@ -64,59 +64,68 @@ void main() {
       expect(fulfillment, contains('.not("skydropx_shipment_id", "is", null)'));
     });
 
+    final sharedOrigin = File(
+      'supabase/functions/_shared/skydropx_shipping_origin.ts',
+    ).readAsStringSync();
+    final mobileQuote = File(
+      'supabase/functions/skydropx-mobile-quote/index.ts',
+    ).readAsStringSync();
+
     test('auto advance is enabled only for sandbox', () {
       expect(fulfillment, contains('environment === "sandbox"'));
       expect(fulfillment, contains('auto_advance: autoAdvance'));
     });
 
     test(
-      'shipping origin comes from warehouses with sandbox-only fallback',
+      'shipping origin comes from warehouses in production with sandbox preset fallback',
       () {
-        expect(fulfillment, contains('.from("warehouses")'));
-        expect(fulfillment, contains('.eq("is_active", true)'));
-        expect(fulfillment, contains('.eq("is_shipping_origin", true)'));
-        expect(fulfillment, contains('warehouses.length === 0'));
-        expect(fulfillment, contains('environment === "sandbox"'));
-        expect(fulfillment, contains('SKYDROPX_SANDBOX_ORIGIN_JSON'));
-        expect(fulfillment, contains('skydropx_origin_not_configured'));
-        expect(fulfillment, contains('multiple_shipping_origins'));
-        expect(fulfillment, contains('invalid_shipping_origin'));
-        expect(fulfillment, isNot(contains('97392')));
+        expect(fulfillment, contains('resolveShippingOrigin(adminClient, environment)'));
+        expect(mobileQuote, contains('resolveShippingOrigin(adminClient, environment)'));
+        expect(sharedOrigin, contains('.from("warehouses")'));
+        expect(sharedOrigin, contains('.eq("is_active", true)'));
+        expect(sharedOrigin, contains('.eq("is_shipping_origin", true)'));
+        expect(sharedOrigin, contains('warehouses.length === 0'));
+        expect(sharedOrigin, contains('env === "sandbox"'));
+        expect(sharedOrigin, contains('SKYDROPX_SANDBOX_ORIGIN_JSON'));
+        expect(sharedOrigin, contains('skydropx_origin_not_configured'));
+        expect(sharedOrigin, contains('multiple_shipping_origins'));
+        expect(sharedOrigin, contains('invalid_shipping_origin'));
+        expect(sharedOrigin, contains('SKYDROPX_SANDBOX_TEST_ORIGIN'));
       },
     );
 
     test('warehouse fields are mapped to SkyDropX address_from', () {
-      expect(fulfillment, contains('mapWarehouseToOrigin'));
+      expect(sharedOrigin, contains('mapWarehouseToOrigin'));
       expect(
-        fulfillment,
+        sharedOrigin,
         contains('country_code: getString(warehouse, "country_code")'),
       );
       expect(
-        fulfillment,
+        sharedOrigin,
         contains('postal_code: getString(warehouse, "postal_code")'),
       );
       expect(
-        fulfillment,
+        sharedOrigin,
         contains('area_level1: getString(warehouse, "state")'),
       );
       expect(
-        fulfillment,
+        sharedOrigin,
         contains('area_level2: getString(warehouse, "city")'),
       );
       expect(
-        fulfillment,
+        sharedOrigin,
         contains('area_level3: getString(warehouse, "neighborhood")'),
       );
       expect(
-        fulfillment,
+        sharedOrigin,
         contains('name: getString(warehouse, "contact_name")'),
       );
-      expect(fulfillment, contains('street1: getString(warehouse, "street1")'));
-      expect(fulfillment, contains('company: getString(warehouse, "company")'));
-      expect(fulfillment, contains('phone: getString(warehouse, "phone")'));
-      expect(fulfillment, contains('email: getString(warehouse, "email")'));
+      expect(sharedOrigin, contains('street1: getString(warehouse, "street1")'));
+      expect(sharedOrigin, contains('company: getString(warehouse, "company")'));
+      expect(sharedOrigin, contains('phone: getString(warehouse, "phone")'));
+      expect(sharedOrigin, contains('email: getString(warehouse, "email")'));
       expect(
-        fulfillment,
+        sharedOrigin,
         contains('reference: getString(warehouse, "reference")'),
       );
     });
@@ -970,7 +979,7 @@ void main() {
       expect(fulfillment, contains('decodeBase64UrlJson(parts[1])'));
       expect(
         fulfillment,
-        contains('const jwtRole = getJwtRoleFromBearerToken(bearerToken)'),
+        contains('const jwtRole = getJwtRoleFromBearerToken(token)'),
       );
       expect(fulfillment, contains('jwtRole !== "service_role"'));
       expect(
@@ -1102,70 +1111,37 @@ void main() {
       },
     );
 
-    test('payment paths trigger fulfillment after approved reconciliation', () {
-      expect(mpWebhook, contains('triggerPaidOrderFulfillment'));
-      expect(verifyPayment, contains('triggerPaidOrderFulfillment'));
-      expect(mpWebhook, contains('reconciledPaymentStatus === "approved"'));
-      expect(verifyPayment, contains('reconciledPaymentStatus === "approved"'));
+    test('payment reconciliation enqueues outbox job and avoids direct webhook race condition', () {
+      final newMigration = File(
+        'supabase/migrations/20260821120000_fix_physical_checkout_ttl_and_post_payment_finalization.sql',
+      ).readAsStringSync();
+      expect(newMigration, contains('order_fulfillment_jobs'));
+      expect(newMigration, contains("INSERT INTO public.order_fulfillment_jobs"));
+      expect(mpWebhook, isNot(contains('triggerPaidOrderFulfillment')));
+      expect(verifyPayment, isNot(contains('triggerPaidOrderFulfillment')));
     });
 
     test(
-      'Mercado Pago webhook accepts status or payment_status from reconciliation RPC',
+      'Mercado Pago webhook reconciles payment safely via RPC',
       () {
-        expect(mpWebhook, contains('function getReconciledPaymentStatus'));
-        expect(
-          mpWebhook,
-          contains(
-            'getString(result, "payment_status") ?? getString(result, "status")',
-          ),
-        );
-        expect(
-          mpWebhook,
-          contains(
-            'const reconciledPaymentStatus = getReconciledPaymentStatus(reconciliationResult)',
-          ),
-        );
-        expect(mpWebhook, contains('reconciledPaymentStatus === "approved"'));
-        expect(mpWebhook, contains('isUuidLike(reconciledOrderId)'));
+        expect(mpWebhook, contains('reconcile_mercado_pago_payment'));
+        expect(mpWebhook, contains('p_payment_id: String(payment.id)'));
+        expect(mpWebhook, contains('p_external_reference: payment.external_reference.trim()'));
       },
     );
 
     test(
-      'approved idempotent reconciliation is allowed to trigger fulfillment',
+      'approved reconciliation enqueues outbox job instead of direct webhook fulfillment',
       () {
-        final triggerStart = mpWebhook.indexOf(
-          'if (\n'
-          '      reconciledOrderId &&',
-        );
-        expect(triggerStart, isNonNegative);
-        final triggerEnd = mpWebhook.indexOf(
-          'return jsonResponse({ received: true, reconciled: true });',
-          triggerStart,
-        );
-        expect(triggerEnd, isNonNegative);
-        final triggerBlock = mpWebhook.substring(triggerStart, triggerEnd);
-
-        expect(
-          triggerBlock,
-          contains('reconciledPaymentStatus === "approved"'),
-        );
-        expect(triggerBlock, contains('triggerPaidOrderFulfillment'));
-        expect(triggerBlock, isNot(contains('idempotent')));
-        expect(triggerBlock, isNot(contains('duplicate_approved')));
+        expect(mpWebhook, contains('reconcile_mercado_pago_payment'));
+        expect(mpWebhook, isNot(contains('triggerPaidOrderFulfillment')));
       },
     );
 
-    test('non-approved reconciliation statuses do not trigger fulfillment', () {
-      expect(
-        mpWebhook,
-        isNot(contains('reconciledPaymentStatus !== "rejected"')),
-      );
-      expect(
-        mpWebhook,
-        isNot(contains('reconciledPaymentStatus !== "pending"')),
-      );
-      expect(mpWebhook, contains('reconciledPaymentStatus === "approved"'));
+    test('verify payment uses reconciliation result and avoids direct fulfillment', () {
+      expect(verifyPayment, contains('reconcile_mercado_pago_payment'));
       expect(verifyPayment, contains('reconciledPaymentStatus === "approved"'));
+      expect(verifyPayment, isNot(contains('triggerPaidOrderFulfillment')));
     });
 
     test('verify payment uses the same reconciliation result contract', () {
@@ -1321,6 +1297,138 @@ void main() {
           'GRANT EXECUTE ON FUNCTION public.apply_paid_order_post_payment(uuid) TO service_role',
         ),
       );
+    });
+
+    group('H6B SkyDropX rate diagnostics and classification', () {
+      test('fulfillment contains sanitized rate diagnostics logging', () {
+        expect(fulfillment, contains('function diagnoseQuotationRates'));
+        expect(fulfillment, contains('event: "skydropx_rate_diagnostics"'));
+        expect(fulfillment, contains('raw_rate_count'));
+        expect(fulfillment, contains('allowed_rate_count'));
+        expect(fulfillment, contains('reason_classification'));
+        expect(fulfillment, contains('normalized_carrier'));
+        expect(fulfillment, contains('allowed_carrier'));
+      });
+
+      test('diagnostics classifies all 4 failure scenarios and success safely', () {
+        expect(fulfillment, contains('"SKYDROPX_ZERO_RATES"'));
+        expect(fulfillment, contains('"ONLY_DISALLOWED_CARRIERS"'));
+        expect(fulfillment, contains('"NO_COVERAGE_RATES"'));
+        expect(fulfillment, contains('"ALLOWED_RATE_FILTER_BUG"'));
+        expect(fulfillment, contains('"VALID_RATES_FOUND"'));
+      });
+
+      test('diagnostics does not leak customer PII or secrets into log object', () {
+        final diagStart = fulfillment.indexOf('function diagnoseQuotationRates');
+        expect(diagStart, isNonNegative);
+        final diagEnd = fulfillment.indexOf('function extractValidRates', diagStart);
+        expect(diagEnd, isNonNegative);
+        final diagBlock = fulfillment.substring(diagStart, diagEnd);
+
+        expect(diagBlock, isNot(contains('client_name')));
+        expect(diagBlock, isNot(contains('lead_name')));
+        expect(diagBlock, isNot(contains('street')));
+        expect(diagBlock, isNot(contains('colonia')));
+        expect(diagBlock, isNot(contains('email')));
+        expect(diagBlock, isNot(contains('phone')));
+        expect(diagBlock, isNot(contains('Authorization')));
+        expect(diagBlock, isNot(contains('apikey')));
+        expect(diagBlock, isNot(contains('service_role')));
+      });
+
+      test('carrier whitelist remains unchanged in fulfillment', () {
+        expect(fulfillment, contains(r'{ normalized: "FedEx", regex: /(?:^|[^a-z0-9])fedex(?:[^a-z0-9]|$)/i }'));
+        expect(fulfillment, contains(r'{ normalized: "DHL", regex: /(?:^|[^a-z0-9])dhl(?:[^a-z0-9]|$)/i }'));
+        expect(fulfillment, contains(r'{ normalized: "Estafeta", regex: /(?:^|[^a-z0-9])estafeta(?:[^a-z0-9]|$)/i }'));
+        expect(fulfillment, contains('{ normalized: "Paquetexpress"'));
+      });
+    });
+
+    group('H7 SkyDropX origin resolution parity between checkout and fulfillment', () {
+      test('both checkout and fulfillment import shared resolveShippingOrigin and resolveSkydropxEnvironment', () {
+        expect(mobileQuote, contains('import {'));
+        expect(mobileQuote, contains('resolveShippingOrigin,'));
+        expect(mobileQuote, contains('resolveSkydropxEnvironment,'));
+        expect(mobileQuote, contains('} from "../_shared/skydropx_shipping_origin.ts"'));
+
+        expect(fulfillment, contains('import {'));
+        expect(fulfillment, contains('resolveShippingOrigin,'));
+        expect(fulfillment, contains('resolveSkydropxEnvironment,'));
+        expect(fulfillment, contains('} from "../_shared/skydropx_shipping_origin.ts"'));
+      });
+
+      test('environment resolution is strictly fail-closed with zero silent fallback', () {
+        expect(sharedOrigin, contains('function resolveSkydropxEnvironment'));
+        expect(sharedOrigin, contains('if (normalized === "sandbox") return "sandbox";'));
+        expect(sharedOrigin, contains('if (normalized === "production") return "production";'));
+        expect(sharedOrigin, isNot(contains('"prod"')));
+        expect(sharedOrigin, isNot(contains("'prod'")));
+        expect(sharedOrigin, contains('throw new Error("skydropx_environment_not_configured")'));
+        expect(sharedOrigin, contains('throw new Error("invalid_skydropx_environment")'));
+
+        expect(mobileQuote, isNot(contains(r'|| "sandbox"')));
+        expect(mobileQuote, isNot(contains("|| 'sandbox'")));
+        expect(fulfillment, isNot(contains(r'|| "sandbox"')));
+        expect(fulfillment, isNot(contains("|| 'sandbox'")));
+      });
+
+      test('sandbox environment uses identical preset origin 97392 for both', () {
+        expect(sharedOrigin, contains('postal_code: "97392"'));
+        expect(sharedOrigin, contains('area_level1: "Yucatán"'));
+        expect(sharedOrigin, contains('area_level2: "Umán"'));
+        expect(sharedOrigin, contains('area_level3: "Piedra de Agua"'));
+        expect(sharedOrigin, contains('country_code: "MX"'));
+      });
+
+      test('production environment uses active shipping origin warehouse only', () {
+        expect(sharedOrigin, contains('env === "production"'));
+        expect(sharedOrigin, contains('.from("warehouses")'));
+        expect(sharedOrigin, contains('.eq("is_active", true)'));
+        expect(sharedOrigin, contains('.eq("is_shipping_origin", true)'));
+        expect(sharedOrigin, contains('throw new Error("shipping_origin_not_configured")'));
+        expect(sharedOrigin, contains('throw new Error("multiple_shipping_origins")'));
+      });
+
+      test('production environment does not fallback to sandbox origin', () {
+        final prodBranchStart = sharedOrigin.indexOf('env === "production"');
+        expect(prodBranchStart, isNonNegative);
+        final prodBranch = sharedOrigin.substring(prodBranchStart);
+
+        expect(prodBranch, isNot(contains('loadSandboxOrigin')));
+        expect(prodBranch, isNot(contains('SKYDROPX_SANDBOX_TEST_ORIGIN')));
+      });
+
+      test('invalid environment fails closed', () {
+        expect(sharedOrigin, contains('throw new Error("invalid_skydropx_environment")'));
+      });
+    });
+
+    group('H8 SkyDropX carrier, service_name, tracking and label persistence', () {
+      final webhookMigration = File(
+        'supabase/migrations/20260822160000_update_shipment_webhook_tracking_persistence.sql',
+      ).readAsStringSync();
+
+      test('fulfillment falls back to refreshedRate carrier and service_name', () {
+        expect(
+          fulfillment,
+          contains('p_carrier: getString(sanitized, "carrier") ?? refreshedRate.rate.carrier'),
+        );
+        expect(
+          fulfillment,
+          contains('p_service_name: getString(sanitized, "service_name") ?? refreshedRate.rate.service'),
+        );
+      });
+
+      test('webhook passes tracking_url and label_url to record_skydropx_shipment_event', () {
+        expect(webhook, contains('p_tracking_url: fields.trackingUrl'));
+        expect(webhook, contains('p_label_url: fields.labelUrl'));
+      });
+
+      test('record_skydropx_shipment_event updates tracking_number, tracking_url and label_url', () {
+        expect(webhookMigration, contains('tracking_number = COALESCE(NULLIF(btrim(p_tracking_number), \'\'), tracking_number)'));
+        expect(webhookMigration, contains('tracking_url = COALESCE(NULLIF(btrim(p_tracking_url), \'\'), tracking_url)'));
+        expect(webhookMigration, contains('label_url = COALESCE(NULLIF(btrim(p_label_url), \'\'), label_url)'));
+      });
     });
   });
 }

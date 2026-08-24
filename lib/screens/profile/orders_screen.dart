@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_helpers.dart';
 import 'order_detail_screen.dart';
+import '../../utils/ui_helpers.dart';
 import '../../widgets/load_error_state.dart';
 
 class OrdersScreen extends StatefulWidget {
@@ -23,20 +24,24 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _loadOrders();
   }
 
-  Future<void> _loadOrders() async {
+  Future<void> _loadOrders({bool showSpinner = true}) async {
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
-      final response = await Supabase.instance.client
-          .from('orders')
-          .select('*')
-          .eq('client_id', widget.clientId)
-          .order('created_at', ascending: false);
+      final results = await Future.wait([
+        Supabase.instance.client
+            .from('orders')
+            .select('*')
+            .eq('client_id', widget.clientId)
+            .order('created_at', ascending: false)
+            .timeout(const Duration(seconds: 30)),
+        if (showSpinner) Future.delayed(const Duration(seconds: 2)),
+      ]);
       if (mounted) {
         setState(() {
-          _orders = response as List;
+          _orders = results[0] as List;
           _loading = false;
         });
       }
@@ -107,22 +112,43 @@ class _OrdersScreenState extends State<OrdersScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: kPrimary))
           : _error != null
-          ? LoadErrorState(
-              error: _error,
-              onRetry: _loadOrders,
-              genericTitle: 'Error al cargar pedidos',
-              genericMessage: 'No pudimos cargar tus pedidos por el momento.',
+          ? RefreshIndicator(
+              color: kPrimary,
+              backgroundColor: Colors.white,
+              displacement: 42,
+              triggerMode: RefreshIndicatorTriggerMode.onEdge,
+              onRefresh: () => _loadOrders(showSpinner: false),
+              child: ListView(
+                physics: UiHelpers.refreshScrollPhysics,
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height - 200,
+                    child: LoadErrorState(
+                      error: _error,
+                      onRetry: _loadOrders,
+                      genericTitle: 'Error al cargar pedidos',
+                      genericMessage:
+                          'No pudimos cargar tus pedidos por el momento.',
+                    ),
+                  ),
+                ],
+              ),
             )
           : _orders.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
               color: kPrimary,
-              onRefresh: _loadOrders,
+              backgroundColor: Colors.white,
+              displacement: 42,
+              triggerMode: RefreshIndicatorTriggerMode.onEdge,
+              onRefresh: () => _loadOrders(showSpinner: false),
               child: ListView.builder(
+                physics: UiHelpers.refreshScrollPhysics,
                 padding: const EdgeInsets.all(12),
                 itemCount: _orders.length,
                 itemBuilder: (context, i) {
                   final o = _orders[i];
+                  final status = o['status']?.toString() ?? '';
                   final total = (o['total'] as num?)?.toDouble() ?? 0.0;
                   final date = DateTime.tryParse(
                     o['created_at'] ?? '',
@@ -130,79 +156,176 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   final dateStr = date != null
                       ? '${date.day}/${date.month}/${date.year}'
                       : '-';
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    elevation: 0,
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(12),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => OrderDetailScreen(order: o),
-                          ),
-                        );
-                      },
-                      title: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              o['order_number'] ?? 'Pedido',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: kNavy,
+                    clipBehavior: Clip.antiAlias,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => OrderDetailScreen(order: o),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: kPrimary.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.receipt_long_outlined,
+                                      color: kPrimary,
+                                      size: 23,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'PEDIDO',
+                                          style: TextStyle(
+                                            color: kPrimary,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          o['order_number']?.toString() ??
+                                              'Pedido',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            color: kNavy,
+                                            fontSize: 14.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _statusColor(
+                                        status,
+                                      ).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      _statusLabel(status),
+                                      style: TextStyle(
+                                        color: _statusColor(status),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _statusColor(
-                                o['status'],
-                              ).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _statusLabel(o['status'] ?? ''),
-                              style: TextStyle(
-                                color: _statusColor(o['status'] ?? ''),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Divider(
+                                  height: 1,
+                                  color: Color(0xFFE5E7EB),
+                                ),
                               ),
-                            ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 4,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Fecha',
+                                          style: TextStyle(
+                                            color: Color(0xFF64748B),
+                                            fontSize: 10.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          dateStr,
+                                          style: const TextStyle(
+                                            color: Color(0xFF334155),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 6,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        const Text(
+                                          'Total',
+                                          style: TextStyle(
+                                            color: Color(0xFF64748B),
+                                            fontSize: 10.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          formatCurrency(total),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Color(0xFF111827),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: Color(0xFF94A3B8),
+                                    size: 22,
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 6),
-                          Text(
-                            'Fecha: $dateStr',
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Total: ${formatCurrency(total)}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      leading: CircleAvatar(
-                        backgroundColor: kPrimary.withValues(alpha: 0.08),
-                        child: const Icon(Icons.receipt_long, color: kPrimary),
+                        ),
                       ),
                     ),
                   );

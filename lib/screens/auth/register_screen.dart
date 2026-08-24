@@ -76,7 +76,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // Enviar a la pantalla de OTP
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => OTPVerificationScreen(email: email),
+            builder: (context) => OTPVerificationScreen(
+              email: email,
+              fullName: name,
+              phone: fullPhone,
+            ),
           ),
         );
       }
@@ -84,7 +88,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       String message = e.message;
       if (e.code == 'user_already_exists' ||
           message.toLowerCase().contains('user already exists')) {
-        message = 'Esta dirección de correo electrónico ya está registrada.';
+        message = 'Este correo ya está registrado. Inicia sesión o recupera tu contraseña.';
       } else if (message.contains('El número de teléfono ya está registrado')) {
         message =
             'Este número ya está registrado en una cuenta de la app. Inicia sesión o recupera tu cuenta.';

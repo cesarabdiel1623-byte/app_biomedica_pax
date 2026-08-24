@@ -4,6 +4,7 @@ import '../../services/product_service.dart';
 import '../product/product_detail_screen.dart';
 import '../../utils/ui_helpers.dart';
 import '../../widgets/load_error_state.dart';
+import '../home/widgets/product_card.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
@@ -46,23 +47,27 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
     _loadProducts();
   }
 
-  Future<void> _loadProducts() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadProducts({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    } else {
+      setState(() => _error = null);
+    }
 
     try {
       final subcategoryId = widget.subcategoryId;
-      final List<Product> list;
+      final Future<List<Product>> fetchFuture;
 
       if (subcategoryId == null || subcategoryId.isEmpty) {
-        list = await ProductService.getProductsByCatalogCategory(
+        fetchFuture = ProductService.getProductsByCatalogCategory(
           categoryId: widget.categoryId,
           legacyCategory: widget.categoryKey,
         );
       } else {
-        list = await ProductService.getProductsByCatalogSubcategory(
+        fetchFuture = ProductService.getProductsByCatalogSubcategory(
           categoryId: widget.categoryId,
           subcategoryId: subcategoryId,
           legacyCategory: widget.categoryKey,
@@ -70,9 +75,14 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
         );
       }
 
+      final results = await Future.wait([
+        fetchFuture.timeout(const Duration(seconds: 30)),
+        if (showSpinner) Future.delayed(const Duration(seconds: 2)),
+      ]);
+
       if (mounted) {
         setState(() {
-          _products = list;
+          _products = results[0] as List<Product>;
           _loading = false;
         });
       }
@@ -99,29 +109,24 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
           onPressed: () => Navigator.pop(context),
         ),
-        title: _loading
-            ? const SizedBox.shrink()
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.subcategoryLabel,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (_isSubcategoryView &&
-                      widget.subcategoryLabel != widget.categoryLabel)
-                    Text(
-                      widget.categoryLabel,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ),
-                ],
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.subcategoryLabel,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            if (_isSubcategoryView &&
+                widget.subcategoryLabel != widget.categoryLabel)
+              Text(
+                widget.categoryLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
               ),
+          ],
+        ),
       ),
       body: _buildBody(),
     );
@@ -129,7 +134,10 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _kPrimary));
+      return const ColoredBox(
+        color: Colors.white,
+        child: Center(child: CircularProgressIndicator(color: _kPrimary)),
+      );
     }
 
     if (_error != null) {
@@ -142,60 +150,78 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
     }
 
     if (_products.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.shopping_cart_outlined,
-                size: 64,
-                color: Colors.grey.shade400,
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'No hay en existencia',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _kNavy,
+      return RefreshIndicator(
+        color: _kPrimary,
+        backgroundColor: Colors.white,
+        displacement: 42,
+        triggerMode: RefreshIndicatorTriggerMode.onEdge,
+        onRefresh: () => _loadProducts(showSpinner: false),
+        child: ListView(
+          physics: UiHelpers.refreshScrollPhysics,
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.62,
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.shopping_cart_outlined,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'No hay en existencia',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _isSubcategoryView
+                          ? 'Actualmente no contamos con productos disponibles para la subcategoría "${widget.subcategoryLabel}".'
+                          : 'Actualmente no contamos con productos disponibles para la categoría "${widget.categoryLabel}".',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kPrimary,
+                        side: const BorderSide(color: _kPrimary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: const Text('Volver a Categorías'),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                _isSubcategoryView
-                    ? 'Actualmente no contamos con productos disponibles para la subcategoría "${widget.subcategoryLabel}".'
-                    : 'Actualmente no contamos con productos disponibles para la categoría "${widget.categoryLabel}".',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _kPrimary,
-                  side: const BorderSide(color: _kPrimary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: const Text('Volver a Categorías'),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
 
     return RefreshIndicator(
       color: _kPrimary,
-      onRefresh: _loadProducts,
+      backgroundColor: Colors.white,
+      displacement: 42,
+      triggerMode: RefreshIndicatorTriggerMode.onEdge,
+      onRefresh: () => _loadProducts(showSpinner: false),
       child: GridView.builder(
+        physics: UiHelpers.refreshScrollPhysics,
         padding: const EdgeInsets.all(12),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
@@ -204,7 +230,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           crossAxisSpacing: 8,
         ),
         itemCount: _products.length,
-        itemBuilder: (context, i) => _ProductCard(product: _products[i]),
+        itemBuilder: (context, i) => ProductCard(product: _products[i]),
       ),
     );
   }
@@ -457,7 +483,7 @@ class _ProductCardState extends State<_ProductCard> {
 
   Widget _placeholder() => Center(
     child: Icon(
-      Icons.medical_services_outlined,
+      Icons.image_not_supported_outlined,
       color: Colors.grey.shade300,
       size: 32,
     ),

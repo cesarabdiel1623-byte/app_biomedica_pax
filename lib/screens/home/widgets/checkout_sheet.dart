@@ -6,10 +6,13 @@ import '../../../services/cart_service.dart';
 import '../../../services/mercado_pago_test_service.dart';
 import '../../../services/shipping_quote_service.dart';
 import '../../../utils/price_formatter.dart';
+import '../../../widgets/standard_section_header.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
 const _kBg = Color(0xFFF8FAFC);
+const _shippingProcessingRetryDelay = Duration(seconds: 2);
+const _shippingProcessingMaxRetries = 3;
 
 class CheckoutSheet extends StatefulWidget {
   const CheckoutSheet({
@@ -19,6 +22,7 @@ class CheckoutSheet extends StatefulWidget {
     required this.total,
     required this.onSuccess,
     this.cartPricingAmounts,
+    this.asPage = false,
   });
 
   final String cartId;
@@ -26,6 +30,7 @@ class CheckoutSheet extends StatefulWidget {
   final double total;
   final VoidCallback onSuccess;
   final CartPricingAmounts? cartPricingAmounts;
+  final bool asPage;
 
   @override
   State<CheckoutSheet> createState() => _CheckoutSheetState();
@@ -62,6 +67,12 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
 
   Future<void> _loadAddressesAndQuote() async {
     setState(() => _fetchingShipping = true);
+    final initialQuoteFuture = widget.cartId.isEmpty
+        ? Future<ShippingQuoteResult?>.value(null)
+        : ShippingQuoteService.fetchQuote(cartId: widget.cartId)
+              .then<ShippingQuoteResult?>((result) => result)
+              .catchError((_) => null);
+
     try {
       final list = await AddressService.getAddresses();
       _addresses = list;
@@ -74,31 +85,98 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
         _selectedAddressId = defaultAddr.id;
         _selectedAddressLabel = '${defaultAddr.label} - ${defaultAddr.address}';
       }
+    } catch (_) {
+      // La cotización puede seguir usando la dirección predeterminada
+      // que resuelve el backend si no se envía address_id.
+    }
 
+    final result = await initialQuoteFuture;
+    if (!mounted) return;
+    if (result != null) {
+      await _handleShippingQuoteResult(result, _selectedAddressId);
+      return;
+    }
+
+    try {
       await _fetchQuoteForAddress(_selectedAddressId);
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
-          _shippingErrorMessage =
-              'No se pudo cargar la dirección ni cotizar el envío.';
+          _shippingErrorMessage = 'No se pudo cotizar el envío.';
           _fetchingShipping = false;
         });
       }
     }
   }
 
-  Future<void> _fetchQuoteForAddress(String? addressId) async {
+  Future<void> _handleShippingQuoteResult(
+    ShippingQuoteResult result,
+    String? addressId, {
+    int processingRetry = 0,
+  }) async {
+    if (result.isStillProcessing &&
+        processingRetry < _shippingProcessingMaxRetries) {
+      await Future.delayed(_shippingProcessingRetryDelay);
+      if (!mounted) return;
+      await _fetchQuoteForAddress(
+        addressId,
+        processingRetry: processingRetry + 1,
+      );
+      return;
+    }
+
+    _applyShippingQuoteResult(result);
+  }
+
+  void _applyShippingQuoteResult(ShippingQuoteResult result) {
+    if (!result.shippable) {
+      setState(() {
+        _shippingErrorMessage =
+            result.message ??
+            'El producto "${result.productName ?? ''}" no cuenta con dimensiones logísticas para cotizar envío.';
+        _fetchingShipping = false;
+      });
+      return;
+    }
+
+    if (!result.ok) {
+      setState(() {
+        _shippingErrorMessage =
+            result.message ?? 'No se pudo obtener la cotización de envío.';
+        _fetchingShipping = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _shippingQuoteResult = result;
+      if (result.rates.isNotEmpty) {
+        _selectedShippingRate = result.rates.first;
+      } else {
+        _shippingErrorMessage =
+            'No se encontraron opciones de envío para la dirección seleccionada.';
+      }
+      _fetchingShipping = false;
+    });
+  }
+
+  Future<void> _fetchQuoteForAddress(
+    String? addressId, {
+    int processingRetry = 0,
+  }) async {
     if (widget.cartId.isEmpty) {
       setState(() => _fetchingShipping = false);
       return;
     }
 
-    setState(() {
-      _fetchingShipping = true;
-      _shippingErrorMessage = null;
-      _shippingQuoteResult = null;
-      _selectedShippingRate = null;
-    });
+    if (processingRetry == 0) {
+      setState(() {
+        _fetchingShipping = true;
+        _shippingErrorMessage = null;
+        _shippingQuoteResult = null;
+        _selectedShippingRate = null;
+      });
+    }
 
     try {
       final result = await ShippingQuoteService.fetchQuote(
@@ -108,44 +186,43 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
 
       if (!mounted) return;
 
-      if (!result.shippable) {
-        setState(() {
-          _shippingErrorMessage =
-              result.message ??
-              'El producto "${result.productName ?? ''}" no cuenta con dimensiones logísticas para cotizar envío.';
-          _fetchingShipping = false;
-        });
-        return;
-      }
-
-      if (!result.ok) {
-        setState(() {
-          _shippingErrorMessage =
-              result.message ?? 'No se pudo obtener la cotización de envío.';
-          _fetchingShipping = false;
-        });
-        return;
-      }
-
-      setState(() {
-        _shippingQuoteResult = result;
-        if (result.rates.isNotEmpty) {
-          _selectedShippingRate = result.rates.first;
-        } else {
-          _shippingErrorMessage =
-              'No se encontraron opciones de envío para la dirección seleccionada.';
-        }
-        _fetchingShipping = false;
-      });
+      await _handleShippingQuoteResult(
+        result,
+        addressId,
+        processingRetry: processingRetry,
+      );
     } catch (e) {
       if (mounted) {
-        final msg = e.toString().replaceAll('Exception: ', '');
         setState(() {
-          _shippingErrorMessage = msg;
+          _shippingErrorMessage = _friendlyShippingError(e);
           _fetchingShipping = false;
         });
       }
     }
+  }
+
+  String _friendlyShippingError(Object error) {
+    final text = error.toString().toLowerCase();
+    if (text.contains('socketexception') ||
+        text.contains('clientexception') ||
+        text.contains('network') ||
+        text.contains('timeout')) {
+      return 'No se pudo cotizar el envío. Revisa tu conexión e intenta nuevamente.';
+    }
+
+    return 'No se pudo cotizar el envío. Intenta nuevamente.';
+  }
+
+  String get _shippingErrorTitle {
+    final message = _shippingErrorMessage?.toLowerCase() ?? '';
+    if (message.contains('procesando')) {
+      return 'Cotización en proceso';
+    }
+    if (message.contains('dimensiones logísticas') ||
+        message.contains('no cuenta con dimensiones')) {
+      return 'Faltan datos de envío';
+    }
+    return 'No pudimos cotizar el envío';
   }
 
   double get _currentCustomerShippingAmount {
@@ -379,6 +456,54 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
   @override
   Widget build(BuildContext context) {
     final currentUser = Supabase.instance.client.auth.currentUser;
+    final subtitle = _isQuote
+        ? 'Completa tus datos para solicitar la cotización'
+        : 'Revisa tu pedido y selecciona tu método de entrega';
+
+    if (widget.asPage) {
+      return Scaffold(
+        backgroundColor: _kBg,
+        body: Column(
+          children: [
+            StandardSectionHeader(
+              title: 'Revisar pedido',
+              subtitle: subtitle,
+              backgroundColor: _kPrimary,
+              backTooltip: 'Regresar',
+              onBack: () => Navigator.maybePop(context),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  MediaQuery.of(context).viewInsets.bottom + 24,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTotalCard(),
+                    const SizedBox(height: 16),
+                    _buildShippingSection(),
+                    const SizedBox(height: 16),
+                    _buildTransactionSelector(),
+                    const SizedBox(height: 16),
+                    if (_isQuote) ...[
+                      _buildQuoteForm(),
+                    ] else ...[
+                      _buildMercadoPagoTestSection(currentUser != null),
+                    ],
+                    const SizedBox(height: 24),
+                    _buildActionButton(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       constraints: BoxConstraints(
@@ -386,65 +511,96 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
       ),
       decoration: const BoxDecoration(
         color: _kBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 10),
           Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: _kPrimary,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
-          ),
-          const SizedBox(height: 8),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                0,
-                20,
-                MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Row(
                         children: [
-                          const Text(
-                            'Revisar pedido',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: _kNavy,
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.shopping_bag_outlined,
+                              color: Colors.white,
+                              size: 20,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _isQuote
-                                ? 'Completa tus datos para solicitar la cotización.'
-                                : 'Prueba técnica de pago con Mercado Pago.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade500,
-                            ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Revisar pedido',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                subtitle,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                        ),
+                        onPressed: () => Navigator.maybePop(context),
                       ),
                     ],
                   ),
-                  const Divider(height: 16),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   _buildTotalCard(),
                   const SizedBox(height: 16),
                   _buildShippingSection(),
@@ -457,40 +613,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                     _buildMercadoPagoTestSection(currentUser != null),
                   ],
                   const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: _isQuote
-                          ? (_loading ? null : _submit)
-                          : (_canSubmitPayment ? _submit : null),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _kPrimary,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.grey.shade300,
-                        shape: const StadiumBorder(),
-                        elevation: 0,
-                      ),
-                      child: _loading
-                          ? const SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.4,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              _isQuote
-                                  ? 'Solicitar cotización'
-                                  : 'Continuar con Mercado Pago - Prueba',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-                  ),
+                  _buildActionButton(),
                 ],
               ),
             ),
@@ -505,106 +628,195 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
     final totalAmount = _calculatedTotal;
     final hasSelectedRate = _selectedShippingRate != null;
     final shippingLabel = !hasSelectedRate
-        ? (_fetchingShipping ? 'Calculando...' : 'Por calcular')
+        ? (_fetchingShipping ? 'Recalculando...' : 'Calculando...')
         : (shippingCost == 0 ? 'GRATIS' : _formatCurrency(shippingCost));
     final totalLabel = hasSelectedRate
         ? _formatCurrency(totalAmount)
-        : 'Por calcular';
+        : 'Calculando...';
     final totalTextColor = hasSelectedRate
         ? _kPrimary
         : const Color(0xFF64748B);
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const Row(
             children: [
-              const Text(
-                'Subtotal productos:',
-                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-              ),
+              Icon(Icons.receipt_long_outlined, color: _kPrimary, size: 20),
+              SizedBox(width: 8),
               Text(
-                _formatCurrency(_displayProductSubtotal),
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                'Resumen de compra',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                   color: _kNavy,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          if (_couponDiscountAmount > 0) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Descuento de cupón:',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Text(
+                'Subtotal productos',
+                style: TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _formatCurrency(_displayProductSubtotal),
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: _kNavy,
+                  ),
                 ),
+              ),
+            ],
+          ),
+          if (_couponDiscountAmount > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(
+                  Icons.confirmation_number_outlined,
+                  size: 15,
+                  color: Color(0xFF16A34A),
+                ),
+                const SizedBox(width: 4),
+                const Expanded(
+                  child: Text(
+                    'Descuento de cupón',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Text(
                   '-${_formatCurrency(_couponDiscountAmount)}',
+                  textAlign: TextAlign.right,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF16A34A),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
           ],
+          const SizedBox(height: 8),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Envío seleccionado:',
-                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-              ),
-              Text(
-                shippingLabel,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: hasSelectedRate && shippingCost == 0
-                      ? _kPrimary
-                      : _kNavy,
+              const Expanded(
+                child: Text(
+                  'Envío seleccionado',
+                  style: TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
                 ),
               ),
+              const SizedBox(width: 12),
+              hasSelectedRate && shippingCost == 0
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFF86EFAC)),
+                      ),
+                      child: const Text(
+                        'GRATIS',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF15803D),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    )
+                  : Flexible(
+                      child: Text(
+                        shippingLabel,
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: hasSelectedRate
+                              ? _kNavy
+                              : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
             ],
           ),
-          const Divider(height: 16),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+          ),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text(
-                'Total a pagar:',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: _kNavy,
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Total a pagar',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: _kNavy,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'IVA incluido',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Text(
-                totalLabel,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: totalTextColor,
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  totalLabel,
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: hasSelectedRate ? 21 : 19,
+                    fontWeight: FontWeight.w900,
+                    color: totalTextColor,
+                  ),
                 ),
               ),
             ],
@@ -617,18 +829,25 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
   Widget _buildShippingSection() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
-              Icon(Icons.local_shipping, color: _kPrimary, size: 20),
+          const Row(
+            children: [
+              Icon(Icons.local_shipping_outlined, color: _kPrimary, size: 20),
               SizedBox(width: 8),
               Text(
                 'Opciones de Envío (SkyDropX)',
@@ -636,16 +855,23 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: _kNavy,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           if (_addresses.isNotEmpty) ...[
             DropdownButtonFormField<String>(
               initialValue: _selectedAddressId,
               isExpanded: true,
-              decoration: _inputDecoration('Dirección de entrega'),
+              decoration: _inputDecoration('Dirección de entrega').copyWith(
+                prefixIcon: const Icon(
+                  Icons.location_on_outlined,
+                  color: _kPrimary,
+                  size: 20,
+                ),
+              ),
               items: _addresses.map<DropdownMenuItem<String>>((addr) {
                 final label = '${addr.label} - ${addr.address}';
                 return DropdownMenuItem<String>(
@@ -665,54 +891,134 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                 }
               },
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
           ],
           if (_fetchingShipping) ...[
             Container(
-              padding: const EdgeInsets.all(16),
-              alignment: Alignment.center,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
                   SizedBox(
-                    width: 18,
-                    height: 18,
+                    width: 22,
+                    height: 22,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
+                      strokeWidth: 2.8,
                       color: _kPrimary,
                     ),
                   ),
-                  SizedBox(width: 10),
-                  Text(
-                    'Calculando opciones de envío...',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Calculando opciones de envío en tiempo real...',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.25,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
           ] else if (_shippingErrorMessage != null) ...[
             Container(
-              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFCA5A5)),
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFDE68A)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.error_outline,
-                    color: Color(0xFFDC2626),
-                    size: 20,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFF7ED),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.local_shipping_outlined,
+                          color: Color(0xFFD97706),
+                          size: 19,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _shippingErrorTitle,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: _kNavy,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _shippingErrorMessage!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF92400E),
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _shippingErrorMessage!,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF991B1B),
-                        height: 1.35,
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'Mercado Pago se habilitará cuando exista una opción de envío válida.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.3,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _fetchingShipping
+                          ? null
+                          : () => _fetchQuoteForAddress(_selectedAddressId),
+                      icon: const Icon(Icons.refresh_rounded, size: 17),
+                      label: const Text('Reintentar cotización'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kPrimary,
+                        side: const BorderSide(color: _kPrimary),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
                   ),
@@ -723,20 +1029,33 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
             if (_shippingQuoteResult!.freeShippingUnlocked) ...[
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF86EFAC)),
                 ),
-                child: const Text(
-                  '✓ Envío gratis aplicado con la opción más económica.\nPuedes elegir un servicio más rápido pagando la diferencia.',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: Color(0xFF166534),
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: Color(0xFF16A34A),
+                      size: 18,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '✓ Envío gratis aplicado con la opción más económica.\nPuedes elegir un servicio más rápido pagando la diferencia.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF166534),
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -744,72 +1063,125 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               children: _shippingQuoteResult!.rates.map((rate) {
                 final isSelected = _selectedShippingRate?.rateId == rate.rateId;
 
-                return InkWell(
-                  onTap: () => setState(() => _selectedShippingRate = rate),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFF0FDFA) : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? _kPrimary : const Color(0xFFE2E8F0),
+                      width: isSelected ? 1.8 : 1.0,
                     ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFFF0FDFA)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected ? _kPrimary : const Color(0xFFCBD5E1),
-                        width: isSelected ? 1.8 : 1.0,
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: _kPrimary.withValues(alpha: 0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => setState(() => _selectedShippingRate = rate),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? _kPrimary
+                                      : Colors.grey.shade400,
+                                  width: isSelected ? 6 : 2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${rate.carrier} · ${rate.service}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: _kNavy,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.schedule_rounded,
+                                        size: 13,
+                                        color: Colors.grey.shade500,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          '${rate.days} ${rate.days == 1 ? "día" : "días"} de entrega estimada',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 11.5,
+                                            color: Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            rate.customerShippingAmount == 0
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFDCFCE7),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: const Color(0xFF86EFAC),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'GRATIS',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF15803D),
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    rate.label,
+                                    style: const TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: _kNavy,
+                                    ),
+                                  ),
+                          ],
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        // ignore: deprecated_member_use
-                        Radio<String>(
-                          value: rate.rateId,
-                          // ignore: deprecated_member_use
-                          groupValue: _selectedShippingRate?.rateId,
-                          activeColor: _kPrimary,
-                          // ignore: deprecated_member_use
-                          onChanged: (_) =>
-                              setState(() => _selectedShippingRate = rate),
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${rate.carrier} · ${rate.service}',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: _kNavy,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${rate.days} días de entrega estimada',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          rate.label,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: rate.customerShippingAmount == 0
-                                ? _kPrimary
-                                : _kNavy,
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 );
@@ -828,7 +1200,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
         const Text(
           'Tipo de transacción',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 13.5,
             fontWeight: FontWeight.bold,
             color: _kNavy,
           ),
@@ -836,8 +1208,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFE2E8F0),
-            borderRadius: BorderRadius.circular(12),
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           padding: const EdgeInsets.all(4),
           child: Row(
@@ -852,6 +1225,15 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                     decoration: BoxDecoration(
                       color: !_isQuote ? _kPrimary : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
+                      boxShadow: !_isQuote
+                          ? [
+                              BoxShadow(
+                                color: _kPrimary.withValues(alpha: 0.25),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Text(
                       'Pago de prueba',
@@ -875,6 +1257,15 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                     decoration: BoxDecoration(
                       color: _isQuote ? _kPrimary : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
+                      boxShadow: _isQuote
+                          ? [
+                              BoxShadow(
+                                color: _kPrimary.withValues(alpha: 0.25),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Text(
                       'Solicitar cotización',
@@ -906,21 +1297,58 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                children: const [
-                  Icon(Icons.payments_rounded, color: _kPrimary),
-                  SizedBox(width: 10),
-                  Expanded(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF009EE3).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.credit_card_rounded,
+                      color: Color(0xFF009EE3),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
                     child: Text(
-                      'Mercado Pago Checkout Pro - Prueba',
+                      'Mercado Pago Checkout Pro',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 14.5,
                         fontWeight: FontWeight.bold,
                         color: _kNavy,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: const Text(
+                      'Seguro',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1D4ED8),
                       ),
                     ),
                   ),
@@ -928,9 +1356,9 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Esta es una prueba técnica de Mercado Pago. No genera un pedido real y no modifica el inventario.',
+                'El pago se procesa de forma segura mediante Mercado Pago. El servidor valida los precios, genera la orden y procesa el envío automáticamente al confirmarse.',
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12.5,
                   height: 1.45,
                   color: Color(0xFF475569),
                 ),
@@ -938,18 +1366,35 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
               const SizedBox(height: 12),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECFEFF),
-                  borderRadius: BorderRadius.circular(12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
                 ),
-                child: const Text(
-                  'El importe final se valida de forma segura en el servidor con los productos y la opción de envío seleccionada.',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.45,
-                    color: Color(0xFF155E75),
-                  ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDFA),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF99F6E4)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 16,
+                      color: Color(0xFF0D9488),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'El importe final se valida de forma autoritativa en el servidor con los productos y la opción de envío seleccionada.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.35,
+                          color: Color(0xFF115E59),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (!isLoggedIn) ...[
@@ -959,15 +1404,28 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFEF2F2),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFECACA)),
                   ),
-                  child: const Text(
-                    'Debes iniciar sesión para realizar el pago de prueba.',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF991B1B),
-                    ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline_rounded,
+                        color: Color(0xFFDC2626),
+                        size: 18,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Debes iniciar sesión para realizar el pago de prueba.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF991B1B),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -985,7 +1443,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
         const Text(
           'Notas para la cotización',
           style: TextStyle(
-            fontSize: 13,
+            fontSize: 13.5,
             fontWeight: FontWeight.bold,
             color: _kNavy,
           ),
@@ -996,35 +1454,104 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
           maxLines: 3,
           decoration: InputDecoration(
             hintText: 'Comparte detalles adicionales para tu solicitud.',
+            hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
             filled: true,
             fillColor: Colors.white,
+            contentPadding: const EdgeInsets.all(14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: _kPrimary, width: 1.5),
             ),
           ),
         ),
-        const SizedBox(height: 16),
       ],
+    );
+  }
+
+  Widget _buildActionButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: _isQuote
+            ? (_loading ? null : _submit)
+            : (_canSubmitPayment ? _submit : null),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _kPrimary,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: Colors.grey.shade300,
+          disabledForegroundColor: Colors.grey.shade500,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          elevation: 0,
+        ),
+        child: _loading
+            ? const SizedBox(
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: Colors.white,
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isQuote ? Icons.send_rounded : Icons.lock_outline_rounded,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _isQuote
+                            ? 'Solicitar cotización'
+                            : 'Continuar con Mercado Pago',
+                        maxLines: 1,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
+      labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
       filled: true,
       fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _kPrimary, width: 1.5),
       ),
     );
   }

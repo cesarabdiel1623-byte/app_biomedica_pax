@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/product.dart';
 import '../../services/question_service.dart';
 import '../product/product_detail_screen.dart';
 import '../product/ask_question_screen.dart';
@@ -23,6 +24,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
 
   // Track expanded cards
   final Set<String> _expandedIds = {};
+  final Set<String> _deletingIds = {};
 
   @override
   void initState() {
@@ -30,17 +32,28 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
     _loadQuestions();
   }
 
-  Future<void> _loadQuestions() async {
-    setState(() => _loading = true);
+  Future<void> _loadQuestions({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() => _loading = true);
+    }
     try {
-      final list = await QuestionService.getClientQuestions();
-      setState(() {
-        _questions = list;
-      });
+      final results = await Future.wait([
+        QuestionService.getClientQuestions().timeout(
+          const Duration(seconds: 30),
+        ),
+        if (showSpinner) Future.delayed(const Duration(seconds: 2)),
+      ]);
+      if (mounted) {
+        setState(() {
+          _questions = results[0] as List<ProductQuestion>;
+        });
+      }
     } catch (e) {
-      print('Error al obtener preguntas: $e');
+      debugPrint('Error al obtener preguntas: $e');
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -140,33 +153,27 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
   }
 
   Future<void> _deleteQuestion(ProductQuestion q) async {
-    // Show a loading overlay
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) =>
-          const Center(child: CircularProgressIndicator(color: _kPrimary)),
-    );
-
+    if (_deletingIds.contains(q.id)) return;
+    setState(() => _deletingIds.add(q.id));
     try {
       await QuestionService.deleteQuestion(q.id);
       if (mounted) {
-        Navigator.of(context).pop(); // pop loading overlay
         setState(() {
           _questions.removeWhere((item) => item.id == q.id);
+          _expandedIds.remove(q.id);
         });
-        UiHelpers.showFloatingSuccessToast(
-          context,
-          'Pregunta eliminada exitosamente.',
-        );
+        UiHelpers.showFloatingSuccessToast(context, 'Pregunta eliminada.');
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        Navigator.of(context).pop(); // pop loading overlay
         UiHelpers.showFloatingDeleteToast(
           context,
-          'Error al eliminar la pregunta: $e',
+          'No se pudo eliminar la pregunta. Inténtalo nuevamente.',
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _deletingIds.remove(q.id));
       }
     }
   }
@@ -198,13 +205,13 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
           : _questions.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
-              onRefresh: _loadQuestions,
+              onRefresh: () => _loadQuestions(showSpinner: false),
               color: _kPrimary,
               child: ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                physics: UiHelpers.refreshScrollPhysics,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 itemCount: _questions.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: 12), // Gap between cards
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final q = _questions[index];
                   return _buildQuestionCard(q);
@@ -219,194 +226,110 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
     final dateStr = _formatDate(q.createdAt);
     final hasAnswer = q.answers.isNotEmpty;
     final isExpanded = _expandedIds.contains(q.id);
+    final productIsAvailable = product != null && product.isActive;
+    final isDeleting = _deletingIds.contains(q.id);
 
     return Container(
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── 1. PRODUCT HEADER ROW ─────────────────────────────────────────
-          if (product != null)
-            InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ProductDetailScreen(productId: product.id),
-                  ),
-                );
-              },
+          Material(
+            color: const Color(0xFFF8FAFC),
+            child: InkWell(
+              onTap: productIsAvailable ? () => _openProduct(product) : null,
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Square image container
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade200),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(7),
-                        child:
-                            product.mainImageUrl != null &&
-                                product.mainImageUrl!.isNotEmpty
-                            ? Image.network(
-                                product.mainImageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => const Icon(
-                                  Icons.shopping_bag_outlined,
-                                  color: _kPrimary,
-                                  size: 26,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.shopping_bag_outlined,
-                                color: _kPrimary,
-                                size: 26,
-                              ),
-                      ),
-                    ),
+                    _buildProductImage(product),
                     const SizedBox(width: 12),
-                    // Title + Price + optional Status
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (product.isActive == false) ...[
-                            Row(
+                      child: product == null
+                          ? const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
-                                  Icons.error_outline_rounded,
-                                  color: Colors.orange,
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 4),
                                 Text(
-                                  'Publicación pausada',
+                                  'Producto no disponible',
                                   style: TextStyle(
+                                    color: _kNavy,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  'La publicación fue retirada del catálogo.',
+                                  style: TextStyle(
+                                    color: Color(0xFF64748B),
                                     fontSize: 12,
-                                    color: Colors.orange.shade700,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: _kNavy,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.25,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  productIsAvailable
+                                      ? product.formattedPrice
+                                      : 'Publicación no disponible',
+                                  style: TextStyle(
+                                    color: productIsAvailable
+                                        ? _kPrimary
+                                        : const Color(0xFF64748B),
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 2),
-                          ],
-                          Text(
-                            product.name,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: _kNavy,
-                              height: 1.3,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            product.formattedPrice,
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                              color: _kPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
-                    // Three dots button inside the product card
+                    if (productIsAvailable)
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Color(0xFF94A3B8),
+                      ),
                     IconButton(
-                      icon: const Icon(Icons.more_vert, color: Colors.grey),
-                      onPressed: () => _showOptionsMenu(q),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                      tooltip: 'Más opciones',
+                      onPressed: isDeleting ? null : () => _showOptionsMenu(q),
+                      icon: isDeleting
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(
+                                color: _kPrimary,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.more_vert_rounded,
+                              color: Color(0xFF64748B),
+                            ),
                     ),
                   ],
                 ),
               ),
             ),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+          ),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-          // ── 2. ACTION BUTTONS (Always shown) ───────────────────────────────
-          if (product != null) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AskQuestionScreen(
-                              productId: product.id,
-                              productName: product.name,
-                            ),
-                          ),
-                        );
-                        _loadQuestions();
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: _kPrimary, width: 1.5),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      child: const Text(
-                        'Hacer otra pregunta',
-                        style: TextStyle(
-                          color: _kPrimary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ProductDetailScreen(productId: product.id),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _kPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      child: const Text(
-                        'Comprar',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
-          ],
-
-          // ── 3. QUESTION ROW (Tapping this toggles expand/collapse) ──────────
           InkWell(
             onTap: () {
               setState(() {
@@ -418,7 +341,7 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
               });
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -429,21 +352,54 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                         Text(
                           q.questionText,
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: isExpanded
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            color: _kTextDark,
-                            height: 1.35,
+                                ? FontWeight.w700
+                                : FontWeight.w600,
+                            color: _kNavy,
+                            height: 1.4,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Hace ${diffInDays(q.createdAt)} días.',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: Colors.grey.shade400,
-                          ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              hasAnswer
+                                  ? Icons.check_circle_outline_rounded
+                                  : Icons.schedule_rounded,
+                              size: 15,
+                              color: hasAnswer
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFF94A3B8),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              hasAnswer ? 'Respondida' : 'Esperando respuesta',
+                              style: TextStyle(
+                                color: hasAnswer
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(0xFF64748B),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '·',
+                              style: TextStyle(color: Color(0xFFCBD5E1)),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                dateStr,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -453,51 +409,118 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                     isExpanded
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
-                    color: Colors.grey.shade400,
-                    size: 20,
+                    color: const Color(0xFF64748B),
+                    size: 22,
                   ),
                 ],
               ),
             ),
           ),
 
-          // ── 4. ANSWER BLOCK (Only shown if expanded and has answer) ─────────
-          if (isExpanded && hasAnswer) ...[
-            const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+          if (isExpanded) ...[
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8, right: 12, top: 2),
-                    child: CustomPaint(
-                      size: const Size(14, 16),
-                      painter: _BracketPainter(),
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          q.answers.first.answerText,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            color: _kTextGrey,
-                            height: 1.4,
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: hasAnswer
+                  ? Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDFA),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFCCFBF1)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.support_agent_rounded,
+                                size: 18,
+                                color: _kPrimary,
+                              ),
+                              SizedBox(width: 7),
+                              Text(
+                                'Respuesta de Go Medical',
+                                style: TextStyle(
+                                  color: _kNavy,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
+                          const SizedBox(height: 10),
+                          Text(
+                            q.answers.first.answerText,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              color: _kTextGrey,
+                              height: 1.45,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _formatDate(q.answers.first.createdAt),
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : const Row(
+                      children: [
+                        Icon(
+                          Icons.schedule_rounded,
+                          color: Color(0xFF94A3B8),
+                          size: 18,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Hace ${diffInDays(q.answers.first.createdAt)} días.',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: Colors.grey.shade400,
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Tu pregunta está pendiente de respuesta.',
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ],
                     ),
+            ),
+          ],
+          if (productIsAvailable) ...[
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => _openProduct(product),
+                    icon: const Icon(Icons.open_in_new_rounded, size: 17),
+                    label: const Text('Ver producto'),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) => AskQuestionScreen(
+                            productId: product.id,
+                            productName: product.name,
+                          ),
+                        ),
+                      );
+                      if (mounted) {
+                        await _loadQuestions(showSpinner: false);
+                      }
+                    },
+                    icon: const Icon(Icons.add_comment_outlined, size: 17),
+                    label: const Text('Preguntar'),
                   ),
                 ],
               ),
@@ -508,11 +531,42 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
     );
   }
 
-  int diffInDays(DateTime date) {
-    final diff = DateTime.now().difference(date).inDays;
-    return diff > 0
-        ? diff
-        : 8; // fallback to 8 like in screenshot or 1 if recently asked
+  void _openProduct(Product product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ProductDetailScreen(productId: product.id),
+      ),
+    );
+  }
+
+  Widget _buildProductImage(Product? product) {
+    final imageUrl = product?.mainImageUrl;
+    return Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl != null && imageUrl.isNotEmpty
+          ? Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const Icon(
+                Icons.inventory_2_outlined,
+                color: Color(0xFF94A3B8),
+                size: 25,
+              ),
+            )
+          : const Icon(
+              Icons.inventory_2_outlined,
+              color: Color(0xFF94A3B8),
+              size: 25,
+            ),
+    );
   }
 
   Widget _buildEmptyState() {
@@ -547,30 +601,4 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
       ),
     );
   }
-}
-
-class _BracketPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.grey.shade300
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-
-    final path = Path()
-      ..moveTo(2, 0)
-      ..lineTo(2, size.height - 4)
-      ..arcToPoint(
-        Offset(6, size.height),
-        radius: const Radius.circular(4),
-        clockwise: false,
-      )
-      ..lineTo(size.width, size.height);
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

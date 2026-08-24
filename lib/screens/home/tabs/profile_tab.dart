@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../profile/orders_screen.dart';
 import '../../profile/quotes_screen.dart';
-import '../../profile/maintenance_screen.dart';
 import '../../profile/edit_profile_screen.dart';
 import '../../profile/notifications_screen.dart';
+import '../../tickets/tickets_list_screen.dart';
 import '../../product/favorites_screen.dart';
 import '../../product/recently_viewed_screen.dart';
 import '../../quotes/questions_screen.dart';
@@ -20,6 +21,10 @@ class ProfileTab extends StatefulWidget {
 }
 
 class _ProfileTabState extends State<ProfileTab> {
+  static const _supportEmail = 'contacto@gomedical.mx';
+  static const _supportPhonePrimary = '529993352872';
+  static const _supportPhoneSecondary = '529992660702';
+
   String? _clientId;
   bool _loadingClient = true;
 
@@ -240,18 +245,15 @@ class _ProfileTabState extends State<ProfileTab> {
                   index: 6,
                   child: _menuTile(
                     Icons.build_circle_outlined,
-                    'Mantenimientos',
-                    'Programa un servicio',
+                    'Servicios',
+                    'Servicios programados',
                     const Color(0xFF10B981),
                     () {
-                      if (_clientId != null) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                MaintenanceScreen(clientId: _clientId!),
-                          ),
-                        );
-                      }
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const TicketsListScreen(),
+                        ),
+                      );
                     },
                   ),
                 ),
@@ -373,11 +375,27 @@ class _ProfileTabState extends State<ProfileTab> {
                 child: Icon(Icons.chat, color: Colors.white),
               ),
               title: const Text('WhatsApp Soporte'),
-              subtitle: const Text('+52 999 123 4567'),
-              onTap: () {
+              subtitle: const Text('+52 999 335 2872'),
+              onTap: () async {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Abriendo WhatsApp...')),
+                await _openWhatsApp(
+                  _supportPhonePrimary,
+                  fallbackMessage: 'No se pudo abrir WhatsApp.',
+                );
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFF25D366),
+                child: Icon(Icons.chat, color: Colors.white),
+              ),
+              title: const Text('WhatsApp Soporte'),
+              subtitle: const Text('+52 999 266 0702'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await _openWhatsApp(
+                  _supportPhoneSecondary,
+                  fallbackMessage: 'No se pudo abrir WhatsApp.',
                 );
               },
             ),
@@ -387,13 +405,12 @@ class _ProfileTabState extends State<ProfileTab> {
                 child: Icon(Icons.email, color: Colors.white),
               ),
               title: const Text('Correo Electrónico'),
-              subtitle: const Text('soporte@gomedical.com.mx'),
-              onTap: () {
+              subtitle: const Text(_supportEmail),
+              onTap: () async {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Abriendo cliente de correo...'),
-                  ),
+                await _openExternalUri(
+                  Uri(scheme: 'mailto', path: _supportEmail),
+                  fallbackMessage: 'No se pudo abrir el cliente de correo.',
                 );
               },
             ),
@@ -402,6 +419,45 @@ class _ProfileTabState extends State<ProfileTab> {
         ),
       ),
     );
+  }
+
+  Future<void> _openWhatsApp(
+    String phone, {
+    required String fallbackMessage,
+  }) async {
+    final appUri = Uri.parse('whatsapp://send?phone=$phone');
+    final webUri = Uri.https('wa.me', '/$phone');
+
+    if (await _tryLaunch(appUri)) return;
+    if (await _tryLaunch(webUri)) return;
+
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(fallbackMessage)));
+    }
+  }
+
+  Future<void> _openExternalUri(
+    Uri uri, {
+    required String fallbackMessage,
+  }) async {
+    if (await _tryLaunch(uri)) return;
+
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(fallbackMessage)));
+    }
+  }
+
+  Future<bool> _tryLaunch(Uri uri) async {
+    try {
+      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('No se pudo abrir enlace externo: ${uri.scheme}');
+      return false;
+    }
   }
 
   Widget _sectionLabel(String label) => Padding(

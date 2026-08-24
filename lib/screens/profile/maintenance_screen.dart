@@ -1,13 +1,12 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../services/address_service.dart';
 import '../../services/ticket_service.dart';
+import '../../utils/service_ticket_intake.dart';
+import '../../utils/service_ticket_type.dart';
 import '../../utils/ui_helpers.dart';
 import '../home/address_picker_screen.dart';
 import 'profile_helpers.dart';
@@ -23,7 +22,6 @@ class MaintenanceScreen extends StatefulWidget {
 
 class _MaintenanceScreenState extends State<MaintenanceScreen> {
   static const _maxPhotos = 5;
-  static const _maxVideoBytes = 40 * 1024 * 1024;
 
   final _formKey = GlobalKey<FormState>();
   final _equipmentNameController = TextEditingController();
@@ -38,7 +36,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   final _institutionController = TextEditingController();
   final _imagePicker = ImagePicker();
 
-  String _ticketType = 'preventivo';
+  String _ticketType = ServiceTicketType.preventivo;
   String _urgency = 'low';
   String? _powerStatus;
   String? _previousMaintenance;
@@ -46,6 +44,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   String? _issueDuration;
   String? _visibleDamage;
   String? _previousRepair;
+  String? _showsErrorCode;
   String? _selectedEquipmentId;
   String? _effectiveClientId;
   String? _accessNotice;
@@ -59,25 +58,17 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   final _scrollController = ScrollController();
   final _submitButtonKey = GlobalKey();
 
-  String get _serviceLabel {
-    switch (_ticketType) {
-      case 'correctivo':
-        return 'Mantenimiento correctivo';
-      case 'reparacion':
-        return 'Reparación';
-      default:
-        return 'Mantenimiento preventivo';
-    }
-  }
+  String get _serviceLabel => ServiceTicketType.label(_ticketType);
 
-  String get _databaseTicketType =>
-      _ticketType == 'reparacion' ? 'correctivo' : _ticketType;
+  String get _normalizedTicketType => ServiceTicketType.normalize(_ticketType);
+
+  String get _databaseTicketType => _normalizedTicketType;
 
   String get _descriptionSectionTitle {
-    switch (_ticketType) {
-      case 'correctivo':
+    switch (_normalizedTicketType) {
+      case ServiceTicketType.correctivo:
         return 'Descripción de la falla';
-      case 'reparacion':
+      case ServiceTicketType.diagnostico:
         return 'Descripción del problema';
       default:
         return 'Descripción';
@@ -85,13 +76,13 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   }
 
   String get _descriptionFieldLabel {
-    switch (_ticketType) {
-      case 'correctivo':
+    switch (_normalizedTicketType) {
+      case ServiceTicketType.correctivo:
         return 'Explica qué ocurrió y qué mostró el equipo';
-      case 'reparacion':
-        return 'Describe el daño o problema del equipo';
+      case ServiceTicketType.diagnostico:
+        return 'Describe el problema o comportamiento observado';
       default:
-        return 'Indica el problema u observaciones del equipo';
+        return 'Indica observaciones o detalles del servicio';
     }
   }
 
@@ -130,51 +121,76 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     }
 
     try {
-      final profile = await Supabase.instance.client
-          .from('profiles')
-          .select('client_id')
-          .eq('id', user.id)
-          .maybeSingle();
-      final resolvedClientId = (profile?['client_id'] as String?) ?? user.id;
+      final results = await Future.wait([
+        Future(() async {
+          final profile = await Supabase.instance.client
+              .from('profiles')
+              .select('client_id')
+              .eq('id', user.id)
+              .maybeSingle()
+              .timeout(const Duration(seconds: 30));
+          final resolvedClientId =
+              (profile?['client_id'] as String?) ?? user.id;
 
-      List<dynamic> equipments = [];
-      try {
-        final response = await Supabase.instance.client
-            .from('equipment_units')
-            .select('*, products(name, brand, model)')
-            .eq('current_client_id', resolvedClientId);
-        equipments = response as List;
-      } catch (_) {
-        final fallback = await Supabase.instance.client
-            .from('equipment_units')
-            .select('*, products(name)')
-            .eq('current_client_id', resolvedClientId);
-        equipments = fallback as List;
-      }
+          List<dynamic> equipments = [];
+          try {
+            final response = await Supabase.instance.client
+                .from('equipment_units')
+                .select('*, products(name, brand, model)')
+                .eq('current_client_id', resolvedClientId)
+                .timeout(const Duration(seconds: 30));
+            equipments = response as List;
+          } catch (_) {
+            final fallback = await Supabase.instance.client
+                .from('equipment_units')
+                .select('*, products(name)')
+                .eq('current_client_id', resolvedClientId)
+                .timeout(const Duration(seconds: 30));
+            equipments = fallback as List;
+          }
 
-      ClientAddress? address;
-      try {
-        address = await AddressService.getDefaultAddress();
-      } catch (_) {
-        address = null;
-      }
+          ClientAddress? address;
+          try {
+            address = await AddressService.getDefaultAddress().timeout(
+              const Duration(seconds: 10),
+            );
+          } catch (_) {
+            address = null;
+          }
+
+          return (
+            resolvedClientId: resolvedClientId,
+            equipments: equipments,
+            address: address,
+          );
+        }),
+        Future.delayed(const Duration(seconds: 2)),
+      ]);
+
+      final data =
+          results[0]
+              as ({
+                ClientAddress? address,
+                List<dynamic> equipments,
+                String resolvedClientId,
+              });
 
       if (!mounted) return;
       setState(() {
-        _effectiveClientId = resolvedClientId;
-        _accessNotice = widget.clientId != resolvedClientId
+        _effectiveClientId = data.resolvedClientId;
+        _accessNotice = widget.clientId != data.resolvedClientId
             ? 'Se validó el cliente activo para proteger el acceso a tus equipos.'
             : null;
-        _equipments = equipments;
-        _selectedAddress = address;
-        _selectedEquipmentId = equipments.isEmpty
+        _equipments = data.equipments;
+        _selectedAddress = data.address;
+        _selectedEquipmentId = data.equipments.isEmpty
             ? 'otro'
-            : equipments.first['id'] as String?;
+            : data.equipments.first['id'] as String?;
         _loading = false;
       });
 
-      if (equipments.isNotEmpty) {
-        _fillEquipmentFrom(equipments.first);
+      if (data.equipments.isNotEmpty) {
+        _fillEquipmentFrom(data.equipments.first);
       }
     } catch (_) {
       if (!mounted) return;
@@ -229,16 +245,17 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   }
 
   void _changeTicketType(String? value) {
-    final type = value ?? 'preventivo';
+    final type = ServiceTicketType.normalize(value);
     setState(() {
-      _ticketType = type;
-      _urgency = type == 'preventivo' ? 'low' : 'medium';
+      _ticketType = type.isEmpty ? ServiceTicketType.preventivo : type;
+      _urgency = _ticketType == ServiceTicketType.preventivo ? 'low' : 'medium';
       _powerStatus = null;
       _previousMaintenance = null;
       _failureFrequency = null;
       _issueDuration = null;
       _visibleDamage = null;
       _previousRepair = null;
+      _showsErrorCode = null;
       _errorCodeController.clear();
     });
   }
@@ -259,65 +276,8 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     }
   }
 
-  Future<void> _showMediaOptions() async {
-    if (_selectingMedia || _submitting) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  'Agregar evidencia',
-                  style: TextStyle(
-                    color: kNavy,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: const Icon(
-                  Icons.add_a_photo_outlined,
-                  color: kPrimary,
-                ),
-                title: const Text('Agregar fotografía'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  _pickPhoto();
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.video_library_outlined,
-                  color: kPrimary,
-                ),
-                title: const Text('Agregar video'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  _pickVideo();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _pickPhoto() async {
-    final photoCount = _attachments.where((item) => !item.isVideo).length;
-    if (photoCount >= _maxPhotos) {
+    if (_attachments.length >= _maxPhotos) {
       await _showMediaWarning(
         icon: Icons.photo_library_outlined,
         title: 'Límite de fotografías',
@@ -343,7 +303,6 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
             name: picked.name,
             bytes: bytes,
             contentType: _imageContentType(picked.name, picked.mimeType),
-            isVideo: false,
           ),
         ),
       );
@@ -357,72 +316,6 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _selectingMedia = false);
-    }
-  }
-
-  Future<void> _pickVideo() async {
-    if (_attachments.any((item) => item.isVideo)) {
-      await _showMediaWarning(
-        icon: Icons.video_library_outlined,
-        title: 'Solo un video',
-        message: 'Quita el video actual antes de seleccionar otro.',
-      );
-      return;
-    }
-
-    setState(() => _selectingMedia = true);
-    VideoPlayerController? controller;
-    try {
-      final picked = await _imagePicker.pickVideo(
-        source: ImageSource.gallery,
-        maxDuration: const Duration(minutes: 1),
-      );
-      if (picked == null) return;
-
-      final size = await picked.length();
-      if (size > _maxVideoBytes) {
-        await _showMediaWarning(
-          icon: Icons.video_file_outlined,
-          title: 'El video es demasiado pesado',
-          message: 'Selecciona un video que pese menos de 40 MB.',
-        );
-        return;
-      }
-
-      controller = VideoPlayerController.file(File(picked.path));
-      await controller.initialize();
-      if (controller.value.duration > const Duration(minutes: 1)) {
-        await _showMediaWarning(
-          icon: Icons.timer_off_outlined,
-          title: 'El video dura demasiado',
-          message: 'Selecciona un video de máximo 1 minuto.',
-        );
-        return;
-      }
-
-      final bytes = await picked.readAsBytes();
-      if (!mounted) return;
-      setState(
-        () => _attachments.add(
-          _PendingAttachment(
-            name: picked.name,
-            bytes: bytes,
-            contentType: _videoContentType(picked.name, picked.mimeType),
-            isVideo: true,
-            duration: controller!.value.duration,
-          ),
-        ),
-      );
-    } catch (_) {
-      if (mounted) {
-        UiHelpers.showErrorToast(
-          context,
-          'No se pudo agregar el video. Usa un archivo MP4 de máximo 1 minuto.',
-        );
-      }
-    } finally {
-      await controller?.dispose();
       if (mounted) setState(() => _selectingMedia = false);
     }
   }
@@ -510,10 +403,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     }
 
     if (!isValid || _selectedAddress == null) {
-      UiHelpers.showWarningToast(
-        context,
-        'Hay campos sin completar',
-      );
+      UiHelpers.showWarningToast(context, 'Hay campos sin completar');
       return;
     }
     if (_effectiveClientId == null) {
@@ -532,65 +422,19 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
       final details = selectedAddress.details;
       final equipmentName = _equipmentNameController.text.trim();
       final equipmentModel = _equipmentModelController.text.trim();
+      final equipmentBrand = _brandController.text.trim();
       final serial = _serialController.text.trim();
-      final photoCount = _attachments.where((item) => !item.isVideo).length;
-      final videoCount = _attachments.where((item) => item.isVideo).length;
-
-      final description = StringBuffer()
-        ..writeln('=== INFORMACIÓN DEL EQUIPO ===')
-        ..writeln('• Nombre: $equipmentName')
-        ..writeln('• Modelo: $equipmentModel')
-        ..writeln('• Marca: ${_brandController.text.trim()}')
-        ..writeln(
-          '• Número de serie: ${serial.isEmpty ? "No proporcionado" : serial}',
-        )
-        ..writeln('\n=== SOLICITUD ===')
-        ..writeln('• Tipo: $_serviceLabel')
-        ..writeln('• ¿El equipo enciende?: ${_powerStatus ?? "No indicado"}');
-
-      if (_ticketType == 'preventivo') {
-        description.writeln(
-          '• Mantenimiento preventivo anterior: ${_previousMaintenance ?? "No indicado"}',
-        );
-        if (_previousMaintenance == 'Sí') {
-          description.writeln(
-            '• Fecha del último mantenimiento: ${_formatDate(_lastMaintenanceDate)}',
-          );
-        }
-      } else if (_ticketType == 'correctivo') {
-        if (_powerStatus == 'Sí') {
-          description.writeln(
-            '• Frecuencia de la falla: ${_failureFrequency ?? "No indicada"}',
-          );
-        }
-        description.writeln(
-          '• ${_powerStatus == "No" ? "Dejó de encender" : "La falla comenzó"}: ${_issueDuration ?? "No indicada"}',
-        );
-      } else if (_ticketType == 'reparacion') {
-        description
-          ..writeln('• Daños visibles: ${_visibleDamage ?? "No indicado"}')
-          ..writeln(
-            '• Reparado anteriormente: ${_previousRepair ?? "No indicado"}',
-          );
-      }
-
       final errorCode = _errorCodeController.text.trim();
-      if (errorCode.isNotEmpty) {
-        description.writeln('• Código de error: $errorCode');
-      }
-
-      description
-        ..writeln('\n=== $_descriptionSectionTitle ===')
-        ..writeln(_descriptionController.text.trim())
-        ..writeln('\n=== CONTACTO Y LOGÍSTICA ===')
-        ..writeln('• Responsable: ${_contactNameController.text.trim()}')
-        ..writeln('• Teléfono: ${_contactPhoneController.text.trim()}')
-        ..writeln('• Área o departamento: ${_areaController.text.trim()}')
-        ..writeln('• Institución: ${_institutionController.text.trim()}')
-        ..writeln('• Dirección: ${_addressSummary(selectedAddress)}')
-        ..writeln(
-          '• Evidencia: $photoCount fotografía(s) y $videoCount video(s)',
-        );
+      final failureDescription = _descriptionController.text.trim();
+      final intakeDetails = buildServiceTicketIntakeDetails(
+        type: _normalizedTicketType,
+        previousMaintenance: _previousMaintenance,
+        lastMaintenanceDate: _lastMaintenanceDate,
+        issueDuration: _issueDuration,
+        visibleDamage: _visibleDamage,
+        previousRepair: _previousRepair,
+        showsErrorCode: _showsErrorCode,
+      );
 
       final ticket = await Supabase.instance.client
           .from('service_tickets')
@@ -600,7 +444,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
                 ? null
                 : _selectedEquipmentId,
             'title': '$_serviceLabel: $equipmentName $equipmentModel'.trim(),
-            'description': description.toString(),
+            'description': failureDescription,
             'type': _databaseTicketType,
             'priority': _urgency,
             'status': 'open',
@@ -620,6 +464,17 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
                 ? null
                 : details.neighborhood,
             'error_code': errorCode.isEmpty ? null : errorCode,
+            'equipment_name': equipmentName,
+            'equipment_brand': equipmentBrand,
+            'equipment_model': equipmentModel,
+            'serial_number': serial.isEmpty ? null : serial,
+            'institution': _institutionController.text.trim(),
+            'department': _areaController.text.trim(),
+            'equipment_operating': _powerStatus == null
+                ? null
+                : _powerStatus == 'Sí',
+            'failure_description': failureDescription,
+            'intake_details': intakeDetails,
           })
           .select('id')
           .single();
@@ -632,13 +487,11 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
             fileName: attachment.name,
             bytes: attachment.bytes,
             contentType: attachment.contentType,
-            isVideo: attachment.isVideo,
+            isVideo: false,
           );
           await TicketService.sendTicketMessage(
             ticketId,
-            attachment.isVideo
-                ? 'Video adjunto a la solicitud inicial'
-                : 'Fotografía adjunta a la solicitud inicial',
+            'Fotografía adjunta a la solicitud inicial',
             attachmentUrl: reference,
           );
         } catch (_) {
@@ -679,7 +532,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
       appBar: AppBar(
         titleSpacing: 0,
         title: const Text(
-          'Programar mantenimiento',
+          'Programar servicio',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         backgroundColor: kPrimary,
@@ -851,7 +704,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
 
   Widget _diagnosticSection() {
     return _formSection(
-      title: 'Estado y diagnóstico',
+      title: 'Datos del servicio',
       icon: Icons.monitor_heart_outlined,
       children: [
         _choiceField<String>(
@@ -860,22 +713,28 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
           value: _ticketType,
           options: const [
             _ChoiceOption(
-              value: 'preventivo',
+              value: ServiceTicketType.preventivo,
               label: 'Mantenimiento preventivo',
             ),
             _ChoiceOption(
-              value: 'correctivo',
+              value: ServiceTicketType.correctivo,
               label: 'Mantenimiento correctivo',
             ),
-            _ChoiceOption(value: 'reparacion', label: 'Reparación'),
+            _ChoiceOption(
+              value: ServiceTicketType.diagnostico,
+              label: 'Diagnóstico',
+            ),
           ],
           onChanged: (value) => _changeTicketType(value),
         ),
         const SizedBox(height: 12),
         _powerDropdown(),
-        if (_ticketType == 'preventivo') ..._preventiveFields(),
-        if (_ticketType == 'correctivo') ..._correctiveFields(),
-        if (_ticketType == 'reparacion') ..._repairFields(),
+        if (_normalizedTicketType == ServiceTicketType.preventivo)
+          ..._preventiveFields(),
+        if (_normalizedTicketType == ServiceTicketType.correctivo)
+          ..._correctiveFields(),
+        if (_normalizedTicketType == ServiceTicketType.diagnostico)
+          ..._diagnosisFields(),
       ],
     );
   }
@@ -916,54 +775,10 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
 
   List<Widget> _correctiveFields() {
     return [
-      if (_powerStatus == 'Sí') ...[
-        const SizedBox(height: 12),
-        _choiceField<String>(
-          key: ValueKey('failure-frequency-$_failureFrequency'),
-          label: 'Frecuencia de la falla',
-          icon: Icons.repeat_outlined,
-          value: _failureFrequency,
-          placeholder: 'Selecciona una opción',
-          requiredMessage: 'Indica la frecuencia de la falla',
-          options: const [
-            _ChoiceOption(value: 'Falla constante', label: 'Constante'),
-            _ChoiceOption(
-              value: 'Falla intermitente / aleatoria',
-              label: 'Intermitente o aleatoria',
-            ),
-            _ChoiceOption(value: 'Falla ocasional', label: 'Ocasional'),
-          ],
-          onChanged: (value) => setState(() => _failureFrequency = value),
-        ),
-      ],
       const SizedBox(height: 12),
-      _issueDurationDropdown(
-        label: _powerStatus == 'No'
-            ? '¿Desde cuándo dejó de encender?'
-            : '¿Desde cuándo ocurre?',
-      ),
+      _issueDurationDropdown(label: '¿Desde cuándo ocurre?'),
       const SizedBox(height: 12),
-      _errorCodeField(),
-    ];
-  }
-
-  List<Widget> _repairFields() {
-    return [
-      const SizedBox(height: 12),
-      _choiceField<String>(
-        key: ValueKey('visible-damage-$_visibleDamage'),
-        label: '¿Tiene daños visibles?',
-        icon: Icons.build_outlined,
-        value: _visibleDamage,
-        placeholder: 'Selecciona una opción',
-        requiredMessage: 'Indica si tiene daños visibles',
-        options: const [
-          _ChoiceOption(value: 'Sí', label: 'Sí'),
-          _ChoiceOption(value: 'No', label: 'No'),
-          _ChoiceOption(value: 'No lo sé', label: 'No lo sé'),
-        ],
-        onChanged: (value) => setState(() => _visibleDamage = value),
-      ),
+      _visibleDamageDropdown(),
       const SizedBox(height: 12),
       _choiceField<String>(
         key: ValueKey('previous-repair-$_previousRepair'),
@@ -984,14 +799,65 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     ];
   }
 
+  List<Widget> _diagnosisFields() {
+    return [
+      const SizedBox(height: 12),
+      _issueDurationDropdown(label: '¿Desde cuándo presenta el problema?'),
+      const SizedBox(height: 12),
+      _choiceField<String>(
+        key: ValueKey('has-error-code-$_showsErrorCode'),
+        label: '¿Muestra código de error?',
+        icon: Icons.bug_report_outlined,
+        value: _showsErrorCode,
+        placeholder: 'Selecciona una opción',
+        requiredMessage: 'Indica si muestra código de error',
+        options: const [
+          _ChoiceOption(value: 'Sí', label: 'Sí'),
+          _ChoiceOption(value: 'No', label: 'No'),
+        ],
+        onChanged: (value) {
+          setState(() {
+            _showsErrorCode = value;
+            if (value == 'No') {
+              _errorCodeController.clear();
+            }
+          });
+        },
+      ),
+      if (_showsErrorCode == 'Sí') ...[
+        const SizedBox(height: 12),
+        _errorCodeField(),
+      ],
+      const SizedBox(height: 12),
+      _visibleDamageDropdown(),
+    ];
+  }
+
+  Widget _visibleDamageDropdown() {
+    return _choiceField<String>(
+      key: ValueKey('visible-damage-$_visibleDamage'),
+      label: '¿Tiene daños visibles?',
+      icon: Icons.build_outlined,
+      value: _visibleDamage,
+      placeholder: 'Selecciona una opción',
+      requiredMessage: 'Indica si tiene daños visibles',
+      options: const [
+        _ChoiceOption(value: 'Sí', label: 'Sí'),
+        _ChoiceOption(value: 'No', label: 'No'),
+        _ChoiceOption(value: 'No lo sé', label: 'No lo sé'),
+      ],
+      onChanged: (value) => setState(() => _visibleDamage = value),
+    );
+  }
+
   Widget _powerDropdown() {
     return _choiceField<String>(
       key: ValueKey('power-$_ticketType-$_powerStatus'),
-      label: '¿El equipo enciende?',
+      label: '¿El equipo está operando actualmente?',
       icon: Icons.power_settings_new_outlined,
       value: _powerStatus,
       placeholder: 'Selecciona una opción',
-      requiredMessage: 'Indica si el equipo enciende',
+      requiredMessage: 'Indica si el equipo está operando actualmente',
       options: const [
         _ChoiceOption(value: 'Sí', label: 'Sí'),
         _ChoiceOption(value: 'No', label: 'No'),
@@ -1058,7 +924,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Fotografías y video',
+          'Fotografías de evidencia',
           style: TextStyle(
             color: kNavy,
             fontSize: 14,
@@ -1067,7 +933,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Hasta 5 fotografías y 1 video de máximo 1 minuto.',
+          'Hasta 5 fotografías de evidencia.',
           style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5),
         ),
         const SizedBox(height: 10),
@@ -1091,7 +957,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
 
   Widget _addAttachmentTile() {
     return InkWell(
-      onTap: _selectingMedia ? null : _showMediaOptions,
+      onTap: _selectingMedia ? null : _pickPhoto,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         width: 104,
@@ -1110,7 +976,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
             : const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_to_photos_outlined, color: kPrimary, size: 30),
+                  Icon(Icons.add_a_photo_outlined, color: kPrimary, size: 30),
                   SizedBox(height: 6),
                   Text(
                     'Agregar',
@@ -1138,27 +1004,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
             border: Border.all(color: const Color(0xFFCBD5E1)),
           ),
           clipBehavior: Clip.antiAlias,
-          child: attachment.isVideo
-              ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.play_circle_outline,
-                      color: kPrimary,
-                      size: 38,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatDuration(attachment.duration),
-                      style: const TextStyle(
-                        color: kNavy,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                )
-              : Image.memory(attachment.bytes, fit: BoxFit.cover),
+          child: Image.memory(attachment.bytes, fit: BoxFit.cover),
         ),
         Positioned(
           top: -5,
@@ -1602,15 +1448,6 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     if (lower.endsWith('.heic')) return 'image/heic';
     return 'image/jpeg';
   }
-
-  String _videoContentType(String fileName, String? mimeType) {
-    if (mimeType?.startsWith('video/') == true) return mimeType!;
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.mov')) return 'video/quicktime';
-    if (lower.endsWith('.webm')) return 'video/webm';
-    if (lower.endsWith('.m4v')) return 'video/x-m4v';
-    return 'video/mp4';
-  }
 }
 
 class _ChoiceOption<T> {
@@ -1782,7 +1619,7 @@ class _AnchoredChoiceFieldState<T> extends State<_AnchoredChoiceField<T>> {
   Widget build(BuildContext context) {
     final hasValue = widget.value != null;
     return FormField<T>(
-      key: _innerKey,          // stable key → state (incl. errorText) survives rebuilds
+      key: _innerKey, // stable key → state (incl. errorText) survives rebuilds
       initialValue: widget.value,
       validator: widget.requiredMessage != null
           ? (v) => (v == null) ? widget.requiredMessage : null
@@ -1838,14 +1675,10 @@ class _PendingAttachment {
   final String name;
   final Uint8List bytes;
   final String contentType;
-  final bool isVideo;
-  final Duration? duration;
 
   const _PendingAttachment({
     required this.name,
     required this.bytes,
     required this.contentType,
-    required this.isVideo,
-    this.duration,
   });
 }

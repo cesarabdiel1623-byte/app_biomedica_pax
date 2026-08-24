@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/cart_service.dart';
+import '../../../services/registration_gate_service.dart';
 
 class Step3PhoneScreen extends StatefulWidget {
   const Step3PhoneScreen({super.key});
@@ -59,12 +60,14 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
         return;
       }
 
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(phone: _fullPhone),
-      );
+      if (Supabase.instance.client.auth.currentUser != null) {
+        await Supabase.instance.client.auth.updateUser(
+          UserAttributes(phone: _fullPhone),
+        );
+      }
       if (mounted) {
         setState(() {
-          _currentView = 'otp';
+          _currentView = 'success';
           _isLoading = false;
         });
       }
@@ -127,6 +130,9 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
         token: code,
         type: OtpType.phoneChange,
       );
+
+      // Persistir teléfono en DB
+      await RegistrationGateService.saveContactPhone(_fullPhone);
 
       // Save WhatsApp opt-in preference
       await Supabase.instance.client.auth.updateUser(
@@ -333,11 +339,14 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
         TextButton(
           onPressed: () async {
             final navigator = Navigator.of(context);
-            try {
-              await Supabase.instance.client.auth.updateUser(
-                UserAttributes(data: {'phone_skipped': true}),
-              );
-            } catch (_) {}
+            if (Supabase.instance.client.auth.currentUser != null) {
+              try {
+                await RegistrationGateService.saveContactPhone(null, skipped: true);
+                await Supabase.instance.client.auth.updateUser(
+                  UserAttributes(data: {'phone_skipped': true}),
+                );
+              } catch (_) {}
+            }
             navigator.pop({
               'success': true,
               'phone': 'Omitido',

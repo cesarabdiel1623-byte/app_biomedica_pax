@@ -5,9 +5,12 @@ import 'profile_helpers.dart';
 import 'quotes_screen.dart';
 import 'quote_detail_screen.dart';
 import 'quote_request_detail_screen.dart';
+import 'orders_screen.dart';
+import 'order_detail_screen.dart';
 import '../product/all_questions_screen.dart';
 import '../product/single_question_screen.dart';
 import '../tickets/ticket_detail_screen.dart';
+import '../tickets/tickets_list_screen.dart';
 import '../../services/auth_identity_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/product_service.dart';
@@ -240,8 +243,12 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     _loadNotifications();
   }
 
-  Future<void> _loadNotifications({bool forceLoading = false}) async {
-    final shouldShowLoading = forceLoading || _notifications.isEmpty;
+  Future<void> _loadNotifications({
+    bool forceLoading = false,
+    bool showSpinner = true,
+  }) async {
+    final shouldShowLoading =
+        showSpinner && (forceLoading || _notifications.isEmpty);
     if (mounted) {
       setState(() {
         _loading = shouldShowLoading;
@@ -251,16 +258,21 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     try {
       final ownerIds = await _notificationOwnerIds();
 
-      final response = await Supabase.instance.client
-          .from('notifications')
-          .select('*')
-          .inFilter('user_id', ownerIds)
-          .order('created_at', ascending: false);
+      final results = await Future.wait([
+        Supabase.instance.client
+            .from('notifications')
+            .select('*')
+            .inFilter('user_id', ownerIds)
+            .order('created_at', ascending: false)
+            .timeout(const Duration(seconds: 30)),
+        if (shouldShowLoading) Future.delayed(const Duration(seconds: 2)),
+      ]);
 
       if (mounted) {
         setState(() {
-          _notifications = _stringKeyedNotificationList(response);
+          _notifications = _stringKeyedNotificationList(results[0]);
           _loading = false;
+          _error = null;
         });
         _openInitialNotificationIfNeeded();
       }
@@ -278,15 +290,13 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     if (_refreshing) return;
     setState(() {
       _refreshing = true;
-      _loading = true;
     });
     try {
-      await _loadNotifications(forceLoading: true);
+      await _loadNotifications(showSpinner: false);
     } finally {
       if (mounted) {
         setState(() {
           _refreshing = false;
-          _loading = false;
         });
       }
     }
@@ -329,15 +339,22 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     }
   }
 
-  Future<void> _markAsRead(String id) async {
+  Future<bool> _markAsRead(String id) async {
     try {
       final ownerIds = await _notificationOwnerIds();
-      await Supabase.instance.client
+      final updated = await Supabase.instance.client
           .from('notifications')
           .update({'is_read': true})
           .eq('id', id)
-          .inFilter('user_id', ownerIds);
-    } catch (_) {}
+          .inFilter('user_id', ownerIds)
+          .select('id')
+          .limit(1)
+          .maybeSingle();
+      return updated != null;
+    } catch (error) {
+      debugPrint('No se pudo marcar la notificación como leída: $error');
+      return false;
+    }
   }
 
   ({IconData icon, Color color, Color bg}) _notifStyle(
@@ -402,7 +419,6 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     final String title = notification['title']?.toString() ?? '';
 
     if (!isRead && id.isNotEmpty) {
-      _markAsRead(id); // fire-and-forget in background
       if (mounted) {
         setState(() {
           final idx = _notifications.indexWhere(
@@ -419,6 +435,10 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
         NotificationService.instance.unreadCountNotifier.value =
             currentCount - 1;
       }
+      final persisted = await _markAsRead(id);
+      if (!persisted && mounted) {
+        await _loadNotifications(showSpinner: false);
+      }
     }
 
     await Future<void>.delayed(Duration.zero);
@@ -426,6 +446,20 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     final bool isQuestionNotif =
         title.toLowerCase().contains('pregunta') ||
         body.toLowerCase().contains('pregunta');
+    final combinedText = '$title $body';
+    final notificationType =
+        _notificationValue(notification, const [
+          'type',
+          'notification_type',
+          'entity_type',
+          'target_type',
+        ])?.toLowerCase() ??
+        '';
+    final isTicketNotification =
+        title.toLowerCase().contains('ticket') ||
+        body.toLowerCase().contains('ticket') ||
+        combinedText.toLowerCase().contains('tck-') ||
+        notificationType.contains('ticket');
 
     if (isQuestionNotif) {
       final nameMatch = RegExp(r'sobre\s+"([^"]+)"').firstMatch(body);
@@ -445,26 +479,104 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       }
     }
 
+    final ticketReference = _notificationValue(notification, const [
+      'ticket_id',
+      'ticketId',
+      'service_ticket_id',
+      'serviceTicketId',
+    ]);
+    final targetReference = isTicketNotification
+        ? _notificationValue(notification, const [
+            'target_id',
+            'targetId',
+            'entity_id',
+            'entityId',
+            'reference_id',
+            'referenceId',
+          ])
+        : null;
+    final directTicketReference = ticketReference ?? targetReference;
     final ticketNumber =
         _notificationValue(notification, const [
           'ticket_number',
           'ticketNumber',
         ]) ??
-        RegExp(r'TCK-\d{8}-[A-Za-z0-9]+').firstMatch(body)?.group(0);
+        (directTicketReference?.toUpperCase().startsWith('TCK-') == true
+            ? directTicketReference
+            : null) ??
+        RegExp(
+          r'TCK-\d{8}-[A-Za-z0-9]+',
+          caseSensitive: false,
+        ).firstMatch(combinedText)?.group(0);
+    final ticketId = _isUuid(directTicketReference)
+        ? directTicketReference!.trim()
+        : null;
+
+    if (ticketId != null) {
+      await _navigateToTicket(ticketId: ticketId);
+      return;
+    }
     if (ticketNumber != null) {
-      if (!mounted) return;
-      final loadingRoute = _showDestinationLoading();
-      await WidgetsBinding.instance.endOfFrame;
-      if (!mounted || !loadingRoute.isCurrent) return;
-      _replaceDestinationLoading(
-        loadingRoute,
-        TicketDetailScreen(ticketNumber: ticketNumber),
-      );
+      await _navigateToTicket(ticketNumber: ticketNumber.toUpperCase());
+      return;
+    }
+
+    if (isTicketNotification) {
+      await _navigateToTicketsList();
+      return;
+    }
+
+    final isOrderNotification =
+        title.toLowerCase().contains('pedido') ||
+        title.toLowerCase().contains('orden') ||
+        title.toLowerCase().contains('pago') ||
+        title.toLowerCase().contains('envío') ||
+        title.toLowerCase().contains('envio') ||
+        body.toLowerCase().contains('pedido') ||
+        body.toLowerCase().contains('orden') ||
+        combinedText.toLowerCase().contains('ord-') ||
+        notificationType.contains('order') ||
+        notificationType.contains('payment') ||
+        notificationType.contains('shipment');
+    final orderReference =
+        _notificationValue(notification, const [
+          'order_id',
+          'orderId',
+          'order_number',
+          'orderNumber',
+        ]) ??
+        (isOrderNotification
+            ? _notificationValue(notification, const [
+                'target_id',
+                'targetId',
+                'entity_id',
+                'entityId',
+                'reference_id',
+                'referenceId',
+              ])
+            : null) ??
+        RegExp(
+          r'ORD-\d{8}-[A-Za-z0-9]+',
+          caseSensitive: false,
+        ).firstMatch(combinedText)?.group(0);
+
+    if (orderReference != null) {
+      await _navigateToOrder(orderReference);
+      return;
+    }
+    if (isOrderNotification) {
+      await _navigateToOrdersList();
       return;
     }
 
     final quoteReference =
         _notificationValue(notification, const [
+          'quote_id',
+          'quoteId',
+          'quote_request_id',
+          'quoteRequestId',
+          'request_id',
+          'requestId',
           'quote_number',
           'request_number',
           'reference_number',
@@ -484,7 +596,99 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       return;
     }
 
-    await _showNotificationDetails(title: title, body: body);
+    if (mounted && !isRead) {
+      UiHelpers.showFloatingSuccessToast(
+        context,
+        'Notificación marcada como leída.',
+        bottomMargin: 12,
+      );
+    }
+  }
+
+  bool _isUuid(String? value) {
+    if (value == null) return false;
+    return RegExp(
+      r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+      caseSensitive: false,
+    ).hasMatch(value.trim());
+  }
+
+  Future<void> _navigateToTicket({
+    String? ticketId,
+    String? ticketNumber,
+  }) async {
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            TicketDetailScreen(ticketId: ticketId, ticketNumber: ticketNumber),
+      ),
+    );
+  }
+
+  Future<void> _navigateToTicketsList() async {
+    if (!mounted) return;
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const TicketsListScreen()));
+  }
+
+  Future<void> _navigateToOrder(String reference) async {
+    if (!mounted) return;
+    final loadingRoute = _showDestinationLoading();
+    try {
+      final normalizedReference = reference.trim();
+      final query = Supabase.instance.client.from('orders').select('*');
+      final Map<String, dynamic>? order = _isUuid(normalizedReference)
+          ? await query.eq('id', normalizedReference).limit(1).maybeSingle()
+          : await query
+                .eq('order_number', normalizedReference.toUpperCase())
+                .limit(1)
+                .maybeSingle();
+
+      if (!mounted || !loadingRoute.isCurrent) return;
+      if (order != null && order['id'] != null) {
+        _replaceDestinationLoading(
+          loadingRoute,
+          OrderDetailScreen(order: order),
+        );
+        return;
+      }
+    } catch (_) {
+      // If a historical notification cannot resolve its exact order, the
+      // authenticated order list remains a safe and useful destination.
+    }
+    await _openOrdersListFromLoading(loadingRoute);
+  }
+
+  Future<void> _navigateToOrdersList() async {
+    if (!mounted) return;
+    final loadingRoute = _showDestinationLoading();
+    await _openOrdersListFromLoading(loadingRoute);
+  }
+
+  Future<void> _openOrdersListFromLoading(Route<void> loadingRoute) async {
+    try {
+      final clientId = await AuthIdentityService.getEffectiveClientId();
+      if (!mounted || !loadingRoute.isCurrent) return;
+      if (clientId == null) {
+        _closeDestinationLoading(loadingRoute);
+        return;
+      }
+      _replaceDestinationLoading(
+        loadingRoute,
+        OrdersScreen(clientId: clientId),
+      );
+    } catch (error) {
+      _closeDestinationLoading(loadingRoute);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No fue posible abrir el pedido: $error'),
+          backgroundColor: kRed,
+        ),
+      );
+    }
   }
 
   String? _notificationValue(
@@ -505,30 +709,6 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       }
     }
     return null;
-  }
-
-  Future<void> _showNotificationDetails({
-    required String title,
-    required String body,
-  }) async {
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(title.isEmpty ? 'Notificación' : title),
-          content: Text(
-            body.isEmpty ? 'Esta notificación no incluye más detalles.' : body,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cerrar'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Route<void> _showDestinationLoading() {
@@ -685,7 +865,20 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       Map<String, dynamic>? quote;
       Map<String, dynamic>? request;
 
-      if (referenceNumber.startsWith('RQ-')) {
+      if (_isUuid(referenceNumber)) {
+        quote = await client
+            .from('quotes')
+            .select('*')
+            .eq('id', referenceNumber)
+            .limit(1)
+            .maybeSingle();
+        request ??= await client
+            .from('quote_requests')
+            .select('*')
+            .eq('id', referenceNumber)
+            .limit(1)
+            .maybeSingle();
+      } else if (referenceNumber.startsWith('RQ-')) {
         request = await client
             .from('quote_requests')
             .select('*')
@@ -770,107 +963,75 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     final hasUnread = _notifications.any((n) => n['is_read'] == false);
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          Container(
-            color: kPrimary,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      onPressed: () => Navigator.of(context).maybePop(),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Notificaciones',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ),
-                    if (hasUnread)
-                      TextButton.icon(
-                        onPressed: _markAllAsRead,
-                        icon: const Icon(
-                          Icons.done_all_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                        label: const Text(
-                          'Marcar todas',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.18),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                      ),
-                  ],
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: const Text(
+          'Notificaciones',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: false,
+        backgroundColor: kPrimary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        actions: [
+          if (hasUnread)
+            TextButton.icon(
+              onPressed: _markAllAsRead,
+              icon: const Icon(
+                Icons.done_all_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+              label: const Text(
+                'Marcar todas',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-          ),
-          Expanded(
-            child: _loading
-                ? const _NotificationsLoadingBody()
-                : _error != null
-                ? _buildError()
-                : _notifications.isEmpty
-                ? _buildEmptyState()
-                : RefreshIndicator(
-                    color: kPrimary,
-                    backgroundColor: Colors.white,
-                    displacement: 42,
-                    triggerMode: RefreshIndicatorTriggerMode.onEdge,
-                    onRefresh: _refreshNotifications,
-                    child: ListView.separated(
-                      padding: EdgeInsets.zero,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: _notifications.length,
-                      separatorBuilder: (_, _) => const Divider(
-                        height: 1,
-                        thickness: 1,
-                        color: Color(0xFFEEEEEE),
-                      ),
-                      itemBuilder: (context, i) {
-                        final notification = _notifications[i];
-                        return KeyedSubtree(
-                          key: ValueKey(notification['id']?.toString() ?? i),
-                          child: _buildNotifCard(notification),
-                        );
-                      },
-                    ),
-                  ),
-          ),
+          const SizedBox(width: 8),
         ],
       ),
+      body: _loading
+          ? const _NotificationsLoadingBody()
+          : _error != null
+          ? _buildError()
+          : _notifications.isEmpty
+          ? _buildEmptyState()
+          : RefreshIndicator(
+              color: kPrimary,
+              backgroundColor: Colors.white,
+              displacement: 42,
+              triggerMode: RefreshIndicatorTriggerMode.onEdge,
+              onRefresh: _refreshNotifications,
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                physics: UiHelpers.refreshScrollPhysics,
+                itemCount: _notifications.length,
+                separatorBuilder: (_, _) => const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Color(0xFFEEEEEE),
+                ),
+                itemBuilder: (context, i) {
+                  final notification = _notifications[i];
+                  return KeyedSubtree(
+                    key: ValueKey(notification['id']?.toString() ?? i),
+                    child: _buildNotifCard(notification),
+                  );
+                },
+              ),
+            ),
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/auth_identity_service.dart';
+import '../../utils/ui_helpers.dart';
 import 'profile_helpers.dart';
 import 'quote_detail_screen.dart';
 import 'quote_request_detail_screen.dart';
@@ -25,9 +26,9 @@ class _QuotesScreenState extends State<QuotesScreen> {
     _loadQuotes();
   }
 
-  Future<void> _loadQuotes() async {
+  Future<void> _loadQuotes({bool showSpinner = true}) async {
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
@@ -35,23 +36,34 @@ class _QuotesScreenState extends State<QuotesScreen> {
       final effectiveClientId =
           await AuthIdentityService.getEffectiveClientId() ?? widget.clientId;
 
-      final quotesResponse = await Supabase.instance.client
+      final quotesFuture = Supabase.instance.client
           .from('quotes')
           .select('*')
           .eq('client_id', effectiveClientId)
-          .order('created_at', ascending: false);
+          .isFilter('service_ticket_id', null)
+          .order('created_at', ascending: false)
+          .timeout(const Duration(seconds: 30));
 
-      List<dynamic> quoteRequestsResponse = [];
-      if (userId != null) {
-        quoteRequestsResponse = await Supabase.instance.client
-            .from('quote_requests')
-            .select('*')
-            .eq('profile_id', userId)
-            .order('created_at', ascending: false);
-      }
+      final quoteRequestsFuture = userId != null
+          ? Supabase.instance.client
+                .from('quote_requests')
+                .select('*')
+                .eq('profile_id', userId)
+                .order('created_at', ascending: false)
+                .timeout(const Duration(seconds: 30))
+          : Future.value(<dynamic>[]);
+
+      final results = await Future.wait([
+        quotesFuture,
+        quoteRequestsFuture,
+        if (showSpinner) Future.delayed(const Duration(seconds: 2)),
+      ]);
+
+      final quotesResponse = results[0] as List;
+      final quoteRequestsResponse = results[1] as List;
 
       final combined = <Map<String, dynamic>>[
-        ...(quotesResponse as List).map(
+        ...quotesResponse.map(
           (quote) => {
             ...(quote as Map<String, dynamic>),
             '_entry_type': 'quote',
@@ -168,19 +180,38 @@ class _QuotesScreenState extends State<QuotesScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: kPrimary))
           : _error != null
-          ? LoadErrorState(
-              error: _error,
-              onRetry: _loadQuotes,
-              genericTitle: 'Error al cargar cotizaciones',
-              genericMessage:
-                  'No pudimos cargar tus cotizaciones por el momento.',
+          ? RefreshIndicator(
+              color: kPrimary,
+              backgroundColor: Colors.white,
+              displacement: 42,
+              triggerMode: RefreshIndicatorTriggerMode.onEdge,
+              onRefresh: () => _loadQuotes(showSpinner: false),
+              child: ListView(
+                physics: UiHelpers.refreshScrollPhysics,
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height - 200,
+                    child: LoadErrorState(
+                      error: _error,
+                      onRetry: _loadQuotes,
+                      genericTitle: 'Error al cargar cotizaciones',
+                      genericMessage:
+                          'No pudimos cargar tus cotizaciones por el momento.',
+                    ),
+                  ),
+                ],
+              ),
             )
           : _quotes.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
               color: kPrimary,
-              onRefresh: _loadQuotes,
+              backgroundColor: Colors.white,
+              displacement: 42,
+              triggerMode: RefreshIndicatorTriggerMode.onEdge,
+              onRefresh: () => _loadQuotes(showSpinner: false),
               child: ListView.builder(
+                physics: UiHelpers.refreshScrollPhysics,
                 padding: const EdgeInsets.all(12),
                 itemCount: _quotes.length,
                 itemBuilder: (context, i) {
@@ -201,139 +232,185 @@ class _QuotesScreenState extends State<QuotesScreen> {
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () {
-                        Navigator.of(context)
-                            .push(
-                              MaterialPageRoute(
-                                builder: (_) => isQuoteRequest
-                                    ? QuoteRequestDetailScreen(request: q)
-                                    : QuoteDetailScreen(quote: q),
-                              ),
-                            )
-                            .then((val) {
-                              if (val == true) {
-                                _loadQuotes();
-                              }
-                            });
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: kPrimary.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.request_quote_outlined,
-                                color: kPrimary,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                    clipBehavior: Clip.antiAlias,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context)
+                              .push(
+                                MaterialPageRoute(
+                                  builder: (_) => isQuoteRequest
+                                      ? QuoteRequestDetailScreen(request: q)
+                                      : QuoteDetailScreen(quote: q),
+                                ),
+                              )
+                              .then((val) {
+                                if (val == true) {
+                                  _loadQuotes();
+                                }
+                              });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: kPrimary.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.request_quote_outlined,
+                                      color: kPrimary,
+                                      size: 23,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          isQuoteRequest
+                                              ? 'SOLICITUD'
+                                              : 'COTIZACIÓN',
+                                          style: const TextStyle(
+                                            color: kPrimary,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.8,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
                                           q['_display_number'] as String? ??
                                               'Cotización',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                            fontWeight: FontWeight.w700,
                                             color: kNavy,
                                             fontSize: 14.5,
                                           ),
-                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 3,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: _statusColor(
-                                            effectiveStatus,
-                                          ).withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          _statusLabel(
-                                            effectiveStatus,
-                                          ).toUpperCase(),
-                                          style: TextStyle(
-                                            color: _statusColor(
-                                              effectiveStatus,
-                                            ),
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.calendar_today_outlined,
-                                        size: 12,
-                                        color: Colors.grey.shade500,
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _statusColor(
+                                        effectiveStatus,
+                                      ).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      _statusLabel(effectiveStatus),
+                                      style: TextStyle(
+                                        color: _statusColor(effectiveStatus),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
                                       ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Fecha: $dateStr',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    total != null
-                                        ? 'Importe total: ${formatCurrency(total)}'
-                                        : 'Solicitud recibida y en seguimiento',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(
-                              Icons.chevron_right_rounded,
-                              color: Colors.grey,
-                              size: 22,
-                            ),
-                          ],
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Divider(
+                                  height: 1,
+                                  color: Color(0xFFE5E7EB),
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 4,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Fecha',
+                                          style: TextStyle(
+                                            color: Color(0xFF64748B),
+                                            fontSize: 10.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          dateStr,
+                                          style: const TextStyle(
+                                            color: Color(0xFF334155),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 6,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          total != null
+                                              ? 'Importe'
+                                              : 'Seguimiento',
+                                          style: const TextStyle(
+                                            color: Color(0xFF64748B),
+                                            fontSize: 10.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          total != null
+                                              ? formatCurrency(total)
+                                              : 'En proceso',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Color(0xFF111827),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    color: Color(0xFF94A3B8),
+                                    size: 22,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

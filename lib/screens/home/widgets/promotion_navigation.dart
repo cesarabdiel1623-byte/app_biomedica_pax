@@ -8,7 +8,7 @@ import '../../../services/promotion_banner_service.dart';
 import '../../product/category_products_screen.dart';
 import '../../product/product_detail_screen.dart';
 import '../../product/promotion_products_screen.dart';
-import '../home_screen.dart';
+import '../../tickets/tickets_list_screen.dart';
 
 class PromotionNavigation {
   const PromotionNavigation._();
@@ -17,10 +17,11 @@ class PromotionNavigation {
     PromotionBanner creative, {
     bool productAvailable = true,
   }) {
-    if (_notEmpty(creative.productId)) return productAvailable;
+    if (_notEmpty(creative.productId)) return true;
     final action = creative.ctaAction?.toLowerCase().trim();
     if (action == 'open_support') return true;
     if (action == null || action.isEmpty || action == 'none') return false;
+    if (_isSubcategoryAction(action)) return _notEmpty(creative.ctaTarget);
     if (action == 'open_promotion') {
       return _notEmpty(creative.ctaTarget) ||
           _notEmpty(creative.promotionId) ||
@@ -41,6 +42,11 @@ class PromotionNavigation {
 
     final action = creative.ctaAction?.toLowerCase().trim() ?? 'none';
     final target = creative.ctaTarget?.trim();
+    if (_isSubcategoryAction(action)) {
+      if (_notEmpty(target)) await _openSubcategory(context, target!);
+      return;
+    }
+
     switch (action) {
       case 'open_product':
         if (_notEmpty(target)) _openProduct(context, target!);
@@ -71,7 +77,11 @@ class PromotionNavigation {
         }
         break;
       case 'open_support':
-        HomeScreen.showTab(3);
+        if (context.mounted) {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const TicketsListScreen()));
+        }
         break;
       case 'external_url':
         final uri = PromotionBannerService.validateExternalUrl(target);
@@ -101,7 +111,12 @@ class PromotionNavigation {
       final categories = await CatalogService.getCategories();
       CatalogCategory? selected;
       for (final category in categories) {
-        if (category.id == categoryId) {
+        if (_matchesCatalogToken(categoryId, [
+          category.id,
+          category.slug,
+          category.productCategoryKey,
+          category.name,
+        ])) {
           selected = category;
           break;
         }
@@ -121,6 +136,81 @@ class PromotionNavigation {
     } catch (_) {
       return;
     }
+  }
+
+  static Future<void> _openSubcategory(
+    BuildContext context,
+    String subcategoryTarget,
+  ) async {
+    try {
+      final categories = await CatalogService.getCategories();
+      CatalogCategory? selectedCategory;
+      CatalogSubcategory? selectedSubcategory;
+
+      for (final category in categories) {
+        for (final subcategory in category.subcategories) {
+          if (_matchesCatalogToken(subcategoryTarget, [
+            subcategory.id,
+            subcategory.slug,
+            subcategory.name,
+          ])) {
+            selectedCategory = category;
+            selectedSubcategory = subcategory;
+            break;
+          }
+        }
+        if (selectedSubcategory != null) break;
+      }
+
+      if (selectedCategory == null ||
+          selectedSubcategory == null ||
+          !context.mounted) {
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CategoryProductsScreen(
+            categoryId: selectedCategory!.id,
+            categoryKey: selectedCategory.productCategoryKey,
+            categoryLabel: selectedCategory.name,
+            subcategoryLabel: selectedSubcategory!.name,
+            subcategoryId: selectedSubcategory.id,
+            subcategoryKey: selectedSubcategory.slug,
+          ),
+        ),
+      );
+    } catch (_) {
+      return;
+    }
+  }
+
+  static bool _isSubcategoryAction(String action) {
+    return switch (action) {
+      'subcategory' ||
+      'open_subcategory' ||
+      'category_subcategory' ||
+      'subcategory_id' => true,
+      _ => false,
+    };
+  }
+
+  static bool _matchesCatalogToken(String target, Iterable<String?> values) {
+    final normalizedTarget = _normalizeCatalogToken(target);
+    if (normalizedTarget.isEmpty) return false;
+    for (final value in values) {
+      if (_normalizeCatalogToken(value) == normalizedTarget) return true;
+    }
+    return false;
+  }
+
+  static String _normalizeCatalogToken(String? value) {
+    return value
+            ?.trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[\s_-]+'), '-')
+            .replaceAll(RegExp(r'^-+|-+$'), '') ??
+        '';
   }
 
   static bool _notEmpty(String? value) => value?.trim().isNotEmpty == true;

@@ -1,7 +1,5 @@
 import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../home/widgets/staggered_fade_slide.dart';
 import '../home/home_screen.dart';
@@ -24,6 +22,7 @@ import 'ask_question_screen.dart';
 import 'all_questions_screen.dart';
 import 'all_reviews_screen.dart';
 import 'write_review_screen.dart';
+import 'quote_cart_screen.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
@@ -58,7 +57,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _loadingQuestions = true;
   bool _loadingDirectBuy = false;
   bool _loadingAddToCart = false;
+  bool _loadingAddToQuote = false;
   bool _addedToCartSuccess = false;
+  bool _addedToQuoteSuccess = false;
   bool _hasPurchased = false;
   ProductReview? _userReview;
 
@@ -190,32 +191,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  Future<void> _shareProduct() async {
-    if (_product == null) return;
-    final shareText =
-        '¡Mira este producto en Go Medical!: ${_product!.name} - ${_product!.formattedPrice}';
-    try {
-      await Clipboard.setData(ClipboardData(text: shareText));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✓ Enlace de producto copiado al portapapeles'),
-            backgroundColor: _kPrimary,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al compartir: $e'),
-            backgroundColor: _kRed,
-          ),
-        );
-      }
-    }
-  }
 
   Future<bool> _addToCart() async {
     if (_product == null) return false;
@@ -243,7 +218,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     try {
       await CartService.addToCart(_product!.id, quantity: _quantity);
       if (mounted) {
-        setState(() => _addedToCartSuccess = true);
+        setState(() {
+          _addedToCartSuccess = true;
+          _addedToQuoteSuccess = false;
+        });
       }
       return true;
     } catch (e) {
@@ -386,13 +364,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _requestQuote(Product p) async {
+    if (_loadingAddToQuote) return;
+    setState(() => _loadingAddToQuote = true);
     try {
-      await QuoteService.addToQuote(p);
+      await QuoteService.addToQuote(p, quantity: _quantity);
       if (mounted) {
+        setState(() {
+          _addedToQuoteSuccess = true;
+          _addedToCartSuccess = false;
+          _loadingAddToQuote = false;
+        });
         UiHelpers.showAddToQuoteSuccessToast(context, p.name, bottomMargin: 12);
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _loadingAddToQuote = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
@@ -753,9 +739,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
-      extendBody: true,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 90),
+        padding: const EdgeInsets.only(bottom: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -892,64 +877,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                       ),
                     ),
-                  // Botones flotantes
+                  // Botón flotante de favorito
                   Positioned(
                     bottom: 12,
                     right: 16,
-                    child: Column(
-                      children: [
-                        // Compartir
-                        GestureDetector(
-                          onTap: _shareProduct,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
+                    child: GestureDetector(
+                      onTap: _toggleFavorite,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
                             ),
-                            child: const Icon(
-                              Icons.share_outlined,
-                              color: _kNavy,
-                              size: 22,
-                            ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        // Favorito (Corazón)
-                        GestureDetector(
-                          onTap: _toggleFavorite,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              _isFavorite
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: _isFavorite ? _kRed : Colors.grey.shade500,
-                              size: 24,
-                            ),
-                          ),
+                        child: Icon(
+                          _isFavorite
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: _isFavorite ? _kRed : Colors.grey.shade500,
+                          size: 24,
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ],
@@ -1106,31 +1061,52 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.inventory_2_outlined,
-                          size: 21,
-                          color: Colors.grey,
+                        // Lado Izquierdo: Disponibilidad con icono de paquete
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.inventory_2_outlined,
+                              size: 20,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              canRequest ? _stockQuantityLabel(p) : 'Agotado',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
+
+                        // En Medio: Cantidad seleccionada
                         Expanded(
-                          child: Text(
-                            canRequest ? 'Cantidad: $_quantity' : 'Agotado',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black,
+                          child: Center(
+                            child: Text(
+                              'Cantidad: $_quantity',
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111827),
+                              ),
                             ),
                           ),
                         ),
+
+                        // Lado Derecho: Botones de quitar (-) y agregar (+)
                         if (canRequest)
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               GestureDetector(
                                 onTap: _quantity > 1
                                     ? () => setState(() => _quantity--)
                                     : null,
                                 child: Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
                                     color: _quantity > 1
                                         ? Colors.white
@@ -1149,13 +1125,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 14),
+                              const SizedBox(width: 8),
                               GestureDetector(
                                 onTap: _quantity < maxQuantity
                                     ? () => setState(() => _quantity++)
                                     : null,
                                 child: Container(
-                                  padding: const EdgeInsets.all(8),
+                                  padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
                                     color: _quantity < maxQuantity
                                         ? Colors.white
@@ -1176,17 +1152,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                             ],
                           ),
-                        if (canRequest)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 12),
-                            child: Text(
-                              _stockQuantityLabel(p),
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ),
                       ],
                     ),
                   ),
@@ -1196,45 +1161,159 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
             const SizedBox(height: 16),
 
-            // ── Botón de Compra ──
+            // ── Botones de Acción: Carrito y Cotización ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
+                  // 1. Agregar al carrito / Ver carrito (Verde _kPrimary)
                   SizedBox(
                     width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: (!_loadingDirectBuy && !_loadingAddToCart)
-                          ? () => _buyNow(p)
-                          : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _kBlue,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _loadingDirectBuy
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              canRequest ? 'Comprar ahora' : 'Agotado',
-                              style: const TextStyle(
+                    height: 52,
+                    child: _addedToCartSuccess
+                        ? ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(
+                                context,
+                              ).popUntil((route) => route.isFirst);
+                              HomeScreen.showTab(2);
+                            },
+                            icon: const Icon(
+                              Icons.shopping_cart_outlined,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              'Ver carrito',
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
-                    ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _kPrimary,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: (canRequest &&
+                                    !_loadingAddToCart &&
+                                    !_loadingAddToQuote)
+                                ? _addToCart
+                                : null,
+                            icon: _loadingAddToCart
+                                ? const SizedBox.shrink()
+                                : const Icon(
+                                    Icons.add_shopping_cart_outlined,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
+                            label: _loadingAddToCart
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    canRequest
+                                        ? 'Agregar al carrito'
+                                        : 'Agotado',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _kPrimary,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
+
+                  // 2. Cotizar / Ver cotización (Azul #3483FA)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: _addedToQuoteSuccess
+                        ? ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const QuoteCartScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(
+                              Icons.description_outlined,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              'Ver cotización',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3483FA),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: (!_loadingAddToQuote &&
+                                    !_loadingAddToCart)
+                                ? () => _requestQuote(p)
+                                : null,
+                            icon: _loadingAddToQuote
+                                ? const SizedBox.shrink()
+                                : const Icon(
+                                    Icons.request_quote_outlined,
+                                    size: 20,
+                                    color: Colors.white,
+                                  ),
+                            label: _loadingAddToQuote
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Cotizar',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3483FA),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                  ),
                   if (!canRequest) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -1274,6 +1353,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   if (p.description != null && p.description!.isNotEmpty)
                     Text(
                       p.description!,
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 13,
                         color: Colors.grey.shade600,
@@ -1339,123 +1420,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
             const SizedBox(height: 40),
           ],
-        ),
-      ),
-      bottomNavigationBar: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12.0, sigmaY: 12.0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.85),
-              border: const Border(
-                top: BorderSide(color: Color(0x1F000000), width: 0.5),
-              ),
-            ),
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              MediaQuery.of(context).padding.bottom > 0 ? 8 : 12,
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => _requestQuote(p),
-                    icon: const Icon(
-                      Icons.request_quote_outlined,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                    style: IconButton.styleFrom(
-                      padding: const EdgeInsets.all(12),
-                      backgroundColor: const Color(0xFF3483FA),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: _addedToCartSuccess
-                          ? ElevatedButton(
-                              onPressed: () {
-                                Navigator.of(
-                                  context,
-                                ).popUntil((route) => route.isFirst);
-                                HomeScreen.showTab(2);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF3483FA),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.shopping_cart_outlined, size: 20),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Ver carrito',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : ElevatedButton(
-                              onPressed:
-                                  (canRequest &&
-                                      !_loadingAddToCart &&
-                                      !_loadingDirectBuy)
-                                  ? _addToCart
-                                  : null,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _kPrimary,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: _loadingAddToCart
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.add_shopping_cart_outlined,
-                                          size: 20,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'Agregar al carrito',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );

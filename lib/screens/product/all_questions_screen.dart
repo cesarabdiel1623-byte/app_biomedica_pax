@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/question_service.dart';
+import '../../utils/ui_helpers.dart';
 import 'ask_question_screen.dart';
 
 class AllProductQuestionsScreen extends StatefulWidget {
@@ -31,8 +32,10 @@ class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
     _loadQuestions();
   }
 
-  Future<void> _loadQuestions() async {
-    setState(() => _loading = true);
+  Future<void> _loadQuestions({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() => _loading = true);
+    }
     try {
       final list = await QuestionService.getProductQuestions(widget.productId);
       setState(() {
@@ -117,9 +120,10 @@ class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
                   : _questions.isEmpty
                   ? _buildEmptyState()
                   : RefreshIndicator(
-                      onRefresh: _loadQuestions,
+                      onRefresh: () => _loadQuestions(showSpinner: false),
                       color: _kPrimary,
                       child: ListView.separated(
+                        physics: UiHelpers.refreshScrollPhysics,
                         padding: const EdgeInsets.all(16),
                         itemCount: _questions.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 16),

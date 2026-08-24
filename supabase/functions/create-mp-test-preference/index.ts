@@ -17,6 +17,24 @@ function jsonResponse(body: JsonRecord, status = 200): Response {
   });
 }
 
+const ALLOWED_CARRIER_PATTERNS = [
+  { normalized: "FedEx", regex: /(?:^|[^a-z0-9])fedex(?:[^a-z0-9]|$)/i },
+  { normalized: "DHL", regex: /(?:^|[^a-z0-9])dhl(?:[^a-z0-9]|$)/i },
+  { normalized: "Estafeta", regex: /(?:^|[^a-z0-9])estafeta(?:[^a-z0-9]|$)/i },
+  { normalized: "Paquetexpress", regex: /(?:^|[^a-z0-9])paquetexpress(?:[^a-z0-9]|$)|(?:^|[^a-z0-9])paquete\s*express(?:[^a-z0-9]|$)/i },
+];
+
+function isAllowedCarrier(carrierName: string | null | undefined): boolean {
+  if (!carrierName || typeof carrierName !== "string") return false;
+  const clean = carrierName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  return ALLOWED_CARRIER_PATTERNS.some((c) => c.regex.test(clean));
+}
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -270,8 +288,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
     const rCurrency = (getString(r, "currency_code") ?? "").toUpperCase();
     const rTotal = getNumber(r, "total");
 
+    const rCarrier = getString(r, "provider_display_name") ?? getString(r, "provider_name") ?? "";
+
     if (
       !rId ||
+      !isAllowedCarrier(rCarrier) ||
       rStatus === "no_coverage" ||
       rStatus === "not_applicable" ||
       rTotal === null ||
@@ -324,47 +345,117 @@ Deno.serve(async (request: Request): Promise<Response> => {
     }, 500);
   }
 
-  const mpToken = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN")?.trim() || "TEST-MOCK-TOKEN";
-  let checkoutUrl = `https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=TEST-PREF-${orderData.order_number}`;
+  const mpToken = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN")?.trim();
+  if (!mpToken) {
+    return jsonResponse({
+      ok: false,
+      error: "mercado_pago_token_missing",
+      message: "Configuración de Mercado Pago incompleta en el servidor.",
+    }, 500);
+  }
 
-  if (mpToken !== "TEST-MOCK-TOKEN") {
-    try {
-      const prefRes = await fetchWithTimeout(
-        "https://api.mercadopago.com/checkout/preferences",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${mpToken}`,
-          },
-          body: JSON.stringify({
-            items: [
-              {
-                title: `Pedido Go Medical - ${orderData.order_number}`,
-                quantity: 1,
-                unit_price: Number(paymentTotal.toFixed(2)),
-                currency_id: "MXN",
-              },
-            ],
-            external_reference: getString(orderData, "order_number") ?? "",
-          }),
+  const orderNumber = getString(orderData, "order_number") ?? "";
+  const orderId = getString(orderData, "order_id") ?? "";
+  const paymentRecordId = getString(orderData, "payment_record_id");
+  const preferenceExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  let prefRes: Response;
+  try {
+    prefRes = await fetchWithTimeout(
+      "https://api.mercadopago.com/checkout/preferences",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${mpToken}`,
         },
-        10000,
-      );
-      const prefData = await parseJsonResponse(prefRes);
-      if (prefRes.ok && isRecord(prefData) && typeof prefData.init_point === "string") {
-        checkoutUrl = prefData.init_point;
-      }
-    } catch (_) {
-      // Fallback a checkout URL mock
-    }
+        body: JSON.stringify({
+          items: [
+            {
+              title: `Pedido Go Medical - ${orderNumber}`,
+              quantity: 1,
+              unit_price: Number(paymentTotal.toFixed(2)),
+              currency_id: "MXN",
+            },
+          ],
+          external_reference: orderNumber,
+          expires: true,
+          expiration_date_to: preferenceExpiresAt,
+          back_urls: {
+            success: "gomedical://payment/success",
+            pending: "gomedical://payment/pending",
+            failure: "gomedical://payment/failure",
+          },
+          auto_return: "approved",
+        }),
+      },
+      10000,
+    );
+  } catch (error) {
+    return jsonResponse({
+      ok: false,
+      error: "mercado_pago_network_error",
+      message: error instanceof Error ? error.message : "Error al conectar con Mercado Pago.",
+    }, 502);
+  }
+
+  const prefData = await parseJsonResponse(prefRes);
+  if (!prefRes.ok || !isRecord(prefData)) {
+    return jsonResponse({
+      ok: false,
+      error: "mercado_pago_preference_failed",
+      message: "Mercado Pago no pudo crear la preferencia de pago.",
+      provider_status: prefRes.status,
+    }, 502);
+  }
+
+  const checkoutUrl = getString(prefData, "init_point");
+  const preferenceId = getString(prefData, "id");
+
+  if (!checkoutUrl || !preferenceId) {
+    return jsonResponse({
+      ok: false,
+      error: "invalid_mercado_pago_response",
+      message: "Respuesta inválida de la pasarela de pagos.",
+    }, 502);
+  }
+
+  // Persistir canónicamente en order_payments (fail-closed)
+  let persistQuery = adminClient
+    .from("order_payments")
+    .update({
+      preference_id: preferenceId,
+      checkout_url: checkoutUrl,
+      preference_expires_at: preferenceExpiresAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("order_id", orderId);
+
+  if (paymentRecordId) {
+    persistQuery = persistQuery.eq("id", paymentRecordId);
+  } else {
+    persistQuery = persistQuery.eq("external_reference", orderNumber);
+  }
+
+  const { data: updatedPayment, error: persistError } = await persistQuery
+    .select("id, preference_id, checkout_url, preference_expires_at")
+    .maybeSingle();
+
+  if (persistError || !updatedPayment || !getString(updatedPayment, "checkout_url")) {
+    return jsonResponse({
+      ok: false,
+      error: "preference_persistence_failed",
+      message: "Error al registrar la preferencia de pago en la base de datos.",
+    }, 500);
   }
 
   return jsonResponse({
     ok: true,
-    checkout_url: checkoutUrl,
-    order_id: getString(orderData, "order_id"),
-    order_number: getString(orderData, "order_number"),
+    checkout_url: getString(updatedPayment, "checkout_url") ?? checkoutUrl,
+    preference_id: getString(updatedPayment, "preference_id") ?? preferenceId,
+    preference_expires_at: getString(updatedPayment, "preference_expires_at") ?? preferenceExpiresAt,
+    order_id: orderId,
+    order_number: orderNumber,
     product_subtotal: getNumber(orderData, "product_subtotal"),
     customer_shipping_amount: getNumber(orderData, "customer_shipping_amount"),
     skydropx_shipping_cost: getNumber(orderData, "skydropx_shipping_cost"),

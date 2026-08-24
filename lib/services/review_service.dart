@@ -41,8 +41,11 @@ class ProductReview {
 
     final rawMedia = json['images'] as List? ?? [];
     final mediaUrls = rawMedia
-        .map((i) => UiHelpers.sanitizeTrustedRemoteUrl(i.toString()))
-        .whereType<String>()
+        .map((i) {
+          final s = i.toString().trim();
+          return UiHelpers.sanitizeTrustedRemoteUrl(s) ?? s;
+        })
+        .where((url) => url.isNotEmpty)
         .toList();
     final images = mediaUrls
         .where((url) => !ReviewService.isVideoUrl(url))
@@ -79,6 +82,39 @@ class ReviewService {
     final path = Uri.tryParse(url)?.path.toLowerCase() ?? url.toLowerCase();
     final extension = path.contains('.') ? path.split('.').last : '';
     return _videoExtensions.contains(extension);
+  }
+
+  static String _titleForRating(int rating) {
+    return switch (rating) {
+      5 => 'Excelente',
+      4 => 'Muy bueno',
+      3 => 'Bueno',
+      2 => 'Regular',
+      _ => 'Malo',
+    };
+  }
+
+  static Future<void> _submitReview({
+    required String productId,
+    required int rating,
+    required String comment,
+    List<String> mediaUrls = const [],
+  }) async {
+    final sanitizedUrls = mediaUrls
+        .map((u) => UiHelpers.sanitizeTrustedRemoteUrl(u))
+        .whereType<String>()
+        .toList();
+
+    await _client.rpc(
+      'submit_product_review',
+      params: {
+        'p_comment': comment,
+        'p_product_id': productId,
+        'p_rating': rating,
+        'p_title': _titleForRating(rating),
+        'p_images': sanitizedUrls,
+      },
+    );
   }
 
   /// Get all reviews for a product.
@@ -123,16 +159,17 @@ class ReviewService {
     required List<String> imageUrls,
     List<String> videoUrls = const [],
   }) async {
-    final clientId = await AuthIdentityService.getEffectiveClientId();
-    if (clientId == null) throw Exception('Usuario no autenticado');
+    if (_client.auth.currentUser == null) {
+      throw Exception('Usuario no autenticado');
+    }
 
-    await _client.from('product_reviews').insert({
-      'product_id': productId,
-      'client_id': clientId,
-      'rating': rating,
-      'comment': comment,
-      'images': [...imageUrls, ...videoUrls],
-    });
+    final allMedia = [...imageUrls, ...videoUrls];
+    await _submitReview(
+      productId: productId,
+      rating: rating,
+      comment: comment,
+      mediaUrls: allMedia,
+    );
   }
 
   /// Upload review photo and return public url.
@@ -278,24 +315,24 @@ class ReviewService {
 
   /// Updates an existing review.
   static Future<void> updateReview({
+    required String productId,
     required String reviewId,
     required int rating,
     required String comment,
     required List<String> imageUrls,
     List<String> videoUrls = const [],
   }) async {
-    final clientId = await AuthIdentityService.getEffectiveClientId();
-    if (clientId == null) throw Exception('Usuario no autenticado');
+    if (_client.auth.currentUser == null) {
+      throw Exception('Usuario no autenticado');
+    }
 
-    await _client
-        .from('product_reviews')
-        .update({
-          'rating': rating,
-          'comment': comment,
-          'images': [...imageUrls, ...videoUrls],
-        })
-        .eq('id', reviewId)
-        .eq('client_id', clientId);
+    final allMedia = [...imageUrls, ...videoUrls];
+    await _submitReview(
+      productId: productId,
+      rating: rating,
+      comment: comment,
+      mediaUrls: allMedia,
+    );
   }
 
   /// Delete one review owned by the authenticated client.
@@ -307,20 +344,25 @@ class ReviewService {
         .from('product_reviews')
         .select('images')
         .eq('id', reviewId)
-        .eq('client_id', clientId)
         .maybeSingle();
     final mediaUrls = (current?['images'] as List? ?? [])
         .map((value) => value.toString())
         .toList();
 
-    final deleted = await _client
-        .from('product_reviews')
-        .delete()
-        .eq('id', reviewId)
-        .eq('client_id', clientId)
-        .select('id');
-    if (deleted.isEmpty) {
-      throw Exception('No se pudo eliminar la opinión.');
+    try {
+      await _client.rpc(
+        'delete_product_review',
+        params: {'p_review_id': reviewId},
+      );
+    } catch (_) {
+      final deleted = await _client
+          .from('product_reviews')
+          .delete()
+          .eq('id', reviewId)
+          .select('id');
+      if (deleted.isEmpty) {
+        throw Exception('No se pudo eliminar la opinión.');
+      }
     }
 
     for (final url in mediaUrls) {

@@ -24,7 +24,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   List<dynamic> _items = [];
   Map<String, ProductReview> _reviewsByProductId = {};
   OrderShipment? _shipment;
-  bool _expandedEvents = false;
   bool _loading = true;
   String? _error;
 
@@ -37,19 +36,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _loadItems() async {
     try {
       final orderId = widget.order['id'] as String;
-      final response = await Supabase.instance.client
-          .from('order_items')
-          .select(
-            '*, products(brand, product_media(${ProductService.publicMediaColumns}))',
-          )
-          .eq('order_id', orderId);
+      final results = await Future.wait<dynamic>([
+        Supabase.instance.client
+            .from('order_items')
+            .select(
+              '*, products(brand, product_media(${ProductService.publicMediaColumns}))',
+            )
+            .eq('order_id', orderId)
+            .timeout(const Duration(seconds: 30)),
+        ReviewService.getClientReviews().timeout(const Duration(seconds: 30)),
+        TrackingService.getShipmentForOrder(
+          orderId,
+        ).timeout(const Duration(seconds: 30)),
+        Future.delayed(const Duration(seconds: 2)),
+      ]);
 
-      final clientReviews = await ReviewService.getClientReviews();
-      final shipment = await TrackingService.getShipmentForOrder(orderId);
+      final response = results[0] as List;
+      final clientReviews = results[1] as List<ProductReview>;
+      final shipment = results[2] as OrderShipment?;
 
       if (mounted) {
         setState(() {
-          _items = response as List;
+          _items = response;
           _reviewsByProductId = {for (var r in clientReviews) r.productId: r};
           _shipment = shipment;
           _loading = false;
@@ -65,48 +73,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'draft':
-        return 'Borrador';
-      case 'pending_review':
-        return 'En Revisión';
-      case 'pending_payment':
-        return 'Pendiente de Pago';
-      case 'paid':
-        return 'Pagado';
-      case 'processing':
-        return 'Procesando';
-      case 'shipped':
-        return 'Enviado';
-      case 'delivered':
-        return 'Entregado';
-      case 'canceled':
-        return 'Cancelado';
-      default:
-        return status;
-    }
-  }
-
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'paid':
-      case 'delivered':
-        return kGreen;
-      case 'pending_payment':
-      case 'pending_review':
-        return kOrange;
-      case 'processing':
-      case 'shipped':
-        return Colors.blue;
-      case 'canceled':
-        return kRed;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Widget _buildOrderPhases(String status) {
+  Widget _buildShipmentTracking(Map<String, dynamic> order) {
+    final status = (order['status'] ?? '').toString();
     if (status == 'canceled') {
       return Container(
         width: double.infinity,
@@ -134,446 +102,730 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       );
     }
 
-    int currentStep = 0;
-    final shippingStatus = _shipment?.shippingStatus.toLowerCase();
-
-    if (shippingStatus != null) {
-      if (shippingStatus == 'pending' || shippingStatus == 'label_created') {
-        currentStep = 0;
-      } else if (shippingStatus == 'ready_to_ship' ||
-          shippingStatus == 'picked_up' ||
-          shippingStatus == 'in_transit' ||
-          shippingStatus == 'out_for_delivery') {
-        currentStep = 1;
-      } else if (shippingStatus == 'delivered') {
-        currentStep = 2;
-      }
-    } else {
-      if (status == 'shipped') {
-        currentStep = 1;
-      } else if (status == 'delivered') {
-        currentStep = 2;
-      }
+    final shipment = _shipment;
+    if (shipment == null) {
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: _trackingCardDecoration(),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Seguimiento del envío',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: kNavy,
+              ),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Estamos preparando la información de envío.',
+              style: TextStyle(fontSize: 12, color: Colors.black87),
+            ),
+          ],
+        ),
+      );
     }
 
-    final steps = [
-      {
-        'label': _shipment != null ? 'Guía lista' : 'En bodega',
-        'desc': _shipment != null ? _shipment!.statusLabel : 'Preparando envío',
-      },
-      {'label': 'En proceso', 'desc': 'En camino'},
-      {'label': 'Entregado', 'desc': '¡Entregado!'},
-    ];
-
-    final hasTrackingInfo =
-        _shipment != null &&
-        (_shipment!.trackingNumber != null || _shipment!.carrier != null);
-    final events = _shipment?.events ?? [];
+    final events = _eventsNewestFirst(shipment.events);
+    final lastUpdate =
+        (events.isNotEmpty ? events.first.eventAt : null) ??
+        shipment.updatedAt ??
+        shipment.createdAt;
+    final trackingNumber = shipment.trackingNumber?.trim();
+    final trackingUrl = shipment.trackingUrl?.trim();
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      decoration: _trackingCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Expanded(
-                child: Text(
-                  'Seguimiento del envío',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: kNavy,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (_shipment != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _shipment!.statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _shipment!.statusLabel,
-                    style: TextStyle(
-                      color: _shipment!.statusColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              Positioned(
-                left: 30,
-                right: 30,
-                child: Container(
-                  height: 3,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 30,
-                right: 30,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final totalWidth = constraints.maxWidth;
-                    double progressPercent = 0.0;
-                    if (currentStep == 1) progressPercent = 0.5;
-                    if (currentStep == 2) progressPercent = 1.0;
-
-                    return Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        width: totalWidth * progressPercent,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: kGreen,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(steps.length, (index) {
-                  final isCompleted = index <= currentStep;
-                  final isActive = index == currentStep;
-
-                  return Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isActive
-                          ? Colors.white
-                          : (isCompleted ? kGreen : Colors.white),
-                      border: Border.all(
-                        color: isCompleted ? kGreen : Colors.grey.shade300,
-                        width: isActive ? 6 : 2,
-                      ),
-                      boxShadow: isActive
-                          ? [
-                              BoxShadow(
-                                color: kGreen.withValues(alpha: 0.3),
-                                blurRadius: 6,
-                                spreadRadius: 1,
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: isCompleted && !isActive
-                        ? const Icon(Icons.check, size: 12, color: Colors.white)
-                        : null,
-                  );
-                }),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(steps.length, (index) {
-              final isCompleted = index <= currentStep;
-              final isActive = index == currentStep;
-
-              Alignment align = Alignment.center;
-              if (index == 0) align = Alignment.centerLeft;
-              if (index == steps.length - 1) align = Alignment.centerRight;
-
-              return Expanded(
-                child: Align(
-                  alignment: align,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: index == 0
-                        ? CrossAxisAlignment.start
-                        : (index == steps.length - 1
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.center),
-                    children: [
-                      Text(
-                        steps[index]['label']!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: isCompleted
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          color: isCompleted ? kNavy : Colors.grey.shade500,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        steps[index]['desc']!,
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: isActive ? kGreen : Colors.grey.shade400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-
-          if (hasTrackingInfo) ...[
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kPrimary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.local_shipping,
-                    color: kPrimary,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${_shipment!.carrierDisplayName}${_shipment!.serviceName != null ? ' - ${_shipment!.serviceName}' : ''}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: kNavy,
-                          fontSize: 13,
-                        ),
-                      ),
-                      if (_shipment!.trackingNumber != null) ...[
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'Guía: ${_shipment!.trackingNumber}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade700,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            InkWell(
-                              onTap: () {
-                                Clipboard.setData(
-                                  ClipboardData(
-                                    text: _shipment!.trackingNumber!,
-                                  ),
-                                );
-                                UiHelpers.showFloatingSuccessToast(
-                                  context,
-                                  '¡Número de guía copiado!',
-                                );
-                              },
-                              child: const Padding(
-                                padding: EdgeInsets.all(4.0),
-                                child: Icon(
-                                  Icons.copy_rounded,
-                                  size: 14,
-                                  color: kPrimary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (_shipment!.estimatedDelivery != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          'Entrega estimada: ${_shipment!.estimatedDelivery!.day}/${_shipment!.estimatedDelivery!.month}/${_shipment!.estimatedDelivery!.year}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: kGreen,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+          const Text(
+            'Seguimiento del envío',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: kNavy,
             ),
-            if (_shipment!.trackingUrl != null &&
-                _shipment!.trackingUrl!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    final url = _shipment!.trackingUrl;
-                    if (url != null && url.isNotEmpty) {
-                      final uri = Uri.tryParse(url);
-                      if (uri != null) {
-                        try {
-                          await launchUrl(
-                            uri,
-                            mode: LaunchMode.externalApplication,
-                          );
-                        } catch (_) {
-                          if (context.mounted) {
-                            UiHelpers.showFloatingSuccessToast(
-                              context,
-                              'Enlace de rastreo: $url',
-                            );
-                          }
-                        }
-                      }
-                    }
-                  },
-                  icon: const Icon(
-                    Icons.open_in_new,
-                    size: 16,
-                    color: kPrimary,
-                  ),
-                  label: const Text(
-                    'Rastrear envío en paquetería',
-                    style: TextStyle(
-                      color: kPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: kPrimary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            shipment.statusLabel,
+            style: TextStyle(
+              color: shipment.statusColor,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (lastUpdate != null) ...[
+            const SizedBox(height: 3),
+            Text(
+              _formatCompactDate(lastUpdate),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            shipmentCompactStatusMessage(shipment.shippingStatus) ??
+                'Se registró una actualización del envío.',
+            style: TextStyle(
+              color: Colors.grey.shade800,
+              fontSize: 13,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kPrimary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.local_shipping,
+                  color: kPrimary,
+                  size: 20,
                 ),
               ),
-            ],
-          ],
-
-          if (events.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () {
-                setState(() => _expandedEvents = !_expandedEvents);
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Historial de eventos (${events.length})',
+                      _carrierServiceLabel(shipment),
                       style: const TextStyle(
-                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: kNavy,
+                        fontSize: 14,
                       ),
                     ),
-                    Icon(
-                      _expandedEvents
-                          ? Icons.keyboard_arrow_up
-                          : Icons.keyboard_arrow_down,
-                      color: Colors.grey,
-                      size: 20,
+                    const SizedBox(height: 2),
+                    Text(
+                      'Paquetería',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ],
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _buildShipmentProgress(shipment),
+          if (trackingNumber != null && trackingNumber.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildTrackingNumberRow(trackingNumber),
+          ],
+          if (trackingUrl != null && trackingUrl.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final uri = Uri.tryParse(trackingUrl);
+                  if (uri == null) return;
+                  try {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } catch (_) {
+                    if (context.mounted) {
+                      UiHelpers.showFloatingSuccessToast(
+                        context,
+                        'Enlace de rastreo: $trackingUrl',
+                      );
+                    }
+                  }
+                },
+                icon: const Icon(Icons.open_in_new, size: 16, color: kPrimary),
+                label: const Text(
+                  'Rastrear con la paquetería',
+                  style: TextStyle(
+                    color: kPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: kPrimary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
             ),
-            if (_expandedEvents)
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: events.length,
-                itemBuilder: (ctx, idx) {
-                  final ev = events[idx];
-                  final evDate =
-                      '${ev.eventAt.day}/${ev.eventAt.month} ${ev.eventAt.hour.toString().padLeft(2, '0')}:${ev.eventAt.minute.toString().padLeft(2, '0')}';
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.radio_button_checked,
-                          size: 14,
-                          color: kPrimary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                ev.description ?? ev.status,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.black87,
-                                ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  BoxDecoration _trackingCardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.02),
+          blurRadius: 4,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShipmentProgress(OrderShipment shipment) {
+    final currentIndex = _shipmentProgressIndexFromShipment(shipment);
+    final events = _eventsNewestFirst(shipment.events);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.alt_route_rounded, size: 18, color: kNavy),
+              SizedBox(width: 8),
+              Text(
+                'Movimientos del envío',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: kNavy,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Column(
+            children: List.generate(kSkyDropXProcesses.length, (index) {
+              final stepLabel = kSkyDropXProcesses[index];
+              final isCompleted = currentIndex >= index;
+              final isCurrent = currentIndex == index;
+              final isLast = index == kSkyDropXProcesses.length - 1;
+
+              final matchingEvent = _findEventForStep(events, index);
+              final eventDate = matchingEvent != null
+                  ? _formatTimelineDate(matchingEvent.eventAt)
+                  : null;
+              final usefulDescription = matchingEvent != null
+                  ? _eventUsefulDescription(matchingEvent)
+                  : null;
+
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      child: Stack(
+                        alignment: Alignment.topCenter,
+                        children: [
+                          if (!isLast)
+                            Positioned(
+                              top: 14,
+                              bottom: 0,
+                              child: Container(
+                                width: 2,
+                                color: currentIndex > index
+                                    ? shipment.statusColor
+                                    : Colors.grey.shade200,
                               ),
-                              if (ev.location != null)
-                                Text(
-                                  ev.location!,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey.shade600,
+                            ),
+                          Container(
+                            width: 14,
+                            height: 14,
+                            margin: const EdgeInsets.only(top: 2),
+                            decoration: BoxDecoration(
+                              color: isCompleted
+                                  ? shipment.statusColor
+                                  : Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isCompleted
+                                    ? shipment.statusColor
+                                    : Colors.grey.shade300,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    stepLabel,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isCompleted
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
+                                      color: isCompleted
+                                          ? kNavy
+                                          : Colors.grey.shade400,
+                                    ),
                                   ),
                                 ),
+                                if (eventDate != null)
+                                  Text(
+                                    eventDate,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isCurrent
+                                          ? shipment.statusColor
+                                          : Colors.grey.shade600,
+                                      fontWeight: isCurrent
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            if (usefulDescription != null) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                usefulDescription,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade700,
+                                  height: 1.25,
+                                ),
+                              ),
                             ],
-                          ),
+                            if (matchingEvent != null &&
+                                matchingEvent.hasLocation) ...[
+                              const SizedBox(height: 3),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_outlined,
+                                    color: kPrimary,
+                                    size: 13,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Expanded(
+                                    child: Text(
+                                      matchingEvent.location!.trim(),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
-                        Text(
-                          evDate,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  );
-                },
+                  ],
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  ShipmentEvent? _findEventForStep(List<ShipmentEvent> events, int stepIndex) {
+    for (final event in events) {
+      if (shipmentProgressStepIndex(event.status) == stepIndex ||
+          shipmentProgressStepIndex(event.description) == stepIndex) {
+        return event;
+      }
+    }
+    return null;
+  }
+
+  int _shipmentProgressIndexFromShipment(OrderShipment shipment) {
+    final current = shipmentProgressStepIndex(shipment.shippingStatus);
+    if (current >= 0) return current;
+
+    return shipment.events.fold<int>(-1, (max, event) {
+      final index = shipmentProgressStepIndex(event.status);
+      return index > max ? index : max;
+    });
+  }
+
+  String? _eventUsefulDescription(ShipmentEvent event) {
+    final description = event.description?.trim();
+    if (description == null || description.isEmpty) return null;
+    if (shipmentStatusLabel(description) != null) return null;
+    if (description.toLowerCase() == event.status.trim().toLowerCase()) {
+      return null;
+    }
+    return description;
+  }
+
+  Widget _buildTrackingNumberRow(String trackingNumber) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.confirmation_number_outlined, color: kPrimary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Guía',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+                Text(
+                  trackingNumber,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: kNavy,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Copiar guía',
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: trackingNumber));
+              UiHelpers.showFloatingSuccessToast(
+                context,
+                '¡Número de guía copiado!',
+              );
+            },
+            icon: const Icon(Icons.copy_rounded, color: kPrimary, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<ShipmentEvent> _eventsNewestFirst(List<ShipmentEvent> events) {
+    return [...events]..sort((a, b) => b.eventAt.compareTo(a.eventAt));
+  }
+
+  String _carrierServiceLabel(OrderShipment shipment) {
+    final serviceName = shipment.serviceName?.trim();
+    if (serviceName == null || serviceName.isEmpty) {
+      return shipment.carrierDisplayName;
+    }
+    return '${shipment.carrierDisplayName} · $serviceName';
+  }
+
+  String _formatTimelineDate(DateTime value) {
+    const months = [
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+    ];
+    final month = months[value.month - 1];
+    return '${value.day.toString().padLeft(2, '0')} $month · '
+        '${value.hour.toString().padLeft(2, '0')}:'
+        '${value.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatCompactDate(DateTime value) {
+    const months = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+    final hour = value.hour % 12 == 0 ? 12 : value.hour % 12;
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '${value.day} de ${months[value.month - 1]} · $hour:$minute';
+  }
+
+  Widget _detailCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE8EEF4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _sectionTitle(IconData icon, String title) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: kPrimary.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: kPrimary, size: 19),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: kNavy,
+              fontSize: 15,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<String> _splitDetailLines(dynamic value) {
+    final text = value?.toString().replaceAll('\r\n', '\n').trim();
+    if (text == null || text.isEmpty) return const [];
+    return text
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+  }
+
+  Widget _detailLine(String rawLine) {
+    final separatorIndex = rawLine.indexOf(':');
+    final hasLabel = separatorIndex > 0 && separatorIndex < 32;
+    final label = hasLabel ? rawLine.substring(0, separatorIndex).trim() : null;
+    final value = hasLabel
+        ? rawLine.substring(separatorIndex + 1).trim()
+        : rawLine.trim();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (label != null) ...[
+            SizedBox(
+              width: 104,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
+            ),
+            const SizedBox(width: 8),
           ],
+          Expanded(
+            child: Text(
+              value.isEmpty ? rawLine : value,
+              style: const TextStyle(
+                color: Color(0xFF1F2937),
+                fontSize: 13,
+                height: 1.25,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeliveryInfoCard(Map<String, dynamic> order) {
+    final addressLines = _splitDetailLines(order['shipping_address']);
+    final notes = order['notes']?.toString().trim();
+    final hasNotes = notes != null && notes.isNotEmpty;
+
+    return _detailCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle(Icons.local_shipping_outlined, 'Dirección de Envío'),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: addressLines.isEmpty
+                ? const Text(
+                    'Entrega e instalación a convenir.',
+                    style: TextStyle(
+                      color: Color(0xFF1F2937),
+                      fontSize: 13,
+                      height: 1.25,
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: addressLines.map(_detailLine).toList(),
+                  ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kNavy.withValues(alpha: 0.035),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.notes_outlined, color: kNavy, size: 18),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Notas / Instrucciones',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: kNavy,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  hasNotes ? notes : 'Sin instrucciones adicionales.',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF1F2937),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentSummaryCard(OrderPaymentBreakdown paymentBreakdown) {
+    return _detailCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle(Icons.receipt_long_outlined, 'Resumen de Pago'),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                _summaryRow(
+                  'Productos',
+                  formatCurrency(paymentBreakdown.products),
+                ),
+                const SizedBox(height: 10),
+                _summaryRow(
+                  'Envío',
+                  paymentBreakdown.shipping == 0
+                      ? 'Gratis'
+                      : formatCurrency(paymentBreakdown.shipping),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                ),
+                _summaryRow(
+                  'Total',
+                  formatCurrency(paymentBreakdown.total),
+                  bold: true,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 15,
+                color: Colors.grey.shade500,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Los precios incluyen IVA.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -585,6 +837,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final total = (o['total'] as num?)?.toDouble() ?? 0.0;
     final subtotal = (o['subtotal'] as num?)?.toDouble() ?? 0.0;
     final tax = (o['tax'] as num?)?.toDouble() ?? 0.0;
+    final paymentBreakdown = buildIncludedVatOrderPaymentBreakdown(
+      subtotal: subtotal,
+      total: total,
+      storedTax: tax,
+      customerShippingAmount: (o['customer_shipping_amount'] as num?)
+          ?.toDouble(),
+    );
     final date = DateTime.tryParse(o['created_at'] ?? '')?.toLocal();
     final dateStr = date != null
         ? '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}'
@@ -612,121 +871,43 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    o['order_number'] ?? 'Pedido',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      color: kNavy,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Estado del Pedido',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Icon(
+                        Icons.event_note_outlined,
+                        size: 15,
+                        color: Colors.grey.shade500,
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _statusColor(
-                            o['status'] ?? '',
-                          ).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                      const SizedBox(width: 5),
+                      Expanded(
                         child: Text(
-                          _statusLabel(o['status'] ?? '').toUpperCase(),
+                          'Realizado el $dateStr',
                           style: TextStyle(
-                            color: _statusColor(o['status'] ?? ''),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Fecha de Creación: $dateStr',
-                    style: const TextStyle(fontSize: 13, color: Colors.black87),
-                  ),
+                  const SizedBox(height: 14),
+                  _buildPaymentStatusBanner(o),
                 ],
               ),
             ),
-            _buildOrderPhases(o['status'] ?? ''),
-            const SizedBox(height: 4),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(
-                            Icons.local_shipping_outlined,
-                            color: kNavy,
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Dirección de Envío',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: kNavy,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        o['shipping_address'] ??
-                            'Entrega e instalación a convenir.',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const Divider(height: 24),
-                      const Row(
-                        children: [
-                          Icon(Icons.notes_outlined, color: kNavy, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Notas / Instrucciones',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: kNavy,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        o['notes'] != null &&
-                                o['notes'].toString().trim().isNotEmpty
-                            ? o['notes']
-                            : 'Sin instrucciones adicionales.',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
+            _buildShipmentTracking(o),
+            const SizedBox(height: 8),
+            _buildDeliveryInfoCard(o),
+            const SizedBox(height: 16),
 
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -765,7 +946,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 : ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: _items.length,
                     itemBuilder: (ctx, i) {
                       final item = _items[i];
@@ -797,29 +978,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           o['status'] != 'draft' && o['status'] != 'canceled';
 
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        color: Colors.white,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(14),
+                          side: const BorderSide(color: Color(0xFFE8EEF4)),
                         ),
                         elevation: 0,
                         child: Padding(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(14),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   if (img != null)
                                     ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(10),
                                       child: Image.network(
                                         img,
-                                        width: 50,
-                                        height: 50,
+                                        width: 62,
+                                        height: 62,
                                         fit: BoxFit.cover,
                                         errorBuilder: (_, _, _) => Container(
-                                          width: 50,
-                                          height: 50,
+                                          width: 62,
+                                          height: 62,
                                           color: Colors.grey.shade100,
                                           child: const Icon(
                                             Icons.broken_image,
@@ -830,11 +1014,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                     )
                                   else
                                     Container(
-                                      width: 50,
-                                      height: 50,
+                                      width: 62,
+                                      height: 62,
                                       decoration: BoxDecoration(
                                         color: kPrimary.withValues(alpha: 0.08),
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Icon(
                                         Icons.medical_services,
@@ -852,14 +1036,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                           item['product_name_snapshot'] ??
                                               'Producto biomédico',
                                           style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
+                                            fontWeight: FontWeight.w800,
                                             color: kNavy,
-                                            fontSize: 13,
+                                            fontSize: 14,
                                           ),
-                                          maxLines: 1,
+                                          maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 8),
                                         Text(
                                           'Cantidad: $qty x ${formatCurrency(price)}',
                                           style: TextStyle(
@@ -867,16 +1051,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                             color: Colors.grey.shade600,
                                           ),
                                         ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'Total producto',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey.shade500,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            Text(
+                                              formatCurrency(subtotalLine),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                color: kNavy,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    formatCurrency(subtotalLine),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: kNavy,
-                                      fontSize: 13,
                                     ),
                                   ),
                                 ],
@@ -1031,45 +1228,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
             const SizedBox(height: 12),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Resumen de Pago',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: kNavy,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _summaryRow('Subtotal', formatCurrency(subtotal)),
-                      const SizedBox(height: 6),
-                      _summaryRow('IVA (16%)', formatCurrency(tax)),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Divider(),
-                      ),
-                      _summaryRow(
-                        'Total',
-                        formatCurrency(total),
-                        bold: true,
-                        size: 16,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            _buildPaymentSummaryCard(paymentBreakdown),
             const SizedBox(height: 24),
           ],
         ),
@@ -1086,14 +1245,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: size,
-            color: bold ? kNavy : Colors.grey.shade600,
-            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: size,
+              color: bold ? kNavy : Colors.grey.shade600,
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            ),
           ),
         ),
+        const SizedBox(width: 12),
         Text(
           value,
           style: TextStyle(
@@ -1104,5 +1266,97 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildPaymentStatusBanner(Map<String, dynamic> order) {
+    final status = order['payment_status']?.toString();
+    final color = _paymentStatusColor(status);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(_paymentStatusIcon(status), color: color, size: 19),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _paymentStatusLabel(status),
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _paymentStatusLabel(String? status) {
+    switch ((status ?? '').trim().toLowerCase()) {
+      case 'approved':
+        return 'Pago aprobado';
+      case 'pending':
+      case 'created':
+        return 'Pago pendiente';
+      case 'rejected':
+      case 'error':
+        return 'Pago rechazado';
+      case 'refunded':
+        return 'Reembolsado';
+      case 'cancelled':
+      case 'canceled':
+        return 'Pago cancelado';
+      case 'charged_back':
+        return 'Contracargo';
+      default:
+        return 'Estado de pago por confirmar';
+    }
+  }
+
+  Color _paymentStatusColor(String? status) {
+    switch ((status ?? '').trim().toLowerCase()) {
+      case 'approved':
+        return kGreen;
+      case 'pending':
+      case 'created':
+        return kOrange;
+      case 'rejected':
+      case 'error':
+      case 'cancelled':
+      case 'canceled':
+      case 'charged_back':
+        return kRed;
+      case 'refunded':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _paymentStatusIcon(String? status) {
+    switch ((status ?? '').trim().toLowerCase()) {
+      case 'approved':
+        return Icons.check_circle_outline;
+      case 'rejected':
+      case 'error':
+      case 'cancelled':
+      case 'canceled':
+      case 'charged_back':
+        return Icons.error_outline;
+      case 'refunded':
+        return Icons.undo_rounded;
+      default:
+        return Icons.schedule_rounded;
+    }
   }
 }

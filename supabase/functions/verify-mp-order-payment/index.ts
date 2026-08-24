@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { triggerPaidOrderFulfillment } from "../_shared/paid_order_fulfillment.ts";
 
 const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
@@ -113,7 +112,6 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     // Si la orden ya está pagada en la BD, responder inmediatamente
     if (order.payment_status === "approved" || order.status === "paid") {
-      await triggerPaidOrderFulfillment(order.id);
       return jsonResponse({
         order_id: order.id,
         payment_status: "approved",
@@ -205,7 +203,6 @@ Deno.serve(async (request: Request): Promise<Response> => {
         isUuidLike(reconciledOrderId) &&
         reconciledPaymentStatus === "approved"
       ) {
-        await triggerPaidOrderFulfillment(reconciledOrderId);
         return jsonResponse({
           order_id: reconciledOrderId,
           payment_status: "approved",

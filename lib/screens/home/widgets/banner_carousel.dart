@@ -10,7 +10,7 @@ import 'promotion_navigation.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
-const _kBannerAspectRatio = 16 / 9;
+const _kBannerAspectRatio = 8 / 3; // 1600 x 600 px (2.6667:1)
 const _kBannerInterval = Duration(seconds: 3);
 const _kInitialBannerPage = 100000;
 
@@ -218,15 +218,23 @@ class _BannerCarouselState extends State<BannerCarousel>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return _buildLoading();
-    if (_error != null) return _buildError();
+    if (_loading && _banners.isEmpty) return _buildLoading();
+    if (_error != null && _banners.isEmpty) return _buildError();
     if (_banners.isEmpty) return const SizedBox.shrink();
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final availableWidth = constraints.maxWidth;
         final bannerWidth = availableWidth > 720 ? 720.0 : availableWidth;
-        final height = (bannerWidth / _kBannerAspectRatio).clamp(140.0, 300.0);
+        final isSingle = _banners.length == 1;
+        // El ancho real del elemento individual de banner:
+        final itemWidth = isSingle
+            ? (bannerWidth - 24.0)
+            : ((bannerWidth * 0.90) - 10.0);
+        // Altura exacta respetando la proporción 8:3 (1600x600 px):
+        final itemHeight = itemWidth / _kBannerAspectRatio;
+        final height =
+            itemHeight + 4.0; // 2px superior + 2px inferior de margen
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -279,20 +287,31 @@ class _BannerCarouselState extends State<BannerCarousel>
   Widget _buildBanner(DisplayPromotionBanner displayBanner) {
     final banner = displayBanner.banner;
     final productId = banner.productId?.trim();
+    final isManualFinalHero = banner.isManualFinalHeroRender;
     final product = productId == null ? null : _productsById[productId];
+    final overlayProduct = isManualFinalHero ? null : product;
     final backgroundColor = _parseColor(banner.primaryColor, Colors.white);
     final textColor = _parseColor(banner.textColor, Colors.white);
     final accentColor = _parseColor(banner.accentColor, _kPrimary);
     final showOverlay =
+        !isManualFinalHero &&
         !banner.isFinalRender &&
         (banner.headline?.trim().isNotEmpty == true ||
             banner.subheadline?.trim().isNotEmpty == true ||
             productId?.isNotEmpty == true);
 
+    // Si un asset legacy antiguo tiene relación muy alejada de 8:3 (e.g. < 2.1:1),
+    // usar contain para evitar recorte agresivo, de lo contrario cover para 1600x600.
+    final assetRatio = banner.selectedAsset?.aspectRatio;
+    final isLegacyNarrowAsset = assetRatio != null && assetRatio < 2.1;
+    final imageFit = isManualFinalHero
+        ? BoxFit.cover
+        : (isLegacyNarrowAsset ? BoxFit.contain : BoxFit.cover);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -304,7 +323,7 @@ class _BannerCarouselState extends State<BannerCarousel>
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
-        color: Colors.transparent,
+        color: const Color(0xFFF8FAFC),
         child: InkWell(
           onTap:
               PromotionNavigation.hasDestination(
@@ -318,32 +337,15 @@ class _BannerCarouselState extends State<BannerCarousel>
             children: [
               Image.network(
                 displayBanner.imageUrl,
-                fit: BoxFit.cover,
+                fit: imageFit,
                 alignment: Alignment.center,
                 semanticLabel: banner.selectedAsset?.altText,
                 filterQuality: FilterQuality.medium,
                 gaplessPlayback: true,
-                errorBuilder: (_, _, _) => const ColoredBox(
-                  color: Color(0xFFF8FAFC),
-                  child: Center(
-                    child: Icon(
-                      Icons.image_not_supported_outlined,
-                      color: Colors.grey,
-                      size: 32,
-                    ),
-                  ),
-                ),
+                errorBuilder: (_, _, _) => _bannerLoadingPlaceholder(),
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
-                  return ColoredBox(
-                    color: backgroundColor,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: _kPrimary,
-                        strokeWidth: 2.5,
-                      ),
-                    ),
-                  );
+                  return _bannerLoadingPlaceholder();
                 },
               ),
               if (showOverlay)
@@ -398,22 +400,22 @@ class _BannerCarouselState extends State<BannerCarousel>
                             ),
                           ),
                         ],
-                        if (product != null) ...[
+                        if (overlayProduct != null) ...[
                           const SizedBox(height: 5),
                           Row(
                             children: [
                               Text(
-                                product.formattedPrice,
+                                overlayProduct.formattedPrice,
                                 style: TextStyle(
                                   color: textColor,
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              if (product.hasDiscount) ...[
+                              if (overlayProduct.hasDiscount) ...[
                                 const SizedBox(width: 6),
                                 Text(
-                                  product.formattedOldPrice,
+                                  overlayProduct.formattedOldPrice,
                                   style: TextStyle(
                                     color: textColor.withValues(alpha: 0.7),
                                     fontSize: 10,
@@ -425,7 +427,7 @@ class _BannerCarouselState extends State<BannerCarousel>
                             ],
                           ),
                           Text(
-                            product.stockStatusLabel,
+                            overlayProduct.stockStatusLabel,
                             style: TextStyle(
                               color: textColor.withValues(alpha: 0.9),
                               fontSize: 10,
@@ -470,7 +472,8 @@ class _BannerCarouselState extends State<BannerCarousel>
       builder: (context, constraints) {
         final availableWidth = constraints.maxWidth;
         final bannerWidth = availableWidth > 720 ? 720.0 : availableWidth;
-        final height = (bannerWidth / _kBannerAspectRatio).clamp(140.0, 300.0);
+        final itemWidth = bannerWidth - 24.0;
+        final height = (itemWidth / _kBannerAspectRatio) + 4.0;
         return Center(
           child: Container(
             width: bannerWidth,
@@ -483,12 +486,7 @@ class _BannerCarouselState extends State<BannerCarousel>
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    color: _kPrimary,
-                    strokeWidth: 2.5,
-                  ),
-                ),
+                child: _bannerLoadingPlaceholder(),
               ),
             ),
           ),
@@ -496,7 +494,6 @@ class _BannerCarouselState extends State<BannerCarousel>
       },
     );
   }
-
 
   Widget _buildError() {
     return Container(
@@ -530,4 +527,9 @@ class _BannerCarouselState extends State<BannerCarousel>
       ),
     );
   }
+
+  Widget _bannerLoadingPlaceholder() => const ColoredBox(
+    color: Color(0xFFF8FAFC),
+    child: Center(child: CircularProgressIndicator(color: _kPrimary)),
+  );
 }

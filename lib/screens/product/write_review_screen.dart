@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../models/product.dart';
 import '../../services/review_service.dart';
@@ -33,15 +32,12 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   late int _rating;
   late final TextEditingController _commentController;
   final List<String> _uploadedPhotos = [];
-  final List<String> _uploadedVideos = [];
   bool _isUploadingPhoto = false;
-  bool _isUploadingVideo = false;
   bool _isSaving = false;
   bool _isDeleting = false;
 
   bool get _isEditing => widget.existingReview != null;
-  bool get _isBusy =>
-      _isUploadingPhoto || _isUploadingVideo || _isSaving || _isDeleting;
+  bool get _isBusy => _isUploadingPhoto || _isSaving || _isDeleting;
   bool get _canSave =>
       _rating > 0 && _commentController.text.trim().isNotEmpty && !_isBusy;
 
@@ -51,21 +47,14 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     _rating = widget.existingReview?.rating ?? 0;
     _commentController = TextEditingController(
       text: widget.existingReview?.comment ?? '',
-    )..addListener(_refreshSaveState);
+    );
     _uploadedPhotos.addAll(widget.existingReview?.images ?? const []);
-    _uploadedVideos.addAll(widget.existingReview?.videos ?? const []);
   }
 
   @override
   void dispose() {
-    _commentController
-      ..removeListener(_refreshSaveState)
-      ..dispose();
+    _commentController.dispose();
     super.dispose();
-  }
-
-  void _refreshSaveState() {
-    if (mounted) setState(() {});
   }
 
   Future<void> _pickImage() async {
@@ -108,132 +97,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     }
   }
 
-  Future<void> _pickVideo() async {
-    if (_uploadedVideos.isNotEmpty) {
-      await _showLimitWarning(
-        icon: Icons.video_library_outlined,
-        title: 'Solo un video por opinión',
-        message: 'Ya agregaste un video. Quítalo si deseas seleccionar otro.',
-      );
-      return;
-    }
-    if (_isUploadingVideo) return;
 
-    final picked = await ImagePicker().pickVideo(
-      source: ImageSource.gallery,
-      maxDuration: const Duration(minutes: 1),
-    );
-    if (picked == null || !mounted) return;
-
-    setState(() => _isUploadingVideo = true);
-    String? uploadedUrl;
-    VideoPlayerController? controller;
-    try {
-      final bytes = await picked.readAsBytes();
-      uploadedUrl = await ReviewService.uploadReviewVideo(
-        widget.product.id,
-        bytes,
-        picked.name,
-      );
-
-      controller = VideoPlayerController.networkUrl(Uri.parse(uploadedUrl));
-      await controller.initialize();
-      if (controller.value.duration > const Duration(minutes: 1)) {
-        await ReviewService.deleteUploadedAsset(uploadedUrl);
-        uploadedUrl = null;
-        throw Exception('El video debe durar máximo 1 minuto.');
-      }
-
-      if (!mounted) return;
-      setState(() => _uploadedVideos.add(uploadedUrl!));
-    } catch (error) {
-      if (uploadedUrl != null) {
-        try {
-          await ReviewService.deleteUploadedAsset(uploadedUrl);
-        } catch (_) {}
-      }
-      if (mounted) {
-        if (error.toString().contains('1 minuto')) {
-          await _showLimitWarning(
-            icon: Icons.timer_off_outlined,
-            title: 'El video dura demasiado',
-            message: 'Selecciona un video que dure máximo 1 minuto.',
-          );
-        } else if (error.toString().contains('40 MB')) {
-          await _showLimitWarning(
-            icon: Icons.video_file_outlined,
-            title: 'El video es demasiado pesado',
-            message: 'Selecciona un video que pese menos de 40 MB.',
-          );
-        } else {
-          UiHelpers.showFloatingDeleteToast(
-            context,
-            'No se pudo agregar el video. Intenta con un archivo MP4.',
-          );
-        }
-      }
-    } finally {
-      await controller?.dispose();
-      if (mounted) setState(() => _isUploadingVideo = false);
-    }
-  }
-
-  Future<void> _showMediaOptions() async {
-    if (_isBusy) return;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  'Agregar contenido',
-                  style: TextStyle(
-                    color: _navy,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: const Icon(
-                  Icons.add_a_photo_outlined,
-                  color: _primary,
-                ),
-                title: const Text('Agregar foto'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  _pickImage();
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.video_library_outlined,
-                  color: _primary,
-                ),
-                title: const Text('Agregar video'),
-                onTap: () {
-                  Navigator.of(sheetContext).pop();
-                  _pickVideo();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Future<void> _showLimitWarning({
     required IconData icon,
@@ -316,11 +180,11 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     try {
       if (_isEditing) {
         await ReviewService.updateReview(
+          productId: widget.product.id,
           reviewId: widget.existingReview!.id,
           rating: _rating,
           comment: _commentController.text.trim(),
           imageUrls: _uploadedPhotos,
-          videoUrls: _uploadedVideos,
         );
       } else {
         await ReviewService.addReview(
@@ -328,7 +192,6 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
           rating: _rating,
           comment: _commentController.text.trim(),
           imageUrls: _uploadedPhotos,
-          videoUrls: _uploadedVideos,
         );
       }
 
@@ -342,6 +205,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
+      debugPrint('Error al guardar opinión: $error');
       setState(() => _isSaving = false);
       UiHelpers.showFloatingDeleteToast(
         context,
@@ -459,33 +323,71 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 72,
-            height: 72,
-            padding: const EdgeInsets.all(5),
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
-              border: Border.all(color: _border),
-              borderRadius: BorderRadius.circular(6),
+              color: Colors.white,
+              border: Border.all(color: Colors.grey.shade200),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: imageUrl != null && imageUrl.isNotEmpty
-                ? UiHelpers.networkImage(imageUrl, fit: BoxFit.contain)
-                : Icon(
-                    Icons.medical_services_outlined,
-                    color: Colors.grey.shade300,
-                    size: 34,
-                  ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: imageUrl != null && imageUrl.isNotEmpty
+                  ? UiHelpers.networkImage(imageUrl, fit: BoxFit.cover)
+                  : const Icon(
+                      Icons.shopping_bag_outlined,
+                      color: _primary,
+                      size: 28,
+                    ),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(
-              product.name,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: _navy,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                height: 1.25,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (product.isActive == false) ...[
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.error_outline_rounded,
+                        color: Colors.orange,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Publicación pausada',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                ],
+                Text(
+                  product.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _navy,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  product.formattedPrice,
+                  style: const TextStyle(
+                    color: _navy,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -576,8 +478,8 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                   child: _MediaPickerButton(
                     icon: Icons.add_to_photos_outlined,
                     label: 'Agregar',
-                    loading: _isUploadingPhoto || _isUploadingVideo,
-                    onTap: _showMediaOptions,
+                    loading: _isUploadingPhoto,
+                    onTap: _pickImage,
                   ),
                 ),
                 ...List.generate(_uploadedPhotos.length, (index) {
@@ -587,18 +489,6 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
                       url: _uploadedPhotos[index],
                       onRemove: () {
                         setState(() => _uploadedPhotos.removeAt(index));
-                      },
-                    ),
-                  );
-                }),
-                ...List.generate(_uploadedVideos.length, (index) {
-                  return Padding(
-                    padding: EdgeInsets.only(
-                      right: index < _uploadedVideos.length - 1 ? 10 : 0,
-                    ),
-                    child: _ReviewVideo(
-                      onRemove: () {
-                        setState(() => _uploadedVideos.removeAt(index));
                       },
                     ),
                   );
@@ -639,9 +529,12 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
           const SizedBox(height: 14),
           TextField(
             controller: _commentController,
-            minLines: 5,
-            maxLines: 8,
-            maxLength: 1000,
+            minLines: 4,
+            maxLines: 6,
+            maxLength: 100,
+            onChanged: (_) {
+              if (mounted) setState(() {});
+            },
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               hintText: '¿Qué le dirías a otras personas sobre este producto?',
@@ -808,66 +701,7 @@ class _MediaPickerButton extends StatelessWidget {
   }
 }
 
-class _ReviewVideo extends StatelessWidget {
-  final VoidCallback onRemove;
 
-  const _ReviewVideo({required this.onRemove});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 96,
-      height: 96,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF172B4D),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.play_circle_outline_rounded,
-                    color: Colors.white,
-                    size: 34,
-                  ),
-                  SizedBox(height: 5),
-                  Text(
-                    'Video',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            top: 5,
-            right: 5,
-            child: IconButton.filled(
-              onPressed: onRemove,
-              tooltip: 'Quitar video',
-              icon: const Icon(Icons.close_rounded, size: 17),
-              style: IconButton.styleFrom(
-                backgroundColor: const Color(0xCC111827),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(30, 30),
-                maximumSize: const Size(30, 30),
-                padding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _ReviewPhoto extends StatelessWidget {
   final String url;

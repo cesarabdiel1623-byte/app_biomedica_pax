@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { triggerPaidOrderFulfillment } from "../_shared/paid_order_fulfillment.ts";
 
 type WebhookBody = {
   type?: string;
@@ -415,28 +414,6 @@ Deno.serve(async (request: Request): Promise<Response> => {
       payment_id: paymentId,
       result: reconciliationResult,
     });
-
-    const reconciledOrderId =
-      reconciliationResult && typeof reconciliationResult === "object" && !Array.isArray(reconciliationResult)
-        ? getString(reconciliationResult as Record<string, unknown>, "order_id")
-        : null;
-    const reconciledPaymentStatus = getReconciledPaymentStatus(reconciliationResult);
-
-    if (
-      reconciledOrderId &&
-      isUuidLike(reconciledOrderId) &&
-      reconciledPaymentStatus === "approved"
-    ) {
-      const fulfillmentResult = await triggerPaidOrderFulfillment(
-        reconciledOrderId,
-      );
-      console.log("Post-payment fulfillment triggered", {
-        trace_id: traceId,
-        payment_id: paymentId,
-        order_id: reconciledOrderId,
-        ok: fulfillmentResult.ok === true,
-      });
-    }
 
     return jsonResponse({ received: true, reconciled: true });
   } catch (error) {

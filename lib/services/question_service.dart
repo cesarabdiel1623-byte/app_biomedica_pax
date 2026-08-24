@@ -159,6 +159,18 @@ class QuestionService {
 
   /// Deletes a question by its ID.
   static Future<void> deleteQuestion(String questionId) async {
-    await _client.from('product_questions').delete().eq('id', questionId);
+    final clientId = await AuthIdentityService.requireLinkedClientId();
+    final deleted = await _client
+        .from('product_questions')
+        .delete()
+        .eq('id', questionId)
+        .eq('client_id', clientId)
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+
+    if (deleted == null) {
+      throw StateError('La pregunta no pudo eliminarse.');
+    }
   }
 }

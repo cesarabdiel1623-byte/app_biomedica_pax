@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/registration_gate_service.dart';
 
 class Step2NameScreen extends StatefulWidget {
   const Step2NameScreen({super.key});
@@ -30,20 +31,17 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await Supabase.instance.client.auth.updateUser(
-        UserAttributes(
-          data: {
-            'full_name': '$nombre $apellido',
-            'first_name': nombre,
-            'last_name': apellido,
-          },
-        ),
-      );
+      final fullName = '$nombre $apellido';
+      if (Supabase.instance.client.auth.currentUser != null) {
+        try {
+          await RegistrationGateService.saveContactName(fullName);
+        } catch (_) {}
+      }
 
       if (mounted) {
         Navigator.of(
           context,
-        ).pop({'success': true, 'name': '$nombre $apellido'});
+        ).pop({'success': true, 'name': fullName});
       }
     } catch (e) {
       if (mounted) {

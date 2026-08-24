@@ -14,75 +14,37 @@ import 'screens/auth/registration_flow/registration_checklist_screen.dart';
 import 'services/notification_service.dart';
 import 'services/quote_service.dart';
 import 'services/cart_service.dart';
+import 'services/registration_gate_service.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
-  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-  runApp(const _GoMedicalBootstrap());
-}
 
-class _GoMedicalBootstrap extends StatefulWidget {
-  const _GoMedicalBootstrap();
+  await Future.wait([
+    Constants.init(),
+    Future.delayed(const Duration(seconds: 2)),
+  ]);
 
-  @override
-  State<_GoMedicalBootstrap> createState() => _GoMedicalBootstrapState();
-}
-
-class _GoMedicalBootstrapState extends State<_GoMedicalBootstrap> {
-  bool _ready = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      FlutterNativeSplash.remove();
-    });
-    unawaited(_initializeApp());
+  try {
+    await QuoteService.init();
+  } catch (e) {
+    debugPrint('Error inicializando QuoteService: $e');
   }
 
-  Future<void> _initializeApp() async {
-    await Constants.init();
-
-    try {
-      await QuoteService.init();
-    } catch (e) {
-      debugPrint('Error inicializando QuoteService: $e');
+  try {
+    if (Constants.hasSupabaseConfig) {
+      await Supabase.initialize(
+        url: Constants.supabaseUrl,
+        publishableKey: Constants.supabaseAnonKey,
+      );
     }
-
-    try {
-      if (Constants.hasSupabaseConfig) {
-        await Supabase.initialize(
-          url: Constants.supabaseUrl,
-          publishableKey: Constants.supabaseAnonKey,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error inicializando Supabase: $e');
-    }
-
-    if (!mounted) return;
-    setState(() => _ready = true);
+  } catch (e) {
+    debugPrint('Error inicializando Supabase: $e');
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_ready) return const GoMedicalApp();
-
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF0D9488),
-            strokeWidth: 2.5,
-          ),
-        ),
-      ),
-    );
-  }
+  runApp(const GoMedicalApp());
 }
 
 class GoMedicalApp extends StatefulWidget {
@@ -342,55 +304,51 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  /// Checks if user has completed all registration steps
-  bool _isRegistrationComplete(User user) {
-    final metadata = user.userMetadata ?? {};
-    final hasName =
-        metadata['full_name'] != null &&
-        (metadata['full_name'] as String).isNotEmpty;
-    final hasPhone = user.phone != null && user.phone!.isNotEmpty;
-    final phoneSkipped = metadata['phone_skipped'] == true;
-    final termsAccepted = metadata['terms_accepted'] == true;
-    final isGoogleUser = user.appMetadata['provider'] == 'google';
-    // Must have: name (or Google) + phone (or skipped) + terms accepted
-    final phoneOk = hasPhone || phoneSkipped;
-    if (isGoogleUser) return phoneOk && termsAccepted;
-    return hasName && phoneOk && termsAccepted;
-  }
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<AuthState>(
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
-        // Use currentSession for the most up-to-date data
-        // The stream is only used to trigger rebuilds
         final session = Supabase.instance.client.auth.currentSession;
 
         if (snapshot.connectionState == ConnectionState.waiting &&
             session == null) {
           return const Scaffold(
             backgroundColor: Colors.white,
-            body: Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFF0D9488),
-                strokeWidth: 2.5,
-              ),
-            ),
+            body: SizedBox.shrink(),
+          );
+        }
+
+        if (session != null) {
+          final user = Supabase.instance.client.auth.currentUser;
+          if (user == null) {
+            FlutterNativeSplash.remove();
+            return const LoginScreen();
+          }
+
+          return FutureBuilder<RegistrationGateState>(
+            future: RegistrationGateService.evaluateGateState(user: user),
+            builder: (context, gateSnapshot) {
+              if (gateSnapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  backgroundColor: Colors.white,
+                  body: SizedBox.shrink(),
+                );
+              }
+
+              FlutterNativeSplash.remove();
+
+              final gateState =
+                  gateSnapshot.data ?? RegistrationGateState.incomplete;
+              if (gateState == RegistrationGateState.complete) {
+                return const HomeScreen();
+              }
+              return const RegistrationChecklistScreen();
+            },
           );
         }
 
         FlutterNativeSplash.remove();
-
-        if (session != null) {
-          // Use currentUser which has the latest metadata
-          final user = Supabase.instance.client.auth.currentUser!;
-          if (!_isRegistrationComplete(user)) {
-            return const RegistrationChecklistScreen();
-          }
-          return const HomeScreen();
-        }
-
         return const LoginScreen();
       },
     );

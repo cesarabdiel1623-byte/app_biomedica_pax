@@ -197,6 +197,8 @@ export async function handleRequest(request: Request): Promise<Response> {
   const { data, error } = await adminClient.rpc("record_skydropx_shipment_event", {
     p_skydropx_shipment_id: fields.shipmentId,
     p_tracking_number: fields.trackingNumber,
+    p_tracking_url: fields.trackingUrl,
+    p_label_url: fields.labelUrl,
     p_provider_status: normalizedStatus,
     p_description: fields.description,
     p_location: fields.location,

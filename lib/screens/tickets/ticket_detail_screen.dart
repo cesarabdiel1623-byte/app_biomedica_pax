@@ -2,12 +2,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
+import '../../models/quote.dart';
+import '../../models/service_completion.dart';
+import '../../models/service_order_presentation.dart';
 import '../../models/service_ticket.dart';
 import '../../models/ticket_message.dart';
+import '../../services/admin_quote_service.dart';
+import '../../services/mercado_pago_service.dart';
+import '../../services/service_order_pdf_service.dart';
 import '../../services/ticket_service.dart';
+import '../../utils/price_formatter.dart';
 import '../../utils/ui_helpers.dart';
 import '../../widgets/load_error_state.dart';
+import '../../widgets/service_completion_card.dart';
+import '../profile/orders_screen.dart';
+import 'admin_create_quote_sheet.dart';
 
 const _kPrimary = Color(0xFF0D9488);
 const _kNavy = Color(0xFF1E3A5F);
@@ -30,13 +41,23 @@ class TicketDetailScreen extends StatefulWidget {
 
 class _TicketDetailScreenState extends State<TicketDetailScreen> {
   ServiceTicket? _ticket;
+  ServiceQuote? _serviceQuote;
+  ServiceCompletion? _serviceCompletion;
   bool _loading = true;
+  bool _loadingQuote = false;
+  bool _loadingCompletion = false;
+  bool _submittingQuoteResponse = false;
+  bool _submittingQuotePayment = false;
   String? _error;
   List<TicketMessage> _messages = [];
   bool _loadingMessages = true;
   bool _uploadingFile = false;
+  bool _generatingServiceOrderPdf = false;
+  bool _generatingFinalServiceOrderPdf = false;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ServiceOrderPdfService _serviceOrderPdfService =
+      ServiceOrderPdfService();
   RealtimeChannel? _chatChannel;
 
   String get _effectiveTicketId => _ticket?.id ?? widget.ticketId ?? '';
@@ -57,26 +78,38 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
   Future<void> _loadTicket() async {
     if (!mounted) return;
+    final isInitial = _ticket == null;
     setState(() {
-      if (_ticket == null) {
+      if (isInitial) {
         _loading = true;
       }
       _error = null;
     });
     try {
-      ServiceTicket? ticket;
+      Future<ServiceTicket?> fetchFuture;
       if (widget.ticketId != null && widget.ticketId!.isNotEmpty) {
-        ticket = await TicketService.getTicketById(widget.ticketId!);
+        fetchFuture = TicketService.getTicketById(widget.ticketId!);
       } else if (widget.ticketNumber != null &&
           widget.ticketNumber!.isNotEmpty) {
-        ticket = await TicketService.getTicketByNumber(widget.ticketNumber!);
+        fetchFuture = TicketService.getTicketByNumber(widget.ticketNumber!);
+      } else {
+        fetchFuture = Future.value(null);
       }
+
+      final results = await Future.wait([
+        fetchFuture.timeout(const Duration(seconds: 30)),
+        if (isInitial) Future.delayed(const Duration(seconds: 2)),
+      ]);
+
+      final ticket = results[0] as ServiceTicket?;
       if (mounted) {
         setState(() {
           _ticket = ticket;
           _loading = false;
         });
         if (ticket != null) {
+          _loadQuote();
+          _loadServiceCompletion();
           _loadMessages();
           _subscribeToChat();
         }
@@ -87,6 +120,351 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           _error = e.toString();
           _loading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _loadQuote() async {
+    final ticketId = _effectiveTicketId.trim();
+    if (ticketId.isEmpty) return;
+    setState(() => _loadingQuote = true);
+    try {
+      final quote = await TicketService.getRelevantServiceQuote(ticketId);
+      if (mounted) {
+        setState(() {
+          _serviceQuote = quote;
+          _loadingQuote = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading service quote: $e');
+      if (mounted) {
+        setState(() {
+          _loadingQuote = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadServiceCompletion() async {
+    final ticketId = _effectiveTicketId.trim();
+    if (ticketId.isEmpty) return;
+    setState(() => _loadingCompletion = true);
+    try {
+      final completion = await TicketService.getServiceCompletion(ticketId);
+      if (mounted) {
+        setState(() {
+          _serviceCompletion = completion;
+          _loadingCompletion = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading service completion: $e');
+      if (mounted) {
+        setState(() {
+          _loadingCompletion = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmAcceptQuote(ServiceQuote quote) async {
+    if (_submittingQuoteResponse) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle_outline, color: _kPrimary, size: 24),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '¿Aceptar cotización?',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _kNavy,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Al aceptar la cotización Folio ${quote.quoteNumber} por un total de ${formatFinancialPrice(quote.total)}, se confirmará la propuesta económica para proceder con el servicio técnico.',
+          style: const TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: Colors.black87,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Aceptar Cotización',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _submittingQuoteResponse = true);
+    try {
+      await TicketService.acceptServiceQuote(quote.id);
+      if (!mounted) return;
+      UiHelpers.showFloatingSuccessToast(
+        context,
+        'Cotización aceptada exitosamente.',
+      );
+      await _loadQuote();
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().replaceAll('Exception: ', '');
+      UiHelpers.showErrorToast(
+        context,
+        'No se pudo aceptar la cotización: $msg',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _submittingQuoteResponse = false);
+      }
+    }
+  }
+
+  Future<void> _confirmRejectQuote(ServiceQuote quote) async {
+    if (_submittingQuoteResponse) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.cancel_outlined, color: _kRed, size: 24),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '¿Rechazar cotización?',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _kNavy,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '¿Confirmas que deseas rechazar la cotización Folio ${quote.quoteNumber}? Esta acción no se puede deshacer.',
+          style: const TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: Colors.black87,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Volver', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Rechazar Cotización',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _submittingQuoteResponse = true);
+    try {
+      await TicketService.rejectServiceQuote(quote.id);
+      if (!mounted) return;
+      UiHelpers.showFloatingSuccessToast(context, 'Cotización rechazada.');
+      await _loadQuote();
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().replaceAll('Exception: ', '');
+      UiHelpers.showErrorToast(
+        context,
+        'No se pudo rechazar la cotización: $msg',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _submittingQuoteResponse = false);
+      }
+    }
+  }
+
+  Future<void> _startQuotePayment(ServiceQuote quote) async {
+    if (_submittingQuotePayment) return;
+
+    setState(() => _submittingQuotePayment = true);
+    try {
+      final service = MercadoPagoService(Supabase.instance.client);
+      final result = await service.startServiceQuotePayment(quoteId: quote.id);
+
+      if (!mounted) return;
+
+      if (result.alreadyPaid) {
+        UiHelpers.showFloatingSuccessToast(
+          context,
+          'Esta cotización ya cuenta con un pago aprobado.',
+        );
+      } else {
+        UiHelpers.showFloatingSuccessToast(
+          context,
+          'Abriendo Mercado Pago para completar tu pago...',
+        );
+      }
+
+      // Al volver o tras la respuesta, refrescar la cotización y el ticket
+      if (mounted) {
+        await _loadQuote();
+        await _loadTicket();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().replaceAll('Exception: ', '');
+      UiHelpers.showErrorToast(context, 'No se pudo iniciar el pago: $msg');
+    } finally {
+      if (mounted) {
+        setState(() => _submittingQuotePayment = false);
+      }
+    }
+  }
+
+  void _viewConvertedOrder(ServiceQuote quote) {
+    if (quote.clientId.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OrdersScreen(clientId: quote.clientId),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openCreateQuoteSheet(ServiceTicket ticket) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => AdminCreateQuoteSheet(
+        ticketId: ticket.id,
+        ticketNumber: ticket.ticketNumber,
+        clientId: ticket.clientId ?? '',
+        clientName: ticket.clientName ?? 'Cliente',
+        equipmentSummary: ticket.equipmentSummary,
+      ),
+    );
+
+    if (result == true && mounted) {
+      await _loadQuote();
+      await _loadTicket();
+    }
+  }
+
+  Future<void> _confirmSendQuote(ServiceQuote quote) async {
+    if (_submittingQuoteResponse) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.send_rounded, color: _kPrimary, size: 24),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '¿Enviar cotización al cliente?',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _kNavy,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Se enviará formalmente la cotización Folio ${quote.quoteNumber} por un total de ${formatFinancialPrice(quote.total)} al cliente. El cliente podrá revisarla y proceder al pago.',
+          style: const TextStyle(
+            fontSize: 13,
+            height: 1.4,
+            color: Colors.black87,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _kPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'Enviar al Cliente',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _submittingQuoteResponse = true);
+    try {
+      final adminService = AdminQuoteService(Supabase.instance.client);
+      await adminService.sendServiceQuote(quoteId: quote.id);
+      if (!mounted) return;
+      UiHelpers.showFloatingSuccessToast(
+        context,
+        'Cotización enviada al cliente exitosamente.',
+      );
+      await _loadQuote();
+      await _loadTicket();
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().replaceAll('Exception: ', '');
+      UiHelpers.showErrorToast(
+        context,
+        'No se pudo enviar la cotización: $msg',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _submittingQuoteResponse = false);
       }
     }
   }
@@ -513,6 +891,135 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     _showFullImageLightbox(trustedUrl);
   }
 
+  Future<void> _openServiceOrderPdf() async {
+    if (_generatingServiceOrderPdf) return;
+
+    final ticketId = _effectiveTicketId.trim();
+    if (ticketId.isEmpty) {
+      UiHelpers.showErrorToast(
+        context,
+        'No se encontró el ticket de servicio.',
+      );
+      return;
+    }
+
+    setState(() {
+      _generatingServiceOrderPdf = true;
+    });
+
+    try {
+      final result = await _serviceOrderPdfService.generate(ticketId: ticketId);
+      if (!mounted) return;
+
+      final trustedUrl = UiHelpers.sanitizeTrustedRemoteUrl(result.signedUrl);
+      if (trustedUrl == null) {
+        UiHelpers.showErrorToast(
+          context,
+          'La orden de servicio no pudo validarse de forma segura.',
+        );
+        return;
+      }
+
+      final launched = await launchUrl(
+        Uri.parse(trustedUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        UiHelpers.showErrorToast(
+          context,
+          'No se pudo abrir la orden de servicio.',
+        );
+      }
+    } on ServiceOrderPdfException catch (e) {
+      debugPrint(
+        'ServiceOrderPdfService failed: status=${e.status ?? 'unknown'}',
+      );
+      if (mounted) {
+        UiHelpers.showErrorToast(context, e.message);
+      }
+    } catch (e) {
+      debugPrint('ServiceOrderPdfService failed: ${e.runtimeType}');
+      if (mounted) {
+        UiHelpers.showErrorToast(
+          context,
+          'No se pudo generar la orden de servicio.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _generatingServiceOrderPdf = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openFinalServiceOrderPdf() async {
+    if (_generatingFinalServiceOrderPdf) return;
+
+    final ticketId = _effectiveTicketId.trim();
+    if (ticketId.isEmpty) {
+      UiHelpers.showErrorToast(
+        context,
+        'No se encontró el ticket de servicio.',
+      );
+      return;
+    }
+
+    setState(() {
+      _generatingFinalServiceOrderPdf = true;
+    });
+
+    try {
+      final result = await _serviceOrderPdfService.generate(
+        ticketId: ticketId,
+        documentType: 'final',
+      );
+      if (!mounted) return;
+
+      final trustedUrl = UiHelpers.sanitizeTrustedRemoteUrl(result.signedUrl);
+      if (trustedUrl == null) {
+        UiHelpers.showErrorToast(
+          context,
+          'La orden de servicio no pudo validarse de forma segura.',
+        );
+        return;
+      }
+
+      final launched = await launchUrl(
+        Uri.parse(trustedUrl),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        UiHelpers.showErrorToast(
+          context,
+          'No se pudo abrir la orden de servicio.',
+        );
+      }
+    } on ServiceOrderPdfException catch (e) {
+      debugPrint(
+        'ServiceOrderPdfService final failed: status=${e.status ?? 'unknown'}',
+      );
+      if (mounted) {
+        UiHelpers.showErrorToast(context, e.message);
+      }
+    } catch (e) {
+      debugPrint('ServiceOrderPdfService final failed: ${e.runtimeType}');
+      if (mounted) {
+        UiHelpers.showErrorToast(
+          context,
+          'No se pudo generar la orden de servicio final.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _generatingFinalServiceOrderPdf = false;
+        });
+      }
+    }
+  }
+
   void _showFullImageLightbox(String imageUrl) {
     showDialog(
       context: context,
@@ -586,7 +1093,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
     try {
       final result = await FilePicker.pickFiles(
-        type: FileType.image,
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
         allowMultiple: true,
         withData: true,
       );
@@ -622,7 +1130,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al seleccionar imágenes: $e'),
+            content: Text('Error al seleccionar archivos: $e'),
             backgroundColor: _kRed,
           ),
         );
@@ -744,7 +1252,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         });
                       },
                       itemBuilder: (context, idx) {
-                        final bytes = dialogFiles[idx].bytes!;
+                        final file = dialogFiles[idx];
+                        final bytes = file.bytes!;
                         return InteractiveViewer(
                           minScale: 0.5,
                           maxScale: 4.0,
@@ -762,7 +1271,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   else
                     const Center(
                       child: Text(
-                        'No hay imágenes seleccionadas',
+                        'No hay archivos seleccionados',
                         style: TextStyle(color: Colors.white, fontSize: 14),
                       ),
                     ),
@@ -789,7 +1298,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                             vertical: 8,
                           ),
                           child: Align(
-                            alignment: Alignment.topLeft,
+                            alignment: Alignment.topRight,
                             child: CircleAvatar(
                               backgroundColor: Colors.black.withValues(
                                 alpha: 0.4,
@@ -845,7 +1354,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                         try {
                                           final addResult =
                                               await FilePicker.pickFiles(
-                                                type: FileType.image,
+                                                type: FileType.custom,
+                                                allowedExtensions: [
+                                                  'jpg',
+                                                  'jpeg',
+                                                  'png',
+                                                  'webp',
+                                                ],
                                                 allowMultiple: true,
                                                 withData: true,
                                               );
@@ -1033,7 +1548,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al subir imágenes: $e'),
+            content: Text('Error al subir archivos: $e'),
             backgroundColor: _kRed,
           ),
         );
@@ -1055,7 +1570,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       backgroundColor: _kBg,
       appBar: AppBar(
         title: Text(
-          ticket != null ? ticket.ticketNumber : 'Detalle de Ticket',
+          ticket != null ? ticket.ticketNumber : 'Detalle del Servicio',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -1079,7 +1594,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         onRefresh: _loadTicket,
         child: _loading
             ? SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: UiHelpers.refreshScrollPhysics,
                 child: SizedBox(
                   height: MediaQuery.of(context).size.height * 0.5,
                   child: const Center(
@@ -1089,12 +1604,12 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               )
             : _error != null
             ? SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: UiHelpers.refreshScrollPhysics,
                 child: _buildErrorView(),
               )
             : ticket == null
             ? SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: UiHelpers.refreshScrollPhysics,
                 child: _buildNotFoundView(),
               )
             : LayoutBuilder(
@@ -1103,7 +1618,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
                   if (isDesktop) {
                     return SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
+                      physics: UiHelpers.refreshScrollPhysics,
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1121,24 +1636,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                                   children: _buildGeneralInfoFields(ticket),
                                 ),
                                 const SizedBox(height: 16),
-                                _buildInfoCard(
-                                  title: 'Detalle del Reporte',
-                                  icon: Icons.description_outlined,
-                                  children: [
-                                    _buildDetailSection(
-                                      label: 'Asunto / Título',
-                                      value: ticket.title,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    _buildDetailSection(
-                                      label: 'Descripción de la Falla',
-                                      value:
-                                          ticket.description ??
-                                          'Sin descripción proporcionada.',
-                                      isDescription: true,
-                                    ),
-                                  ],
-                                ),
+                                _buildServiceOrderCard(ticket),
+                                const SizedBox(height: 16),
+                                _buildQuoteSection(ticket),
+                                if (_serviceCompletion != null &&
+                                    _serviceCompletion!.isCompleted) ...[
+                                  const SizedBox(height: 16),
+                                  ServiceCompletionCard(
+                                    serviceCompletion: _serviceCompletion!,
+                                    onDownloadReportPdf:
+                                        _openFinalServiceOrderPdf,
+                                    isDownloadingPdf:
+                                        _generatingFinalServiceOrderPdf,
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -1150,7 +1661,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   }
 
                   return SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
+                    physics: UiHelpers.refreshScrollPhysics,
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1163,24 +1674,18 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                           children: _buildGeneralInfoFields(ticket),
                         ),
                         const SizedBox(height: 16),
-                        _buildInfoCard(
-                          title: 'Detalle del Reporte',
-                          icon: Icons.description_outlined,
-                          children: [
-                            _buildDetailSection(
-                              label: 'Asunto / Título',
-                              value: ticket.title,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildDetailSection(
-                              label: 'Descripción de la Falla',
-                              value:
-                                  ticket.description ??
-                                  'Sin descripción proporcionada.',
-                              isDescription: true,
-                            ),
-                          ],
-                        ),
+                        _buildServiceOrderCard(ticket),
+                        const SizedBox(height: 16),
+                        _buildQuoteSection(ticket),
+                        if (_serviceCompletion != null &&
+                            _serviceCompletion!.isCompleted) ...[
+                          const SizedBox(height: 16),
+                          ServiceCompletionCard(
+                            serviceCompletion: _serviceCompletion!,
+                            onDownloadReportPdf: _openFinalServiceOrderPdf,
+                            isDownloadingPdf: _generatingFinalServiceOrderPdf,
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         _buildChatCard(ticket),
                       ],
@@ -1412,6 +1917,1167 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return fields;
   }
 
+  Color _quoteStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved':
+      case 'converted':
+        return const Color(0xFF16A34A);
+      case 'sent':
+        return const Color(0xFF0284C7);
+      case 'draft':
+        return Colors.grey;
+      case 'rejected':
+      case 'expired':
+        return const Color(0xFFEF4444);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Widget _buildQuoteSection(ServiceTicket ticket) {
+    if (_loadingQuote) {
+      return _buildInfoCard(
+        title: 'COTIZACIÓN DE SERVICIO',
+        icon: Icons.request_quote_outlined,
+        children: const [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: _kPrimary,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_serviceQuote == null) {
+      return _buildEmptyQuoteCard(ticket);
+    }
+
+    return _buildQuoteCard(_serviceQuote!, ticket);
+  }
+
+  Widget _buildEmptyQuoteCard(ServiceTicket ticket) {
+    final isAssignedOrBeyond =
+        ticket.status.toLowerCase() == 'assigned' ||
+        ticket.status.toLowerCase() == 'in_progress' ||
+        ticket.status.toLowerCase() == 'resolved' ||
+        ticket.status.toLowerCase() == 'closed';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.request_quote_outlined,
+                color: _kPrimary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'COTIZACIÓN DE SERVICIO',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _kNavy,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Text(
+                  'SIN COTIZACIÓN',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          if (isAssignedOrBeyond) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    color: Color(0xFFD97706),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Aviso administrativo: Este ticket se encuentra en estado "${ticket.statusLabel}". Puedes generar la cotización formal en cualquier momento para registrar la propuesta económica.',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF92400E),
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ] else ...[
+            Text(
+              'Este ticket de servicio aún no cuenta con una cotización económica registrada.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _openCreateQuoteSheet(ticket),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _kPrimary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              icon: const Icon(Icons.add_chart_outlined, size: 18),
+              label: const Text(
+                'Crear cotización',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuoteCard(ServiceQuote quote, ServiceTicket ticket) {
+    final statusColor = _quoteStatusColor(quote.status);
+    final validDate = quote.validUntil;
+    final validStr = validDate != null
+        ? '${validDate.day}/${validDate.month}/${validDate.year}'
+        : null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(
+                    Icons.request_quote_outlined,
+                    color: _kPrimary,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'COTIZACIÓN DE SERVICIO',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: _kNavy,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  quote.statusLabel.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                quote.quoteNumber,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: _kNavy,
+                ),
+              ),
+              if (validStr != null)
+                Row(
+                  children: [
+                    Icon(
+                      Icons.event_outlined,
+                      size: 13,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Válida hasta: $validStr',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+
+          Text(
+            'CONCEPTOS INCLUIDOS',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade500,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (quote.items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Sin partidas desglosadas.',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            )
+          else
+            ...quote.items.map((item) {
+              final formattedUnit = formatFinancialPrice(item.unitPrice);
+              final formattedLineTotal = formatFinancialPrice(
+                item.totalLinePrice,
+              );
+              final hasDiscount = item.hasDiscount;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _kBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.productNameSnapshot,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _kNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${item.quantity.toInt()} x $formattedUnit',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        if (!hasDiscount)
+                          Text(
+                            formattedLineTotal,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: _kNavy,
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (hasDiscount) ...[
+                      const SizedBox(height: 3),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Bonificación / Descuento:',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF16A34A),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            '-${formatFinancialPrice(item.discount)}',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF16A34A),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Importe partida:',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            formattedLineTotal,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: _kNavy,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }),
+
+          const SizedBox(height: 8),
+
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Subtotal',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    Text(
+                      formatFinancialPrice(quote.subtotal),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: _kNavy,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'IVA (${(quote.taxPct * 100).toInt()}%)',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    Text(
+                      formatFinancialPrice(quote.tax),
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: _kNavy,
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Divider(height: 1, thickness: 0.8),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'TOTAL COTIZADO',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: _kNavy,
+                      ),
+                    ),
+                    Text(
+                      formatFinancialPrice(quote.total),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: _kPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          if (quote.notes != null && quote.notes!.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildDetailSection(
+              label: 'Observaciones del presupuesto',
+              value: quote.notes!.trim(),
+              isDescription: true,
+            ),
+          ],
+
+          const SizedBox(height: 14),
+
+          if (quote.isDraft) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.edit_note_outlined,
+                    color: Color(0xFF64748B),
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cotización en borrador',
+                          style: TextStyle(
+                            color: Color(0xFF334155),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Esta propuesta aún no ha sido enviada al cliente. Puedes revisarla y enviarla cuando esté lista.',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openCreateQuoteSheet(ticket),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _kNavy,
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: const Text(
+                      'Modificar',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: _submittingQuoteResponse
+                        ? null
+                        : () => _confirmSendQuote(quote),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: _submittingQuoteResponse
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded, size: 16),
+                    label: const Text(
+                      'Enviar al Cliente',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (quote.isSent) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F9FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFBAE6FD)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.forward_to_inbox_outlined,
+                    color: Color(0xFF0284C7),
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cotización enviada al cliente',
+                          style: TextStyle(
+                            color: Color(0xFF0369A1),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'La propuesta económica fue enviada. Esperando confirmación o respuesta del cliente.',
+                          style: TextStyle(
+                            color: Color(0xFF0284C7),
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _submittingQuoteResponse
+                        ? null
+                        : () => _confirmRejectQuote(quote),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _kRed,
+                      side: const BorderSide(color: _kRed),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Rechazar',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _submittingQuoteResponse
+                        ? null
+                        : () => _confirmAcceptQuote(quote),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kPrimary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: _submittingQuoteResponse
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Aceptar Cotización',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (quote.isApproved) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cotización aceptada',
+                          style: TextStyle(
+                            color: Color(0xFF166534),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'La propuesta económica ha sido confirmada. Procede con el pago para continuar con el servicio.',
+                          style: TextStyle(
+                            color: Color(0xFF15803D),
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _submittingQuotePayment
+                    ? null
+                    : () => _startQuotePayment(quote),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF009EE3),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: _submittingQuotePayment
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.payment_outlined, size: 18),
+                label: Text(
+                  _submittingQuotePayment
+                      ? 'Iniciando Mercado Pago...'
+                      : 'Pagar Cotización (${formatFinancialPrice(quote.total)})',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13.5,
+                  ),
+                ),
+              ),
+            ),
+          ] else if (quote.isRejected) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.cancel, color: Color(0xFFDC2626), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Cotización rechazada',
+                      style: TextStyle(
+                        color: Color(0xFF991B1B),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openCreateQuoteSheet(ticket),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kPrimary,
+                  side: const BorderSide(color: _kPrimary),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text(
+                  'Crear nueva cotización',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ),
+            ),
+          ] else if (quote.isExpired) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.schedule, color: Color(0xFFD97706), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Cotización vencida',
+                      style: TextStyle(
+                        color: Color(0xFF92400E),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openCreateQuoteSheet(ticket),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kPrimary,
+                  side: const BorderSide(color: _kPrimary),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text(
+                  'Crear nueva cotización',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ),
+            ),
+          ] else if (quote.isConverted) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDFA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF99F6E4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.verified, color: Color(0xFF0D9488), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Cotización pagada / convertida en compra',
+                          style: TextStyle(
+                            color: Color(0xFF115E59),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'El pago fue acreditado y la orden está registrada.',
+                          style: TextStyle(
+                            color: Color(0xFF0F766E),
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (quote.convertedOrderId != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _viewConvertedOrder(quote),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0D9488),
+                    side: const BorderSide(color: Color(0xFF0D9488)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                  label: const Text(
+                    'Ver en Mis Compras',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceOrderCard(ServiceTicket ticket) {
+    final order = ServiceOrderPresentation.fromTicket(ticket);
+    final evidence = _evidenceSummary(order);
+
+    return _buildInfoCard(
+      title: 'ORDEN DE SERVICIO',
+      icon: Icons.assignment_outlined,
+      children: [
+        _buildServiceOrderPdfAction(),
+        const SizedBox(height: 16),
+        _buildOrderSection('DATOS DEL EQUIPO', [
+          _orderField('Equipo', order.equipmentName, Icons.settings_outlined),
+          _orderField('Marca', order.equipmentBrand, Icons.sell_outlined),
+          _orderField(
+            'Modelo',
+            order.equipmentModel,
+            Icons.view_in_ar_outlined,
+          ),
+          _orderField(
+            'Número de serie',
+            order.serialNumber,
+            Icons.tag_outlined,
+          ),
+          _orderField(
+            'Equipo operando',
+            order.equipmentOperating,
+            Icons.power_settings_new_outlined,
+          ),
+        ]),
+        _buildOrderSection('TIPO DE SERVICIO', [
+          _orderField(
+            'Servicio solicitado',
+            order.serviceTypeLabel,
+            Icons.build_circle_outlined,
+          ),
+        ]),
+        _buildOrderSection('DATOS DEL CLIENTE', [
+          _orderField('Cliente', order.clientName, Icons.business_outlined),
+          _orderField(
+            'Institución',
+            order.institution,
+            Icons.local_hospital_outlined,
+          ),
+          _orderField(
+            'Área / departamento',
+            order.department,
+            Icons.meeting_room_outlined,
+          ),
+          _orderField(
+            'Responsable',
+            order.responsible,
+            Icons.contacts_outlined,
+          ),
+          _orderField('Teléfono', order.phone, Icons.phone_android_outlined),
+          _orderField('Correo', order.email, Icons.email_outlined),
+          _orderField('Dirección', order.address, Icons.location_on_outlined),
+        ]),
+        if (order.intakeDetails.isNotEmpty)
+          _buildOrderSection('DATOS ADICIONALES', [
+            for (final entry in order.intakeDetails.entries)
+              _orderField(entry.key, entry.value, Icons.fact_check_outlined),
+          ]),
+        if (order.failureDescription != null)
+          _buildDetailSection(
+            label: order.descriptionLabel,
+            value: order.failureDescription!,
+            isDescription: true,
+          ),
+        if (evidence != null) ...[
+          const SizedBox(height: 16),
+          _buildDetailSection(
+            label: 'Evidencias',
+            value: evidence,
+            isDescription: true,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildServiceOrderPdfAction() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _kPrimary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kPrimary.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _kPrimary.withValues(alpha: 0.18)),
+                ),
+                child: const Icon(
+                  Icons.picture_as_pdf_outlined,
+                  color: _kPrimary,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Documento generado con la información registrada para este servicio.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        color: _kNavy,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    _PreliminaryChip(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _generatingServiceOrderPdf
+                  ? null
+                  : _openServiceOrderPdf,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _kPrimary,
+                side: const BorderSide(color: _kPrimary),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: _generatingServiceOrderPdf
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: _kPrimary,
+                      ),
+                    )
+                  : const Icon(Icons.open_in_new_rounded, size: 18),
+              label: Text(
+                _generatingServiceOrderPdf
+                    ? 'Generando orden...'
+                    : 'Ver orden de servicio',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrderSection(String title, List<_ServiceOrderField?> fields) {
+    final visibleFields = fields.whereType<_ServiceOrderField>().toList();
+    if (visibleFields.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: _kNavy,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 4),
+          for (final field in visibleFields)
+            _buildDetailRow(
+              label: field.label,
+              value: field.value,
+              icon: field.icon,
+            ),
+        ],
+      ),
+    );
+  }
+
+  _ServiceOrderField? _orderField(String label, String? value, IconData icon) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) return null;
+    return _ServiceOrderField(label: label, value: trimmed, icon: icon);
+  }
+
+  String? _evidenceSummary(ServiceOrderPresentation order) {
+    final realAttachments = _messages
+        .where((message) => message.attachmentUrl?.trim().isNotEmpty == true)
+        .length;
+    if (realAttachments > 0) {
+      final suffix = realAttachments == 1 ? 'adjunto' : 'adjuntos';
+      return '$realAttachments $suffix disponibles en el chat de soporte técnico.';
+    }
+    return order.legacyEvidenceSummary;
+  }
+
   Widget _buildInfoCard({
     required String title,
     required IconData icon,
@@ -1537,7 +3203,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     return LoadErrorState(
       error: _error,
       onRetry: _loadTicket,
-      genericTitle: 'Error al cargar el detalle del ticket',
+      genericTitle: 'Error al cargar el detalle del servicio',
       genericMessage: 'No pudimos cargar esta conversación por el momento.',
     );
   }
@@ -1556,13 +3222,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              'No se encontró el ticket',
+              'No se encontró el servicio',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             const Text(
-              'El ticket de servicio solicitado podría no existir o no tener permisos para verlo.',
+              'El servicio solicitado podría no existir o no tener permisos para verlo.',
               style: TextStyle(color: Colors.grey, fontSize: 12),
               textAlign: TextAlign.center,
             ),
@@ -1588,6 +3254,42 @@ bool _isVideoAttachment(String url) {
       path.endsWith('.mov') ||
       path.endsWith('.m4v') ||
       path.endsWith('.webm');
+}
+
+class _ServiceOrderField {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _ServiceOrderField({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+}
+
+class _PreliminaryChip extends StatelessWidget {
+  const _PreliminaryChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE0F2FE),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFBAE6FD)),
+      ),
+      child: const Text(
+        'Preliminar',
+        style: TextStyle(
+          color: Color(0xFF0369A1),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
 }
 
 class _VideoAttachmentViewer extends StatefulWidget {

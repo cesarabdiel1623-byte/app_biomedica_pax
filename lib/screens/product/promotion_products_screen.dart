@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/product.dart';
 import '../../services/product_service.dart';
+import '../../utils/ui_helpers.dart';
 import '../../widgets/load_error_state.dart';
 import '../home/widgets/product_card.dart';
 
@@ -11,12 +12,14 @@ const _kBackground = Color(0xFFF8FAFC);
 class PromotionProductsScreen extends StatefulWidget {
   const PromotionProductsScreen({
     super.key,
-    required this.promotionId,
+    this.promotionId,
     this.title,
+    this.initialProducts,
   });
 
-  final String promotionId;
+  final String? promotionId;
   final String? title;
+  final List<Product>? initialProducts;
 
   @override
   State<PromotionProductsScreen> createState() =>
@@ -31,18 +34,35 @@ class _PromotionProductsScreenState extends State<PromotionProductsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.initialProducts != null && widget.initialProducts!.isNotEmpty) {
+      _products = widget.initialProducts!;
+      _loading = false;
+    } else {
+      _load();
+    }
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool showSpinner = true}) async {
     setState(() {
-      _loading = true;
+      if (showSpinner) _loading = true;
       _error = null;
     });
     try {
-      final products = await ProductService.getProductsByPromotion(
-        widget.promotionId,
-      );
+      final Future<List<Product>> fetchFuture;
+      if (widget.promotionId != null && widget.promotionId!.isNotEmpty) {
+        fetchFuture = ProductService.getProductsByPromotion(
+          widget.promotionId!,
+        );
+      } else {
+        fetchFuture = ProductService.getAllProducts().then(
+          (list) => list.where((p) => p.hasDiscount).toList(),
+        );
+      }
+      final results = await Future.wait([
+        fetchFuture.timeout(const Duration(seconds: 30)),
+        if (showSpinner) Future.delayed(const Duration(seconds: 2)),
+      ]);
+      final products = results[0] as List<Product>;
       if (!mounted) return;
       setState(() {
         _products = products;
@@ -60,13 +80,21 @@ class _PromotionProductsScreenState extends State<PromotionProductsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kBackground,
+      backgroundColor: _loading ? Colors.white : _kBackground,
       appBar: AppBar(
         backgroundColor: _kPrimary,
         foregroundColor: Colors.white,
+        elevation: 0,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(
-          widget.title?.trim().isNotEmpty == true ? widget.title! : 'Promoción',
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+          widget.title?.trim().isNotEmpty == true
+              ? widget.title!
+              : 'Promociones del Día',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
       body: _buildBody(),
@@ -75,7 +103,10 @@ class _PromotionProductsScreenState extends State<PromotionProductsScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: _kPrimary));
+      return const ColoredBox(
+        color: Colors.white,
+        child: Center(child: CircularProgressIndicator(color: _kPrimary)),
+      );
     }
     if (_error != null) {
       return LoadErrorState(
@@ -88,9 +119,9 @@ class _PromotionProductsScreenState extends State<PromotionProductsScreen> {
     if (_products.isEmpty) {
       return RefreshIndicator(
         color: _kPrimary,
-        onRefresh: _load,
+        onRefresh: () => _load(showSpinner: false),
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: UiHelpers.refreshScrollPhysics,
           children: const [
             SizedBox(height: 220),
             Icon(Icons.local_offer_outlined, size: 48, color: Colors.grey),
@@ -105,9 +136,9 @@ class _PromotionProductsScreenState extends State<PromotionProductsScreen> {
 
     return RefreshIndicator(
       color: _kPrimary,
-      onRefresh: _load,
+      onRefresh: () => _load(showSpinner: false),
       child: GridView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: UiHelpers.refreshScrollPhysics,
         padding: const EdgeInsets.all(10),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,

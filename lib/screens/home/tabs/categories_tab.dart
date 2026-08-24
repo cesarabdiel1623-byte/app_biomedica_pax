@@ -20,6 +20,7 @@ class CategoriesTab extends StatefulWidget {
 
 class CategoriesTabState extends State<CategoriesTab> {
   List<CatalogCategory> _categories = const [];
+  final Set<String> _precacheRequestedUrls = <String>{};
   int _selectedIndex = 0;
   bool _loading = true;
   String? _error;
@@ -38,19 +39,35 @@ class CategoriesTabState extends State<CategoriesTab> {
     );
     if (index >= 0 && mounted) {
       setState(() => _selectedIndex = index);
+      _precacheCategoryImages(_categories[index]);
     }
   }
 
-  Future<void> _loadCategories() async {
-    if (mounted) {
+  Future<void> reload({bool showSpinner = true}) =>
+      _loadCategories(showSpinner: showSpinner);
+
+  Future<void> _loadCategories({
+    bool showSpinner = true,
+    bool refreshImages = false,
+  }) async {
+    if (mounted && showSpinner) {
       setState(() {
         _loading = true;
         _error = null;
       });
+    } else if (mounted && _error != null) {
+      setState(() => _error = null);
     }
 
     try {
-      final categories = await CatalogService.getCategories();
+      if (refreshImages) {
+        await _evictCachedCategoryImages();
+      }
+      final results = await Future.wait([
+        CatalogService.getCategories().timeout(const Duration(seconds: 30)),
+        if (showSpinner) Future.delayed(const Duration(seconds: 2)),
+      ]);
+      final categories = results[0] as List<CatalogCategory>;
       if (!mounted) return;
       final requestedIndex = _requestedCategoryId == null
           ? -1
@@ -65,7 +82,21 @@ class CategoriesTabState extends State<CategoriesTab> {
             ? 0
             : _selectedIndex.clamp(0, categories.length - 1);
         _loading = false;
+        _error = null;
       });
+      if (categories.isNotEmpty) {
+        final selectedCategory =
+            categories[_selectedIndex.clamp(0, categories.length - 1)];
+        _precacheCategoryImages(selectedCategory);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          for (final category in categories) {
+            if (category.id != selectedCategory.id) {
+              _precacheCategoryImages(category);
+            }
+          }
+        });
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -123,6 +154,49 @@ class CategoriesTabState extends State<CategoriesTab> {
     );
   }
 
+  void _precacheCategoryImages(CatalogCategory category) {
+    if (!mounted) return;
+
+    final urls = category.subcategories
+        .map((subcategory) {
+          final url = CatalogService.resolveSubcategoryImageUrl(
+            subcategory.imagePath,
+          );
+          return UiHelpers.sanitizeTrustedRemoteUrl(url);
+        })
+        .whereType<String>()
+        .toSet();
+
+    for (final url in urls) {
+      if (!_precacheRequestedUrls.add(url)) continue;
+      precacheImage(
+        ResizeImage(NetworkImage(url), width: 160, height: 160),
+        context,
+      ).timeout(const Duration(seconds: 3)).catchError((_) {});
+    }
+  }
+
+  Future<void> _evictCachedCategoryImages() async {
+    final urls = _categories
+        .expand((category) => category.subcategories)
+        .map((subcategory) {
+          final url = CatalogService.resolveSubcategoryImageUrl(
+            subcategory.imagePath,
+          );
+          return UiHelpers.sanitizeTrustedRemoteUrl(url);
+        })
+        .whereType<String>()
+        .toSet();
+
+    _precacheRequestedUrls.removeAll(urls);
+    await Future.wait(
+      urls.map(
+        (url) =>
+            ResizeImage(NetworkImage(url), width: 160, height: 160).evict(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = _categories.isNotEmpty
@@ -141,9 +215,7 @@ class CategoriesTabState extends State<CategoriesTab> {
           backTooltip: 'Volver al inicio',
           onBack: () => HomeScreen.showTab(0),
         ),
-        Expanded(
-          child: _buildBody(current),
-        ),
+        Expanded(child: _buildBody(current)),
       ],
     );
   }
@@ -152,27 +224,46 @@ class CategoriesTabState extends State<CategoriesTab> {
     if (_loading) {
       return const ColoredBox(
         color: Colors.white,
-        child: Center(
-          child: CircularProgressIndicator(color: _kPrimary),
-        ),
+        child: Center(child: CircularProgressIndicator(color: _kPrimary)),
       );
     }
 
     if (_error != null && _categories.isEmpty) {
-      return LoadErrorState(
-        error: _error,
-        onRetry: _loadCategories,
-        genericTitle: 'Error al cargar categorías',
-        genericMessage: 'No pudimos consultar las categorías por el momento.',
+      return RefreshIndicator(
+        color: _kPrimary,
+        backgroundColor: Colors.white,
+        displacement: 42,
+        triggerMode: RefreshIndicatorTriggerMode.onEdge,
+        onRefresh: () =>
+            _loadCategories(showSpinner: false, refreshImages: true),
+        child: ListView(
+          physics: UiHelpers.refreshScrollPhysics,
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height - 240,
+              child: LoadErrorState(
+                error: _error,
+                onRetry: _loadCategories,
+                genericTitle: 'Error al cargar categorías',
+                genericMessage:
+                    'No pudimos consultar las categorías por el momento.',
+              ),
+            ),
+          ],
+        ),
       );
     }
 
     if (_categories.isEmpty || current == null) {
       return RefreshIndicator(
         color: _kPrimary,
-        onRefresh: _loadCategories,
+        backgroundColor: Colors.white,
+        displacement: 42,
+        triggerMode: RefreshIndicatorTriggerMode.onEdge,
+        onRefresh: () =>
+            _loadCategories(showSpinner: false, refreshImages: true),
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: UiHelpers.refreshScrollPhysics,
           children: const [
             SizedBox(height: 220),
             Icon(Icons.category_outlined, color: Colors.grey, size: 48),
@@ -196,7 +287,6 @@ class CategoriesTabState extends State<CategoriesTab> {
     );
   }
 
-
   Widget _buildCategorySidebar() {
     return Container(
       width: 84,
@@ -209,7 +299,10 @@ class CategoriesTabState extends State<CategoriesTab> {
           final active = index == _selectedIndex;
 
           return InkWell(
-            onTap: () => setState(() => _selectedIndex = index),
+            onTap: () {
+              setState(() => _selectedIndex = index);
+              _precacheCategoryImages(category);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               constraints: const BoxConstraints(minHeight: 82),
@@ -271,13 +364,18 @@ class CategoriesTabState extends State<CategoriesTab> {
 
   Widget _buildSubcategoryGrid(CatalogCategory category) {
     return Container(
+      key: ValueKey<String>('subcategory-grid-${category.id}'),
       color: _kBackground,
       padding: const EdgeInsets.all(8),
       child: RefreshIndicator(
         color: _kPrimary,
-        onRefresh: _loadCategories,
+        backgroundColor: Colors.white,
+        displacement: 42,
+        triggerMode: RefreshIndicatorTriggerMode.onEdge,
+        onRefresh: () =>
+            _loadCategories(showSpinner: false, refreshImages: true),
         child: GridView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: UiHelpers.refreshScrollPhysics,
           padding: EdgeInsets.zero,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
@@ -293,6 +391,7 @@ class CategoriesTabState extends State<CategoriesTab> {
             );
 
             return InkWell(
+              key: ValueKey<String>('subcategory-${subcategory.id}'),
               borderRadius: BorderRadius.circular(8),
               onTap: () => _openProducts(category, subcategory: subcategory),
               child: Container(
@@ -312,6 +411,8 @@ class CategoriesTabState extends State<CategoriesTab> {
                               imageUrl,
                               fit: BoxFit.contain,
                               iconSize: 26,
+                              cacheWidth: 160,
+                              cacheHeight: 160,
                             )
                           : Icon(
                               _iconFor(subcategory.slug),
@@ -348,9 +449,12 @@ class CategoriesTabState extends State<CategoriesTab> {
   Widget _buildCategoryOverview(CatalogCategory category) {
     return RefreshIndicator(
       color: _kPrimary,
-      onRefresh: _loadCategories,
+      backgroundColor: Colors.white,
+      displacement: 42,
+      triggerMode: RefreshIndicatorTriggerMode.onEdge,
+      onRefresh: () => _loadCategories(showSpinner: false, refreshImages: true),
       child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: UiHelpers.refreshScrollPhysics,
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 90),

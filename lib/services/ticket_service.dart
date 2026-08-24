@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import '../models/quote.dart';
+import '../models/service_completion.dart';
 import '../models/service_ticket.dart';
 import '../models/ticket_message.dart';
 import '../utils/ui_helpers.dart';
@@ -109,19 +111,45 @@ class TicketService {
     });
   }
 
-  /// Sube una imagen y retorna una referencia interna para generar URL firmada.
+  static bool isVideoFile(String fileName) {
+    try {
+      final ext = _fileExtension(fileName);
+      return _allowedVideoExtensions.contains(ext);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static String _videoContentType(String fileName) {
+    try {
+      final ext = _fileExtension(fileName);
+      return switch (ext) {
+        'mov' => 'video/quicktime',
+        'webm' => 'video/webm',
+        'm4v' => 'video/x-m4v',
+        _ => 'video/mp4',
+      };
+    } catch (_) {
+      return 'video/mp4';
+    }
+  }
+
+  /// Sube un adjunto (imagen o video) y retorna una referencia interna para generar URL firmada.
   static Future<String> uploadChatAttachment(
     String ticketId,
     String fileName,
     Uint8List bytes,
   ) async {
-    UiHelpers.validateImageUpload(bytes, fileName);
+    final isVideo = isVideoFile(fileName);
+    final contentType = isVideo
+        ? _videoContentType(fileName)
+        : _imageContentType(fileName);
     return uploadTicketAttachment(
       ticketId: ticketId,
       fileName: fileName,
       bytes: bytes,
-      contentType: _imageContentType(fileName),
-      isVideo: false,
+      contentType: contentType,
+      isVideo: isVideo,
     );
   }
 
@@ -319,6 +347,122 @@ class TicketService {
           .isFilter('delivered_at', null);
     } catch (e) {
       // Ignorar errores silenciosamente
+    }
+  }
+
+  /// Obtener la cotización de servicio relevante para el ticket.
+  /// Prioridad:
+  /// 1. sent
+  /// 2. approved
+  /// 3. la más reciente entre converted / rejected / expired / draft
+  static Future<ServiceQuote?> getRelevantServiceQuote(String ticketId) async {
+    await _ensureTicketBelongsToCurrentClient(ticketId);
+    final res = await _db
+        .from('quotes')
+        .select('*, quote_items(*)')
+        .eq('service_ticket_id', ticketId)
+        .order('created_at', ascending: false);
+
+    if (res.isEmpty) return null;
+
+    final quotes = res
+        .map((m) => ServiceQuote.fromJson(m))
+        .toList();
+
+    if (quotes.isEmpty) return null;
+
+    final sentQuote = quotes.where((q) => q.isSent).firstOrNull;
+    if (sentQuote != null) return sentQuote;
+
+    final approvedQuote = quotes.where((q) => q.isApproved).firstOrNull;
+    if (approvedQuote != null) return approvedQuote;
+
+    return quotes.firstOrNull;
+  }
+
+  /// Aceptar la cotización de servicio mediante RPC autoritativa
+  static Future<void> acceptServiceQuote(String quoteId) async {
+    final userId = _db.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('Debes iniciar sesión para responder a la cotización.');
+    }
+    await _db.rpc(
+      'respond_to_quote',
+      params: {
+        'p_quote_id': quoteId,
+        'p_accept': true,
+      },
+    );
+  }
+
+  /// Rechazar la cotización de servicio mediante RPC autoritativa
+  static Future<void> rejectServiceQuote(String quoteId) async {
+    final userId = _db.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('Debes iniciar sesión para responder a la cotización.');
+    }
+    await _db.rpc(
+      'respond_to_quote',
+      params: {
+        'p_quote_id': quoteId,
+        'p_accept': false,
+      },
+    );
+  }
+
+  /// Preparar la orden de compra en backend a partir de la cotización aprobada.
+  /// (Base lista para T2A-4. NO envía p_environment).
+  static Future<Map<String, dynamic>> prepareServiceQuoteOrder(
+    String quoteId, {
+    String? notes,
+  }) async {
+    final userId = _db.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('Debes iniciar sesión para preparar la orden.');
+    }
+    final res = await _db.rpc(
+      'prepare_quote_order',
+      params: {
+        'p_quote_id': quoteId,
+        if (notes != null && notes.trim().isNotEmpty) 'p_notes': notes.trim(),
+      },
+    );
+    if (res is! Map) {
+      throw Exception('Respuesta inesperada al preparar la orden.');
+    }
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// Obtiene los datos de finalización técnica del servicio (sólo lectura para el cliente).
+  /// Si existen múltiples órdenes históricas, selecciona la orden finalizada más reciente
+  /// (status = 'resolved' o 'closed' con completed_at no nulo).
+  static Future<ServiceCompletion?> getServiceCompletion(
+    String ticketId,
+  ) async {
+    final cleanId = ticketId.trim();
+    if (cleanId.isEmpty) return null;
+
+    try {
+      await _ensureTicketBelongsToCurrentClient(cleanId);
+      final res = await _db
+          .from('service_orders')
+          .select(
+            '*, assigned_technician:assigned_technician_id(full_name), service_parts_used(id, service_order_id, product_id, quantity, products:product_id(name))',
+          )
+          .eq('service_ticket_id', cleanId)
+          .inFilter('status', ['resolved', 'closed'])
+          .not('completed_at', 'is', null)
+          .order('completed_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (res == null) return null;
+      final completion = ServiceCompletion.fromJson(
+        Map<String, dynamic>.from(res as Map),
+      );
+      return completion.isCompleted ? completion : null;
+    } catch (e) {
+      return null;
     }
   }
 }

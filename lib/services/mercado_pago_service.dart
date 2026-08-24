@@ -55,6 +55,30 @@ class OrderPaymentSnapshot {
           paymentStatus == 'charged_back');
 }
 
+class ServiceQuotePaymentResult {
+  const ServiceQuotePaymentResult({
+    required this.ok,
+    required this.alreadyPaid,
+    this.orderId,
+    this.orderNumber,
+    this.paymentRecordId,
+    this.checkoutUri,
+    this.amount,
+    this.currencyId,
+    this.reusedPreference = false,
+  });
+
+  final bool ok;
+  final bool alreadyPaid;
+  final String? orderId;
+  final String? orderNumber;
+  final String? paymentRecordId;
+  final Uri? checkoutUri;
+  final double? amount;
+  final String? currencyId;
+  final bool reusedPreference;
+}
+
 class MercadoPagoService {
   MercadoPagoService(this._supabase);
 
@@ -70,6 +94,81 @@ class MercadoPagoService {
     'mercadopago.co',
     'mpago.la',
   };
+
+  Future<ServiceQuotePaymentResult> startServiceQuotePayment({
+    required String quoteId,
+    String? notes,
+  }) async {
+    if (_supabase.auth.currentSession == null) {
+      throw Exception('Debes iniciar sesión para pagar.');
+    }
+
+    if (_opening) {
+      throw Exception('Ya se está abriendo Mercado Pago.');
+    }
+
+    _opening = true;
+
+    try {
+      final response = await _supabase.functions.invoke(
+        'create-mp-quote-order-preference',
+        body: {
+          'quote_id': quoteId,
+          if (notes?.trim().isNotEmpty == true) 'notes': notes!.trim(),
+        },
+      );
+
+      final data = response.data;
+      if (response.status >= 400 || data is! Map) {
+        final msg = data is Map ? data['message']?.toString() : null;
+        throw Exception(
+          msg ?? 'No fue posible iniciar el pago de la cotización.',
+        );
+      }
+
+      final alreadyPaid = data['already_paid'] == true;
+      final orderId = data['order_id']?.toString();
+      final orderNumber = data['order_number']?.toString();
+      final paymentRecordId = data['payment_record_id']?.toString();
+      final amount = (data['amount'] as num?)?.toDouble();
+      final currencyId = data['currency_id']?.toString() ?? 'MXN';
+      final reusedPreference = data['reuse_preference'] == true;
+
+      if (alreadyPaid) {
+        return ServiceQuotePaymentResult(
+          ok: true,
+          alreadyPaid: true,
+          orderId: orderId,
+          orderNumber: orderNumber,
+          amount: amount,
+          currencyId: currencyId,
+        );
+      }
+
+      final rawUrl = data['checkout_url']?.toString();
+      if (rawUrl == null || rawUrl.trim().isEmpty) {
+        throw Exception('No se recibió la URL de pago de Mercado Pago.');
+      }
+
+      final checkoutUri = validateCheckoutUri(rawUrl);
+
+      await _openCheckout(checkoutUri);
+
+      return ServiceQuotePaymentResult(
+        ok: true,
+        alreadyPaid: false,
+        orderId: orderId,
+        orderNumber: orderNumber,
+        paymentRecordId: paymentRecordId,
+        checkoutUri: checkoutUri,
+        amount: amount,
+        currencyId: currencyId,
+        reusedPreference: reusedPreference,
+      );
+    } finally {
+      _opening = false;
+    }
+  }
 
   Future<MercadoPagoCheckoutSession> startOrderPayment({
     required String cartId,

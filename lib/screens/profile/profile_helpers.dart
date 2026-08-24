@@ -16,6 +16,52 @@ String formatCurrency(double v) {
   return '\$$buf.${parts[1]} MXN';
 }
 
+class OrderPaymentBreakdown {
+  final double products;
+  final double includedTax;
+  final double shipping;
+  final double total;
+
+  const OrderPaymentBreakdown({
+    required this.products,
+    required this.includedTax,
+    required this.shipping,
+    required this.total,
+  });
+}
+
+OrderPaymentBreakdown buildIncludedVatOrderPaymentBreakdown({
+  required double subtotal,
+  required double total,
+  double? storedTax,
+  double? customerShippingAmount,
+  double taxPct = 0.16,
+}) {
+  final safeTotal = _roundMoney(total);
+  final safeShipping = _roundMoney(
+    (customerShippingAmount ?? 0).clamp(0.0, double.infinity),
+  );
+  final fallbackProducts = (safeTotal - safeShipping).clamp(
+    0.0,
+    double.infinity,
+  );
+  final products = _roundMoney(
+    subtotal > 0 ? subtotal : fallbackProducts.toDouble(),
+  );
+  final includedTax = storedTax != null && storedTax > 0
+      ? _roundMoney(storedTax)
+      : _roundMoney(products - (products / (1 + taxPct)));
+
+  return OrderPaymentBreakdown(
+    products: products,
+    includedTax: includedTax,
+    shipping: safeShipping,
+    total: safeTotal,
+  );
+}
+
+double _roundMoney(num value) => (value * 100).roundToDouble() / 100;
+
 String getEffectiveStatus(Map<String, dynamic> q) {
   final status = q['status'] ?? '';
   if (status == 'sent' || status == 'draft') {

@@ -1,4 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  resolveShippingOrigin,
+  resolveSkydropxEnvironment,
+  SKYDROPX_SANDBOX_TEST_ORIGIN,
+} from "../_shared/skydropx_shipping_origin.ts";
 
 const JSON_HEADERS = {
   "Content-Type": "application/json; charset=utf-8",
@@ -10,16 +15,23 @@ const JSON_HEADERS = {
 
 type JsonRecord = Record<string, unknown>;
 
-// SKYDROPX SANDBOX TEST ORIGIN
-// Configuración Sandbox de prueba exclusivamente para desarrollo.
-// PENDIENTE: Reemplazar por la dirección física de almacén/remitente autorizada en producción.
-const SKYDROPX_SANDBOX_TEST_ORIGIN = {
-  country_code: "MX",
-  postal_code: "97392",
-  area_level1: "Yucatán",
-  area_level2: "Umán",
-  area_level3: "Piedra de Agua",
-};
+const ALLOWED_CARRIER_PATTERNS = [
+  { normalized: "FedEx", regex: /(?:^|[^a-z0-9])fedex(?:[^a-z0-9]|$)/i },
+  { normalized: "DHL", regex: /(?:^|[^a-z0-9])dhl(?:[^a-z0-9]|$)/i },
+  { normalized: "Estafeta", regex: /(?:^|[^a-z0-9])estafeta(?:[^a-z0-9]|$)/i },
+  { normalized: "Paquetexpress", regex: /(?:^|[^a-z0-9])paquetexpress(?:[^a-z0-9]|$)|(?:^|[^a-z0-9])paquete\s*express(?:[^a-z0-9]|$)/i },
+];
+
+function isAllowedCarrier(carrierName: string | null | undefined): boolean {
+  if (!carrierName || typeof carrierName !== "string") return false;
+  const clean = carrierName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  return ALLOWED_CARRIER_PATTERNS.some((c) => c.regex.test(clean));
+}
 
 function jsonResponse(body: JsonRecord, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -384,8 +396,28 @@ Deno.serve(async (request: Request): Promise<Response> => {
     }, 502);
   }
 
+  let originResult: { origin: JsonRecord; source: string };
+  try {
+    const environment = resolveSkydropxEnvironment();
+    originResult = await resolveShippingOrigin(adminClient, environment);
+  } catch (error) {
+    const errorName = error instanceof Error ? error.message : "invalid_shipping_origin";
+    const status = errorName === "multiple_shipping_origins" ? 409 : 500;
+    return jsonResponse({
+      ok: false,
+      error: errorName,
+      message: "Error al resolver la dirección de origen para el envío.",
+    }, status);
+  }
+
   const quotationPayload = {
-    address_from: SKYDROPX_SANDBOX_TEST_ORIGIN,
+    address_from: {
+      country_code: getString(originResult.origin, "country_code"),
+      postal_code: getString(originResult.origin, "postal_code"),
+      area_level1: getString(originResult.origin, "area_level1"),
+      area_level2: getString(originResult.origin, "area_level2"),
+      area_level3: getString(originResult.origin, "area_level3"),
+    },
     address_to: {
       country_code: "MX",
       postal_code: destPostalCode,
@@ -520,6 +552,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     if (
       !rId ||
+      !isAllowedCarrier(rCarrier) ||
       rStatus === "no_coverage" ||
       rStatus === "not_applicable" ||
       rTotal === null ||

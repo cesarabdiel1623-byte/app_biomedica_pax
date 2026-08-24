@@ -6,6 +6,7 @@ import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../../services/search_service.dart';
 import '../../widgets/standard_section_header.dart';
+import '../home/widgets/product_card.dart';
 import 'product_detail_screen.dart';
 import '../../utils/ui_helpers.dart';
 
@@ -94,13 +95,12 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<void> _executeSearch(String query) async {
+  Future<void> _executeSearch(String query, {bool showSpinner = false}) async {
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) return;
 
     _focusNode.unfocus();
     setState(() {
-      _isLoading = true;
       _currentQuery = trimmedQuery;
       _searchController.text = trimmedQuery;
     });
@@ -125,6 +125,11 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     }
+  }
+
+  Future<void> _refreshSearchResults() async {
+    if (_currentQuery.trim().isEmpty) return;
+    await _executeSearch(_currentQuery, showSpinner: false);
   }
 
   Future<void> _deleteHistoryItem(String query) async {
@@ -299,10 +304,6 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: _kPrimary));
-    }
-
     if (_isSearching) {
       return _buildSearchResults();
     }
@@ -319,52 +320,58 @@ class _SearchScreenState extends State<SearchScreen> {
     final bool hasRecent = _recentlyViewed.isNotEmpty;
 
     if (!hasHistory && !hasRecent) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: _kPrimary.withValues(alpha: 0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.search_rounded,
-                  size: 64,
-                  color: _kPrimary,
-                ),
+      return ListView(
+        physics: const ClampingScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.62,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: _kPrimary.withValues(alpha: 0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.search_rounded,
+                      size: 64,
+                      color: _kPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Busca equipos médicos',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _kNavy,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Encuentra ultrasonidos, consumibles, refacciones y más en Biomedica Pax.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Busca equipos médicos',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _kNavy,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Encuentra ultrasonidos, consumibles, refacciones y más en Biomedica Pax.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                  height: 1.4,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       );
     }
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      physics: const BouncingScrollPhysics(),
+      physics: const ClampingScrollPhysics(),
       children: [
         if (hasHistory) ...[
           const Text(
@@ -491,6 +498,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildSuggestionsList() {
     return ListView.separated(
+      physics: const ClampingScrollPhysics(),
       itemCount: _suggestions.length + 1,
       separatorBuilder: (context, index) =>
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
@@ -561,74 +569,94 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildSearchResults() {
     if (_results.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildSearchOffIcon(),
-              const SizedBox(height: 12),
-              Text(
-                'Sin resultados para "$_currentQuery"',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: _kNavy,
+      return RefreshIndicator(
+        color: _kPrimary,
+        backgroundColor: Colors.white,
+        displacement: 42,
+        triggerMode: RefreshIndicatorTriggerMode.onEdge,
+        onRefresh: _refreshSearchResults,
+        child: ListView(
+          physics: UiHelpers.refreshScrollPhysics,
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.58,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 48,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildSearchOffIcon(),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Sin resultados para "$_currentQuery"',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _kNavy,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'No encontramos coincidencias para esta búsqueda.\nIntenta con otros términos o verifica la ortografía.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'No encontramos coincidencias para esta búsqueda.\nIntenta con otros términos o verifica la ortografía.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            '${_results.length} resultado${_results.length > 1 ? 's' : ''} para "$_currentQuery"',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
+    return RefreshIndicator(
+      color: _kPrimary,
+      backgroundColor: Colors.white,
+      displacement: 42,
+      triggerMode: RefreshIndicatorTriggerMode.onEdge,
+      onRefresh: _refreshSearchResults,
+      child: CustomScrollView(
+        physics: UiHelpers.refreshScrollPhysics,
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                '${_results.length} resultado${_results.length > 1 ? 's' : ''} para "$_currentQuery"',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: GridView.builder(
+          SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            physics: const BouncingScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisExtent: 315, // Updated to match enlarged size
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisExtent: 315,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final product = _results[index];
+                return ProductCard(product: product, enableHero: false);
+              }, childCount: _results.length),
             ),
-            itemCount: _results.length,
-            itemBuilder: (context, index) {
-              final product = _results[index];
-              return _ProductCard(
-                product: product,
-                searchQuery: _currentQuery,
-                onGoToCart: () {
-                  // Re-load results just in case
-                },
-              );
-            },
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -784,31 +812,30 @@ class _ProductCardState extends State<_ProductCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   const SizedBox(height: 2),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        product.formattedPrice,
-                        style: TextStyle(
-                          fontSize: priceFontSize,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF111827),
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      if (product.hasDiscount) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          '${product.discountPercent}% OFF',
-                          style: TextStyle(
-                            fontSize: oldPriceFontSize,
-                            color: _kGreen,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ],
+                  Text(
+                    product.formattedPrice,
+                    style: TextStyle(
+                      fontSize: priceFontSize,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF111827),
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (product.hasDiscount) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${product.discountPercent}% OFF',
+                      style: TextStyle(
+                        fontSize: oldPriceFontSize,
+                        color: _kGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   if (product.hasFreeShipping)
                     Padding(
@@ -871,7 +898,7 @@ class _ProductCardState extends State<_ProductCard> {
 
   Widget _placeholder() => Center(
     child: Icon(
-      Icons.medical_services_outlined,
+      Icons.image_not_supported_outlined,
       color: Colors.grey.shade300,
       size: widget.isCompact ? 28 : 32,
     ),

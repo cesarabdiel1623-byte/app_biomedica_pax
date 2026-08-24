@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../models/registration_draft.dart';
+import '../../../services/registration_gate_service.dart';
 import '../../../utils/ui_helpers.dart';
+import '../../home/home_screen.dart';
+import '../otp_verification_screen.dart';
 import 'step_1_email.dart';
 import 'step_2_name.dart';
 import 'step_3_phone.dart';
@@ -17,15 +21,20 @@ class RegistrationChecklistScreen extends StatefulWidget {
 class _RegistrationChecklistScreenState
     extends State<RegistrationChecklistScreen>
     with SingleTickerProviderStateMixin {
+  final RegistrationDraft _draft = RegistrationDraft();
+
   bool _emailValidated = false;
   bool _nameCompleted = false;
   bool _phoneValidated = false;
   bool _passwordCreated = false;
   bool _termsAccepted = false;
+  bool _isGoogle = false;
+  bool _isCompleting = false;
 
   String _userEmail = '';
   String _userName = '';
   String _userPhone = '';
+  String _userPassword = '';
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -45,47 +54,45 @@ class _RegistrationChecklistScreenState
     _loadExistingProgress();
   }
 
-  /// Loads existing user data to restore registration progress after page reload
-  void _loadExistingProgress() {
+  /// Loads existing user data from authoritative DB and auth state if session exists
+  Future<void> _loadExistingProgress() async {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      setState(() {
+        _isGoogle = false;
+      });
+      return;
+    }
 
-    final metadata = user.userMetadata ?? {};
-    final isGoogleUser = user.appMetadata['provider'] == 'google';
+    final progress = await RegistrationGateService.loadOnboardingProgress(user: user);
+    if (!mounted) return;
 
     setState(() {
-      // Step 1: Email is validated if user has a session (they verified OTP)
-      if (user.email != null && user.email!.isNotEmpty) {
-        _emailValidated = true;
-        _userEmail = user.email!;
-      }
+      _emailValidated = progress.emailVerified;
+      _nameCompleted = progress.nameCompleted;
+      _phoneValidated = progress.phoneCompleted;
+      _passwordCreated = progress.passwordCreated;
+      _termsAccepted = progress.termsAccepted;
+      _userEmail = progress.email;
+      _userName = progress.fullName;
+      _userPhone = progress.phone.isNotEmpty
+          ? progress.phone
+          : (progress.phoneCompleted ? 'Omitido - verificar después' : '');
+      _isGoogle = progress.isGoogleUser;
 
-      // Step 2: Name is completed if full_name exists
-      final fullName = metadata['full_name'] as String?;
-      if (fullName != null && fullName.isNotEmpty) {
-        _nameCompleted = true;
-        _userName = fullName;
-      }
-
-      // Step 3: Phone is validated if phone exists or was skipped
-      if ((user.phone != null && user.phone!.isNotEmpty) ||
-          metadata['phone_skipped'] == true) {
-        _phoneValidated = true;
-        _userPhone = (user.phone != null && user.phone!.isNotEmpty)
-            ? user.phone!
-            : 'Omitido - verificar después';
-      }
-
-      // Step 4: Google users don't need a password (they use Google to sign in)
-      if (isGoogleUser) {
-        _passwordCreated = true;
-      }
+      _draft.email = _userEmail;
+      _draft.fullName = _userName;
+      _draft.phone = progress.phone;
+      _draft.phoneSkipped = progress.phoneCompleted && progress.phone.isEmpty;
+      _draft.termsAccepted = _termsAccepted;
     });
   }
 
   @override
   void dispose() {
     _animController.dispose();
+    _draft.clear();
+    _userPassword = '';
     super.dispose();
   }
 
@@ -94,12 +101,15 @@ class _RegistrationChecklistScreenState
     if (!_emailValidated) return 0;
     if (!_nameCompleted) return 1;
     if (!_phoneValidated) return 2;
-    if (!_passwordCreated) return 3;
+    if (!_isGoogle && !_passwordCreated) return 3;
     return 4; // All done
   }
 
-  bool get _allCompleted =>
-      _emailValidated && _nameCompleted && _phoneValidated && _passwordCreated;
+  bool get _allCompleted {
+    if (!_emailValidated || !_nameCompleted || !_phoneValidated) return false;
+    if (!_isGoogle && !_passwordCreated) return false;
+    return true;
+  }
 
   Widget _buildStepItem({
     required int stepIndex,
@@ -233,6 +243,105 @@ class _RegistrationChecklistScreenState
     );
   }
 
+  Future<void> _handleFinalSubmission() async {
+    if (!_termsAccepted || _isCompleting) return;
+
+    setState(() => _isCompleting = true);
+    final user = Supabase.instance.client.auth.currentUser;
+
+    try {
+      if (user == null) {
+        // REGISTRO EMAIL NORMAL: Crear cuenta por primera vez
+        final authRes = await Supabase.instance.client.auth.signUp(
+          email: _userEmail.trim(),
+          password: _userPassword,
+          data: {
+            'full_name': _userName.trim(),
+          },
+        );
+
+        if (!mounted) return;
+
+        if (authRes.session != null) {
+          // Sesión activa inmediata -> finalizar onboarding
+          await RegistrationGateService.completeOnboarding(
+            fullName: _userName.trim(),
+            phone: _userPhone.startsWith('Omitido') ? null : _userPhone,
+            phoneSkipped: _userPhone.startsWith('Omitido'),
+          );
+
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+            );
+          }
+        } else {
+          // Confirmación requerida -> Pantalla de código OTP
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => OTPVerificationScreen(
+                  email: _userEmail.trim(),
+                  fullName: _userName.trim(),
+                  phone: _userPhone.startsWith('Omitido') ? null : _userPhone,
+                  phoneSkipped: _userPhone.startsWith('Omitido'),
+                ),
+              ),
+            );
+          }
+        }
+      } else {
+        // USUARIO YA AUTENTICADO (Google o sesión existente): Finalizar onboarding
+        final ok = await RegistrationGateService.completeOnboarding(
+          fullName: _userName.trim(),
+          phone: _userPhone.startsWith('Omitido') ? null : _userPhone,
+          phoneSkipped: _userPhone.startsWith('Omitido'),
+        );
+
+        if (!mounted) return;
+
+        if (ok) {
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          } else {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Error al finalizar registro. Por favor intenta de nuevo.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al registrar: $e'),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCompleting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Theme(
@@ -358,12 +467,12 @@ class _RegistrationChecklistScreenState
                               _buildStepItem(
                                 stepIndex: 0,
                                 icon: Icons.email_outlined,
-                                title: 'Validar e-mail',
-                                completedTitle: 'E-mail validado',
-                                subtitle: 'Lo usarás para recuperar tu cuenta.',
-                                completedSubtitle: 'Verificado',
+                                title: 'Ingresar e-mail',
+                                completedTitle: 'E-mail ingresado',
+                                subtitle: 'Lo usarás como tu usuario de acceso.',
+                                completedSubtitle: 'Guardado',
                                 isCompleted: _emailValidated,
-                                buttonText: 'Validar',
+                                buttonText: 'Ingresar',
                                 onTap: () async {
                                   final result = await Navigator.of(context)
                                       .push<Map<String, dynamic>>(
@@ -377,6 +486,7 @@ class _RegistrationChecklistScreenState
                                     setState(() {
                                       _emailValidated = true;
                                       _userEmail = result['email'] ?? '';
+                                      _draft.email = _userEmail;
                                     });
                                   }
                                 },
@@ -391,6 +501,7 @@ class _RegistrationChecklistScreenState
                                 subtitle: 'Elige cómo quieres que te llamemos.',
                                 completedSubtitle: 'Guardado',
                                 isCompleted: _nameCompleted,
+                                buttonText: 'Completar',
                                 onTap: () async {
                                   final result = await Navigator.of(context)
                                       .push<Map<String, dynamic>>(
@@ -404,6 +515,7 @@ class _RegistrationChecklistScreenState
                                     setState(() {
                                       _nameCompleted = true;
                                       _userName = result['name'] ?? '';
+                                      _draft.fullName = _userName;
                                     });
                                   }
                                 },
@@ -413,15 +525,15 @@ class _RegistrationChecklistScreenState
                               _buildStepItem(
                                 stepIndex: 2,
                                 icon: Icons.phone_android_outlined,
-                                title: 'Validar teléfono',
-                                completedTitle: 'Teléfono validado',
-                                subtitle: 'Servirá para ingresar a tu cuenta.',
+                                title: 'Teléfono de contacto',
+                                completedTitle: 'Teléfono ingresado',
+                                subtitle: 'Para coordinar envíos y notificaciones.',
                                 completedSubtitle:
                                     _userPhone.startsWith('Omitido')
                                     ? 'Omitido por ahora'
-                                    : 'Validado',
+                                    : 'Guardado',
                                 isCompleted: _phoneValidated,
-                                buttonText: 'Validar',
+                                buttonText: 'Ingresar',
                                 onTap: () async {
                                   final result = await Navigator.of(context)
                                       .push<Map<String, dynamic>>(
@@ -439,18 +551,23 @@ class _RegistrationChecklistScreenState
                                           result['skipped'] == true) {
                                         _userPhone =
                                             'Omitido - verificar después';
+                                        _draft.phoneSkipped = true;
+                                        _draft.phone = '';
+                                      } else {
+                                        _draft.phone = _userPhone;
+                                        _draft.phoneSkipped = false;
                                       }
                                     });
                                     if (mounted) {
                                       if (result['skipped'] == true) {
                                         UiHelpers.showFloatingSuccessToast(
                                           context,
-                                          'Verificación de teléfono omitida por ahora.',
+                                          'Teléfono omitido por ahora.',
                                         );
                                       } else {
                                         UiHelpers.showFloatingSuccessToast(
                                           context,
-                                          '¡Teléfono validado con éxito!',
+                                          '¡Teléfono guardado!',
                                         );
                                       }
                                     }
@@ -458,38 +575,43 @@ class _RegistrationChecklistScreenState
                                 },
                               ),
 
-                              // Step 4: Password
-                              _buildStepItem(
-                                stepIndex: 3,
-                                icon: Icons.lock_outline,
-                                title: 'Crear contraseña',
-                                completedTitle: 'Contraseña creada',
-                                subtitle: 'Servirá para ingresar a tu cuenta.',
-                                completedSubtitle: 'Guardada',
-                                isCompleted: _passwordCreated,
-                                buttonText: 'Crear',
-                                onTap: () async {
-                                  final result = await Navigator.of(context)
-                                      .push<Map<String, dynamic>>(
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              Step4PasswordScreen(
-                                                userName: _userName,
-                                              ),
-                                        ),
-                                      );
-                                  if (result != null &&
-                                      result['success'] == true) {
-                                    setState(() => _passwordCreated = true);
-                                    if (mounted) {
-                                      UiHelpers.showFloatingSuccessToast(
-                                        context,
-                                        '¡Contraseña creada con éxito!',
-                                      );
+                              // Step 4: Password (solo para email/password)
+                              if (!_isGoogle)
+                                _buildStepItem(
+                                  stepIndex: 3,
+                                  icon: Icons.lock_outline,
+                                  title: 'Crear contraseña',
+                                  completedTitle: 'Contraseña creada',
+                                  subtitle: 'Servirá para ingresar a tu cuenta.',
+                                  completedSubtitle: 'Guardada',
+                                  isCompleted: _passwordCreated,
+                                  buttonText: 'Crear',
+                                  onTap: () async {
+                                    final result = await Navigator.of(context)
+                                        .push<Map<String, dynamic>>(
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                Step4PasswordScreen(
+                                                  userName: _userName,
+                                                ),
+                                          ),
+                                        );
+                                    if (result != null &&
+                                        result['success'] == true) {
+                                      setState(() {
+                                        _passwordCreated = true;
+                                        _userPassword = result['password'] ?? '';
+                                        _draft.password = _userPassword;
+                                      });
+                                      if (mounted) {
+                                        UiHelpers.showFloatingSuccessToast(
+                                          context,
+                                          '¡Contraseña lista!',
+                                        );
+                                      }
                                     }
-                                  }
-                                },
-                              ),
+                                  },
+                                ),
 
                               // Terms & Conditions (only when all steps are done)
                               if (_allCompleted) ...[
@@ -524,20 +646,20 @@ class _RegistrationChecklistScreenState
                                             ),
                                           ),
                                           onChanged: (value) {
-                                            setState(
-                                              () => _termsAccepted =
-                                                  value ?? false,
-                                            );
+                                            setState(() {
+                                              _termsAccepted = value ?? false;
+                                              _draft.termsAccepted = _termsAccepted;
+                                            });
                                           },
                                         ),
                                       ),
                                       const SizedBox(width: 10),
                                       Expanded(
                                         child: GestureDetector(
-                                          onTap: () => setState(
-                                            () => _termsAccepted =
-                                                !_termsAccepted,
-                                          ),
+                                          onTap: () => setState(() {
+                                            _termsAccepted = !_termsAccepted;
+                                            _draft.termsAccepted = _termsAccepted;
+                                          }),
                                           child: RichText(
                                             text: TextSpan(
                                               style: const TextStyle(
@@ -582,26 +704,8 @@ class _RegistrationChecklistScreenState
                                   width: double.infinity,
                                   height: 48,
                                   child: ElevatedButton(
-                                    onPressed: _termsAccepted
-                                        ? () async {
-                                            // Save terms acceptance in user metadata
-                                            await Supabase.instance.client.auth
-                                                .updateUser(
-                                                  UserAttributes(
-                                                    data: {
-                                                      'terms_accepted': true,
-                                                    },
-                                                  ),
-                                                );
-                                            // Refresh session so AuthGate detects completed registration
-                                            await Supabase.instance.client.auth
-                                                .refreshSession();
-                                            if (mounted &&
-                                                Navigator.canPop(context)) {
-                                              Navigator.of(context).pop();
-                                            }
-                                            // If rendered by AuthGate, the stream rebuild will show HomeScreen
-                                          }
+                                    onPressed: _termsAccepted && !_isCompleting
+                                        ? _handleFinalSubmission
                                         : null,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _primaryColor,
@@ -615,13 +719,22 @@ class _RegistrationChecklistScreenState
                                         borderRadius: BorderRadius.circular(24),
                                       ),
                                     ),
-                                    child: const Text(
-                                      'Continuar',
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                    child: _isCompleting
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : Text(
+                                            _isGoogle ? 'Continuar' : 'Crear cuenta',
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                   ),
                                 ),
                               ],

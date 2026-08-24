@@ -26,17 +26,26 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
     _loadHistory();
   }
 
-  Future<void> _loadHistory() async {
-    setState(() => _loading = true);
+  Future<void> _loadHistory({bool showSpinner = true}) async {
+    if (showSpinner) {
+      setState(() => _loading = true);
+    }
     try {
-      final list = await SearchService.getRecentlyViewed();
-      setState(() {
-        _historyList = list;
-      });
+      final results = await Future.wait([
+        SearchService.getRecentlyViewed().timeout(const Duration(seconds: 30)),
+        Future.delayed(const Duration(seconds: 2)),
+      ]);
+      if (mounted) {
+        setState(() {
+          _historyList = results[0] as List<Product>;
+        });
+      }
     } catch (e) {
-      print('Error al obtener historial: $e');
+      debugPrint('Error al obtener historial: $e');
     } finally {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -106,13 +115,21 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
           ? const Center(child: CircularProgressIndicator(color: _kPrimary))
           : _historyList.isEmpty
           ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _historyList.length,
-              itemBuilder: (context, index) {
-                final product = _historyList[index];
-                return _buildHistoryCard(product);
-              },
+          : RefreshIndicator(
+              color: _kPrimary,
+              backgroundColor: Colors.white,
+              displacement: 42,
+              triggerMode: RefreshIndicatorTriggerMode.onEdge,
+              onRefresh: () => _loadHistory(showSpinner: false),
+              child: ListView.builder(
+                physics: UiHelpers.refreshScrollPhysics,
+                padding: const EdgeInsets.all(16),
+                itemCount: _historyList.length,
+                itemBuilder: (context, index) {
+                  final product = _historyList[index];
+                  return _buildHistoryCard(product);
+                },
+              ),
             ),
     );
   }
@@ -244,32 +261,31 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
                         ),
                         const SizedBox(height: 2),
                       ],
-                      // Current price + discount percentage
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            product.formattedPrice,
-                            style: const TextStyle(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF111827),
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          if (hasDiscount) ...[
-                            const SizedBox(width: 6),
-                            Text(
-                              '${product.discountPercent}% OFF',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF16A34A),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ],
+                      // Current price and discount stay on separate lines on narrow cards.
+                      Text(
+                        product.formattedPrice,
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF111827),
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                      if (hasDiscount) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${product.discountPercent}% OFF',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF16A34A),
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                       const SizedBox(height: 6),
                       // Shipping Info
                       if (product.hasFreeShipping)

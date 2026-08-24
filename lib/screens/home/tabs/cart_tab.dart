@@ -25,7 +25,6 @@ class CartTabState extends State<CartTab> {
   CartPricingAmounts? _cartPricingAmounts;
   bool _syncingCouponState = false;
   final Set<String> _notifiedStaleCouponKeys = {};
-  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
   bool get _isFullCartSelected =>
       _items.isNotEmpty && _selectedItemIds.length == _items.length;
@@ -44,33 +43,16 @@ class CartTabState extends State<CartTab> {
       _items.removeAt(originalIndex);
     });
 
-    _listKey.currentState?.removeItem(
-      originalIndex,
-      (context, animation) {
-        if (fromSwipe) {
-          return const SizedBox.shrink();
-        }
-        return SizeTransition(
-          sizeFactor: animation,
-          child: FadeTransition(
-            opacity: animation,
-            child: _cartItemCard(removedItem, originalIndex),
-          ),
-        );
-      },
-      duration: fromSwipe ? Duration.zero : const Duration(milliseconds: 300),
-    );
-
     try {
       await CartService.removeFromCart(removedItem.id);
       load(showSpinner: false);
     } catch (e) {
       setState(() {
         _clearCartPricingAmounts();
-        _items.insert(originalIndex, removedItem);
+        final safeIndex = originalIndex.clamp(0, _items.length);
+        _items.insert(safeIndex, removedItem);
         _selectedItemIds.add(removedItem.id);
       });
-      _listKey.currentState?.insertItem(originalIndex);
       if (context.mounted) {
         UiHelpers.showErrorToast(
           context,
@@ -203,6 +185,7 @@ class CartTabState extends State<CartTab> {
       context: context,
       barrierDismissible: true,
       builder: (_) => _CartCouponDialog(
+        currentAmounts: _cartPricingAmounts,
         onPricingChanged: (amounts) {
           if (!mounted) return;
           setState(() => _cartPricingAmounts = amounts);
@@ -337,7 +320,7 @@ class CartTabState extends State<CartTab> {
 
                     _summaryRow('Productos ($qty)', _fmt(origSubtotal)),
                     const SizedBox(height: 10),
-                    _summaryRow('Envío', 'Por calcular'),
+                    _summaryRow('Envío', 'Calculando al pagar'),
 
                     if (prodDiscount > 0) ...[
                       const SizedBox(height: 10),
@@ -528,20 +511,18 @@ class CartTabState extends State<CartTab> {
     final synced = await _syncPersistedCouponBeforeCheckout();
     if (!synced || !mounted) return;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => CheckoutSheet(
-        cartId: _items.isNotEmpty ? _items.first.cartId : '',
-        subtotal: _subtotal,
-        total: _total,
-        cartPricingAmounts: _isFullCartSelected ? _cartPricingAmounts : null,
-        onSuccess: () {
-          load();
-        },
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => CheckoutSheet(
+          cartId: _items.isNotEmpty ? _items.first.cartId : '',
+          subtotal: _subtotal,
+          total: _total,
+          cartPricingAmounts: _isFullCartSelected ? _cartPricingAmounts : null,
+          asPage: true,
+          onSuccess: () {
+            load();
+          },
+        ),
       ),
     );
   }
@@ -806,9 +787,9 @@ class CartTabState extends State<CartTab> {
                   backgroundColor: Colors.white,
                   displacement: 42,
                   triggerMode: RefreshIndicatorTriggerMode.onEdge,
-                  onRefresh: () => load(showSpinner: true),
+                  onRefresh: () => load(showSpinner: false),
                   child: ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
+                    physics: UiHelpers.refreshScrollPhysics,
                     children: [
                       SizedBox(
                         height: MediaQuery.of(context).size.height - 240,
@@ -852,9 +833,9 @@ class CartTabState extends State<CartTab> {
                         backgroundColor: Colors.white,
                         displacement: 42,
                         triggerMode: RefreshIndicatorTriggerMode.onEdge,
-                        onRefresh: () => load(showSpinner: true),
+                        onRefresh: () => load(showSpinner: false),
                         child: CustomScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
+                          physics: UiHelpers.refreshScrollPhysics,
                           slivers: [
                             SliverToBoxAdapter(
                               child: Column(
@@ -917,20 +898,10 @@ class CartTabState extends State<CartTab> {
                                 horizontal: 12,
                                 vertical: 12,
                               ),
-                              sliver: SliverAnimatedList(
-                                key: _listKey,
-                                initialItemCount: _items.length,
-                                itemBuilder: (context, index, animation) {
-                                  if (index >= _items.length) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  final item = _items[index];
-                                  return _buildAnimatedItem(
-                                    item,
-                                    animation,
-                                    index,
-                                  );
-                                },
+                              sliver: SliverList.builder(
+                                itemCount: _items.length,
+                                itemBuilder: (context, index) =>
+                                    _cartItemCard(_items[index], index),
                               ),
                             ),
                           ],
@@ -942,20 +913,6 @@ class CartTabState extends State<CartTab> {
                 ),
         ),
       ],
-    );
-  }
-
-  Widget _buildAnimatedItem(
-    CartItem item,
-    Animation<double> animation,
-    int index,
-  ) {
-    return SizeTransition(
-      sizeFactor: animation,
-      child: FadeTransition(
-        opacity: animation,
-        child: _cartItemCard(item, index),
-      ),
     );
   }
 
@@ -1437,9 +1394,13 @@ class CartTabState extends State<CartTab> {
 }
 
 class _CartCouponDialog extends StatefulWidget {
-  const _CartCouponDialog({required this.onPricingChanged});
+  const _CartCouponDialog({
+    required this.onPricingChanged,
+    this.currentAmounts,
+  });
 
   final ValueChanged<CartPricingAmounts?> onPricingChanged;
+  final CartPricingAmounts? currentAmounts;
 
   @override
   State<_CartCouponDialog> createState() => _CartCouponDialogState();
@@ -1451,6 +1412,13 @@ class _CartCouponDialogState extends State<_CartCouponDialog> {
   bool _changed = false;
   bool _success = false;
   String? _feedback;
+  CartPricingAmounts? _displayAmounts;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayAmounts = widget.currentAmounts;
+  }
 
   @override
   void dispose() {
@@ -1473,6 +1441,7 @@ class _CartCouponDialogState extends State<_CartCouponDialog> {
       final result = await CartService.applyCartCoupon(_codeController.text);
       if (!mounted) return;
       if (result.valid) {
+        _displayAmounts = result.amounts;
         widget.onPricingChanged(result.amounts);
       }
       setState(() {
@@ -1502,6 +1471,7 @@ class _CartCouponDialogState extends State<_CartCouponDialog> {
       final amounts = await CartService.removeCartCoupon();
       if (!mounted) return;
       _codeController.clear();
+      _displayAmounts = amounts;
       widget.onPricingChanged(amounts);
       setState(() {
         _loading = false;
@@ -1521,6 +1491,9 @@ class _CartCouponDialogState extends State<_CartCouponDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final couponDiscount = _displayAmounts?.couponDiscount ?? 0.0;
+    final hasAppliedCoupon = couponDiscount > 0;
+
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 28),
       backgroundColor: Colors.white,
@@ -1582,36 +1555,101 @@ class _CartCouponDialogState extends State<_CartCouponDialog> {
                       : const Color(0xFFFEF2F2),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  _feedback!,
-                  style: TextStyle(
-                    color: _success
-                        ? const Color(0xFF0F766E)
-                        : const Color(0xFFB91C1C),
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      _success
+                          ? Icons.check_circle_outline
+                          : Icons.error_outline,
+                      color: _success
+                          ? const Color(0xFF0F766E)
+                          : const Color(0xFFB91C1C),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _feedback!,
+                        style: TextStyle(
+                          color: _success
+                              ? const Color(0xFF0F766E)
+                              : const Color(0xFFB91C1C),
+                          fontSize: 13,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (hasAppliedCoupon) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.confirmation_number_outlined,
+                      color: Color(0xFF16A34A),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Descuento de cupón',
+                        style: TextStyle(
+                          color: Color(0xFF166534),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '-${formatCommercialPrice(couponDiscount)}',
+                      style: const TextStyle(
+                        color: Color(0xFF16A34A),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
             const SizedBox(height: 16),
-            Row(
-              children: [
-                TextButton(
+            if (hasAppliedCoupon) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
                   onPressed: _loading ? null : _removeCoupon,
-                  child: const Text(
-                    'Quitar cupón',
-                    style: TextStyle(color: Color(0xFF64748B)),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  label: const Text('Quitar cupón aplicado'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF64748B),
+                    side: const BorderSide(color: Color(0xFFE2E8F0)),
                   ),
                 ),
-                const Spacer(),
+              ),
+              const SizedBox(height: 10),
+            ],
+            Row(
+              children: [
                 TextButton(
                   onPressed: _loading
                       ? null
                       : () => Navigator.pop(context, _changed),
                   child: const Text('Cerrar'),
                 ),
-                const SizedBox(width: 4),
+                const Spacer(),
                 FilledButton(
                   onPressed: _loading ? null : _applyCoupon,
                   style: FilledButton.styleFrom(backgroundColor: _kPrimary),

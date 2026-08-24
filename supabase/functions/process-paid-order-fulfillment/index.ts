@@ -1,7 +1,12 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import {
+  REQUIRED_ORIGIN_FIELDS,
+  resolveShippingOrigin,
+  resolveSkydropxEnvironment,
+} from "../_shared/skydropx_shipping_origin.ts";
 
 type JsonRecord = Record<string, unknown>;
-type SupabaseAdminClient = ReturnType<typeof createClient>;
+type SupabaseAdminClient = SupabaseClient;
 
 type ShippingRate = {
   rate_id: string;
@@ -40,19 +45,23 @@ const JSON_HEADERS = {
 const QUOTATION_POLL_INTERVAL_MS = 3000;
 const QUOTATION_MAX_POLL_ATTEMPTS = 20;
 
-const REQUIRED_ORIGIN_FIELDS = [
-  "country_code",
-  "postal_code",
-  "area_level1",
-  "area_level2",
-  "area_level3",
-  "name",
-  "street1",
-  "company",
-  "phone",
-  "email",
-  "reference",
-] as const;
+const ALLOWED_CARRIER_PATTERNS = [
+  { normalized: "FedEx", regex: /(?:^|[^a-z0-9])fedex(?:[^a-z0-9]|$)/i },
+  { normalized: "DHL", regex: /(?:^|[^a-z0-9])dhl(?:[^a-z0-9]|$)/i },
+  { normalized: "Estafeta", regex: /(?:^|[^a-z0-9])estafeta(?:[^a-z0-9]|$)/i },
+  { normalized: "Paquetexpress", regex: /(?:^|[^a-z0-9])paquetexpress(?:[^a-z0-9]|$)|(?:^|[^a-z0-9])paquete\s*express(?:[^a-z0-9]|$)/i },
+];
+
+function isAllowedCarrier(carrierName: string | null | undefined): boolean {
+  if (!carrierName || typeof carrierName !== "string") return false;
+  const clean = carrierName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  return ALLOWED_CARRIER_PATTERNS.some((c) => c.regex.test(clean));
+}
 
 function jsonResponse(body: JsonRecord, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
@@ -170,84 +179,6 @@ async function getSandboxAccessToken(baseUrl: string): Promise<string> {
     throw new Error(`oauth_failed_${response.status}`);
   }
   return data.access_token;
-}
-
-function loadSandboxOrigin(): JsonRecord {
-  const rawOrigin = Deno.env.get("SKYDROPX_SANDBOX_ORIGIN_JSON")?.trim();
-  if (!rawOrigin) throw new Error("skydropx_origin_not_configured");
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawOrigin);
-  } catch (_) {
-    throw new Error("skydropx_origin_not_configured");
-  }
-
-  if (!isRecord(parsed)) throw new Error("skydropx_origin_not_configured");
-  const origin: JsonRecord = {};
-  for (const field of REQUIRED_ORIGIN_FIELDS) {
-    const value = getString(parsed, field);
-    if (!value) throw new Error("skydropx_origin_not_configured");
-    origin[field] = field === "country_code" ? value.toUpperCase() : value;
-  }
-  if (origin.country_code !== "MX") throw new Error("skydropx_origin_not_configured");
-  return origin;
-}
-
-function validateOriginAddress(origin: JsonRecord, errorName: string): JsonRecord {
-  const validOrigin: JsonRecord = {};
-  for (const field of REQUIRED_ORIGIN_FIELDS) {
-    const value = getString(origin, field);
-    if (!value) throw new Error(errorName);
-    validOrigin[field] = field === "country_code" ? value.toUpperCase() : value;
-  }
-  if (validOrigin.country_code !== "MX") throw new Error(errorName);
-  return validOrigin;
-}
-
-function mapWarehouseToOrigin(warehouse: JsonRecord): JsonRecord {
-  return validateOriginAddress({
-    country_code: getString(warehouse, "country_code"),
-    postal_code: getString(warehouse, "postal_code"),
-    area_level1: getString(warehouse, "state"),
-    area_level2: getString(warehouse, "city"),
-    area_level3: getString(warehouse, "neighborhood"),
-    name: getString(warehouse, "contact_name"),
-    street1: getString(warehouse, "street1"),
-    company: getString(warehouse, "company"),
-    phone: getString(warehouse, "phone"),
-    email: getString(warehouse, "email"),
-    reference: getString(warehouse, "reference"),
-  }, "invalid_shipping_origin");
-}
-
-async function loadShippingOrigin(
-  adminClient: SupabaseAdminClient,
-  environment: string,
-): Promise<{ origin: JsonRecord; source: "warehouse" | "sandbox_secret" }> {
-  const { data, error } = await adminClient
-    .from("warehouses")
-    .select(
-      "name, company, contact_name, phone, email, street1, postal_code, country_code, state, city, neighborhood, reference",
-    )
-    .eq("is_active", true)
-    .eq("is_shipping_origin", true);
-
-  if (error) throw new Error("invalid_shipping_origin");
-  const warehouses = Array.isArray(data) ? data.filter(isRecord) : [];
-
-  if (warehouses.length === 0) {
-    if (environment === "sandbox") {
-      return { origin: loadSandboxOrigin(), source: "sandbox_secret" };
-    }
-    throw new Error("shipping_origin_not_configured");
-  }
-
-  if (warehouses.length > 1) {
-    throw new Error("multiple_shipping_origins");
-  }
-
-  return { origin: mapWarehouseToOrigin(warehouses[0]), source: "warehouse" };
 }
 
 function buildQuotationAddress(address: JsonRecord): JsonRecord {
@@ -507,7 +438,7 @@ function describeProviderShape(data: unknown): JsonRecord {
   return providerShape;
 }
 
-async function buildShippingUnits(adminClient: ReturnType<typeof createClient>, orderId: string): Promise<ShippingUnit[]> {
+async function buildShippingUnits(adminClient: SupabaseAdminClient, orderId: string): Promise<ShippingUnit[]> {
   const { data: items, error } = await adminClient
     .from("order_items")
     .select("product_id, quantity, product_name_snapshot")
@@ -612,6 +543,7 @@ function extractRate(rawRate: unknown): ShippingRate | null {
   if (
     !rateId ||
     !carrier ||
+    !isAllowedCarrier(carrier) ||
     !service ||
     status === "no_coverage" ||
     status === "not_applicable" ||
@@ -629,6 +561,123 @@ function extractRate(rawRate: unknown): ShippingRate | null {
     days,
     total: Math.round(total * 100) / 100,
   };
+}
+
+type SanitizedRateDiagnostic = {
+  rate_id: string | null;
+  provider_name: string | null;
+  provider_service_name: string | null;
+  status: string | null;
+  currency_code: string | null;
+  total: number | null;
+  days: number | null;
+  normalized_carrier: string | null;
+  allowed_carrier: boolean;
+};
+
+type RateDiagnosticsResult = {
+  event: "skydropx_rate_diagnostics";
+  order_id: string | null;
+  quotation_id: string | null;
+  is_completed: boolean;
+  raw_rate_count: number;
+  allowed_rate_count: number;
+  reason_classification:
+    | "SKYDROPX_ZERO_RATES"
+    | "ONLY_DISALLOWED_CARRIERS"
+    | "NO_COVERAGE_RATES"
+    | "ALLOWED_RATE_FILTER_BUG"
+    | "VALID_RATES_FOUND";
+  rates: SanitizedRateDiagnostic[];
+};
+
+function diagnoseQuotationRates(
+  quotation: JsonRecord,
+  orderId?: string | null,
+): RateDiagnosticsResult {
+  const quotationId = getString(quotation, "id");
+  const isCompleted = quotation.is_completed === true;
+  const rawRates = Array.isArray(quotation.rates) ? quotation.rates : [];
+
+  const sanitizedRates: SanitizedRateDiagnostic[] = [];
+  let allowedCount = 0;
+  let allowedCarrierCount = 0;
+  let noCoverageCount = 0;
+
+  for (const rawRate of rawRates) {
+    if (!isRecord(rawRate)) continue;
+    const rateId = getString(rawRate, "id");
+    const providerName = getString(rawRate, "provider_display_name") ??
+      getString(rawRate, "provider_name");
+    const serviceName = getString(rawRate, "provider_service_name");
+    const status = getString(rawRate, "status");
+    const currency = getString(rawRate, "currency_code");
+    const total = getNumber(rawRate, "total");
+    const days = getNumber(rawRate, "days");
+    const normalizedCarrier = providerName
+      ? providerName
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim()
+        .toLowerCase()
+      : null;
+    const allowed = isAllowedCarrier(providerName);
+
+    if (allowed) allowedCarrierCount++;
+
+    const statusNorm = normalizeForRateMatch(status);
+    if (statusNorm === "no_coverage" || statusNorm === "not_applicable") {
+      noCoverageCount++;
+    }
+
+    const isValid = extractRate(rawRate) !== null;
+    if (isValid) allowedCount++;
+
+    sanitizedRates.push({
+      rate_id: rateId,
+      provider_name: providerName,
+      provider_service_name: serviceName,
+      status,
+      currency_code: currency,
+      total,
+      days,
+      normalized_carrier: normalizedCarrier,
+      allowed_carrier: allowed,
+    });
+  }
+
+  let classification:
+    | "SKYDROPX_ZERO_RATES"
+    | "ONLY_DISALLOWED_CARRIERS"
+    | "NO_COVERAGE_RATES"
+    | "ALLOWED_RATE_FILTER_BUG"
+    | "VALID_RATES_FOUND" = "VALID_RATES_FOUND";
+
+  if (allowedCount === 0) {
+    if (rawRates.length === 0) {
+      classification = "SKYDROPX_ZERO_RATES";
+    } else if (allowedCarrierCount === 0) {
+      classification = "ONLY_DISALLOWED_CARRIERS";
+    } else if (noCoverageCount === rawRates.length) {
+      classification = "NO_COVERAGE_RATES";
+    } else if (allowedCarrierCount > 0) {
+      classification = "ALLOWED_RATE_FILTER_BUG";
+    }
+  }
+
+  const result: RateDiagnosticsResult = {
+    event: "skydropx_rate_diagnostics",
+    order_id: orderId ?? null,
+    quotation_id: quotationId,
+    is_completed: isCompleted,
+    raw_rate_count: rawRates.length,
+    allowed_rate_count: allowedCount,
+    reason_classification: classification,
+    rates: sanitizedRates,
+  };
+
+  console.log(JSON.stringify(result));
+  return result;
 }
 
 function extractValidRates(quotation: JsonRecord): ShippingRate[] {
@@ -680,6 +729,7 @@ async function createFreshQuotation(
   addressFrom: JsonRecord,
   addressTo: JsonRecord,
   parcels: Array<{ length: number; width: number; height: number; weight: number }>,
+  orderId?: string | null,
 ): Promise<JsonRecord> {
   let createResponse: Response;
   let createData: unknown;
@@ -728,6 +778,7 @@ async function createFreshQuotation(
   if (!quotationId) throw new Error("skydropx_requotation_failed");
 
   if (createdQuotation.is_completed === true) {
+    diagnoseQuotationRates(createdQuotation, orderId);
     if (extractValidRates(createdQuotation).length === 0) {
       throw new Error("no_valid_shipping_rates");
     }
@@ -767,6 +818,7 @@ async function createFreshQuotation(
       continue;
     }
 
+    diagnoseQuotationRates(pollQuotation, orderId);
     if (extractValidRates(pollQuotation).length === 0) {
       throw new Error("no_valid_shipping_rates");
     }
@@ -780,6 +832,7 @@ async function createFreshQuotation(
 async function refreshShippingRateForShipment(params: {
   baseUrl: string;
   accessToken: string;
+  orderId?: string | null;
   oldQuotationId: string | null;
   oldRateId: string | null;
   customerShippingAmount: number;
@@ -800,6 +853,7 @@ async function refreshShippingRateForShipment(params: {
     params.addressFrom,
     params.addressTo,
     params.parcels,
+    params.orderId,
   );
   const newQuotationId = getString(freshQuotation, "id");
   if (!newQuotationId) throw new Error("skydropx_requotation_failed");
@@ -836,6 +890,34 @@ async function refreshShippingRateForShipment(params: {
   throw new Error("shipping_rate_refresh_requires_manual_selection");
 }
 
+async function updateFulfillmentJobStatus(
+  adminClient: SupabaseAdminClient,
+  orderId: string,
+  status: "pending" | "processing" | "completed" | "failed",
+  lastError: string | null = null,
+): Promise<void> {
+  try {
+    const nextAttemptAt = status === "failed"
+      ? new Date(Date.now() + 5 * 60 * 1000).toISOString()
+      : new Date().toISOString();
+
+    await adminClient
+      .from("order_fulfillment_jobs")
+      .upsert(
+        {
+          order_id: orderId,
+          status,
+          last_error: lastError,
+          next_attempt_at: nextAttemptAt,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "order_id" },
+      );
+  } catch (_) {
+    // Non-blocking
+  }
+}
+
 async function triggerFulfillmentForOrder(
   orderId: string,
 ): Promise<{ body: JsonRecord; status: number }> {
@@ -859,24 +941,88 @@ async function triggerFulfillmentForOrder(
     return { status: 400, body: { ok: false, error: "order_not_approved" } };
   }
 
-  const { data: stockResult, error: stockError } = await adminClient.rpc(
-    "apply_paid_order_post_payment",
-    { p_order_id: orderId },
-  );
+  // 1. Service-only check first (bypass before any physical inventory guard)
+  const { data: physicalItems, error: itemsError } = await adminClient
+    .from("order_items")
+    .select("id, product_id")
+    .eq("order_id", orderId)
+    .not("product_id", "is", null);
 
-  if (stockError || !isRecord(stockResult) || stockResult.success !== true) {
+  if (itemsError) {
     return {
-      status: 409,
+      status: 500,
       body: {
         ok: false,
-        error: getString(isRecord(stockResult) ? stockResult : {}, "error") ??
-          "post_payment_fulfillment_failed",
+        error: "failed_to_check_order_items",
+        details: itemsError.message,
         order_id: orderId,
-        fulfillment: isRecord(stockResult) ? stockResult : null,
       },
     };
   }
 
+  const hasPhysicalItems = Array.isArray(physicalItems) && physicalItems.length > 0;
+  const hasShippingRate = Boolean(getString(order, "skydropx_rate_id"));
+  const sourceQuoteId = getString(order, "source_quote_id");
+
+  let isServiceQuote = false;
+  if (sourceQuoteId) {
+    const { data: quoteData, error: quoteError } = await adminClient
+      .from("quotes")
+      .select("id, service_ticket_id")
+      .eq("id", sourceQuoteId)
+      .maybeSingle();
+
+    if (quoteError) {
+      return {
+        status: 500,
+        body: {
+          ok: false,
+          error: "failed_to_check_source_quote",
+          details: quoteError.message,
+          order_id: orderId,
+        },
+      };
+    }
+
+    if (isRecord(quoteData) && getString(quoteData, "service_ticket_id")) {
+      isServiceQuote = true;
+    }
+  }
+
+  // Bypass ÚNICAMENTE para orden de servicio confirmada (cotización ligada a ticket) sin artículos físicos ni tarifa de envío
+  if (isServiceQuote === true && !hasPhysicalItems && !hasShippingRate) {
+    await updateFulfillmentJobStatus(adminClient, orderId, "completed");
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        order_id: orderId,
+        shipment_created: false,
+        service_only: true,
+        is_service_quote: true,
+        message: "No physical shipment required for verified service ticket order",
+      },
+    };
+  }
+
+  // 2. Physical order authoritative guard: positive stock_status === 'deducted' check
+  const stockStatus = getString(order, "stock_status");
+  if (stockStatus !== "deducted") {
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", "inventory_not_finalized");
+    return {
+      status: 409,
+      body: {
+        ok: false,
+        error: "inventory_not_finalized",
+        order_id: orderId,
+        stock_status: stockStatus,
+      },
+    };
+  }
+
+  await updateFulfillmentJobStatus(adminClient, orderId, "processing");
+
+  // 3. Existing shipment reuse check
   const { data: existingShipment } = await adminClient
     .from("order_shipments")
     .select("id, skydropx_shipment_id, carrier, service_name, tracking_number, tracking_url, shipping_status")
@@ -887,12 +1033,12 @@ async function triggerFulfillmentForOrder(
     .maybeSingle();
 
   if (isRecord(existingShipment) && getString(existingShipment, "skydropx_shipment_id")) {
+    await updateFulfillmentJobStatus(adminClient, orderId, "completed");
     return {
       status: 200,
       body: {
         ok: true,
         order_id: orderId,
-        stock: stockResult,
         shipment_created: false,
         shipment_reused: true,
         shipment: existingShipment,
@@ -906,20 +1052,23 @@ async function triggerFulfillmentForOrder(
 
   const rawBaseUrl = requiredEnv("SKYDROPX_SANDBOX_BASE_URL");
   const baseUrl = rawBaseUrl.replace(/\/+$/, "");
-  const environment = (Deno.env.get("SKYDROPX_ENV")?.trim().toLowerCase() || "sandbox");
-  const autoAdvance = environment === "sandbox";
-
-  let originResult: { origin: JsonRecord; source: "warehouse" | "sandbox_secret" };
+  let environment: string;
+  let autoAdvance: boolean;
+  let originResult: { origin: JsonRecord; source: string };
   try {
-    originResult = await loadShippingOrigin(adminClient, environment);
+    environment = resolveSkydropxEnvironment();
+    autoAdvance = environment === "sandbox";
+    originResult = await resolveShippingOrigin(adminClient, environment);
   } catch (error) {
     const errorName = error instanceof Error ? error.message : "invalid_shipping_origin";
     const status = errorName === "multiple_shipping_origins" ? 409 : 500;
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", errorName);
     return { status, body: { ok: false, error: errorName, order_id: orderId } };
   }
 
   const clientId = getString(order, "client_id");
   if (!clientId) {
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", "invalid_recipient_shipping_data");
     return { status: 422, body: { ok: false, error: "invalid_recipient_shipping_data", order_id: orderId } };
   }
 
@@ -930,6 +1079,7 @@ async function triggerFulfillmentForOrder(
     .maybeSingle();
 
   if (clientError || !isRecord(client)) {
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", "invalid_recipient_shipping_data");
     return { status: 422, body: { ok: false, error: "invalid_recipient_shipping_data", order_id: orderId } };
   }
 
@@ -937,6 +1087,7 @@ async function triggerFulfillmentForOrder(
   try {
     addressTo = buildAddressTo(order, client);
   } catch (_) {
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", "invalid_recipient_shipping_data");
     return { status: 422, body: { ok: false, error: "invalid_recipient_shipping_data", order_id: orderId } };
   }
 
@@ -944,11 +1095,13 @@ async function triggerFulfillmentForOrder(
   try {
     shippingUnits = await buildShippingUnits(adminClient, orderId);
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "invalid_order_parcels";
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", errorMsg);
     return {
       status: 422,
       body: {
         ok: false,
-        error: error instanceof Error ? error.message : "invalid_order_parcels",
+        error: errorMsg,
         order_id: orderId,
       },
     };
@@ -960,6 +1113,7 @@ async function triggerFulfillmentForOrder(
   try {
     accessToken = await getSandboxAccessToken(baseUrl);
   } catch (_) {
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", "skydropx_auth_error");
     return { status: 502, body: { ok: false, error: "skydropx_auth_error", order_id: orderId } };
   }
 
@@ -968,6 +1122,7 @@ async function triggerFulfillmentForOrder(
     refreshedRate = await refreshShippingRateForShipment({
       baseUrl,
       accessToken,
+      orderId,
       oldQuotationId,
       oldRateId,
       customerShippingAmount,
@@ -986,6 +1141,7 @@ async function triggerFulfillmentForOrder(
       : errorName === "shipping_rate_refresh_requires_manual_selection"
       ? 409
       : 502;
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", errorName);
     return { status, body: { ok: false, error: errorName, order_id: orderId } };
   }
 
@@ -999,6 +1155,7 @@ async function triggerFulfillmentForOrder(
     .eq("id", orderId);
 
   if (logisticsUpdateError) {
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", "skydropx_requotation_failed");
     return { status: 500, body: { ok: false, error: "skydropx_requotation_failed", order_id: orderId } };
   }
 
@@ -1016,7 +1173,6 @@ async function triggerFulfillmentForOrder(
   };
 
   let shipmentResponse: Response;
-  let shipmentData: unknown;
   try {
     shipmentResponse = await fetchWithTimeout(
       `${baseUrl}/api/v1/shipments`,
@@ -1031,18 +1187,26 @@ async function triggerFulfillmentForOrder(
       },
       20000,
     );
-    shipmentData = await parseJsonResponse(shipmentResponse);
   } catch (error) {
+    const errorName = error instanceof Error && error.name === "AbortError"
+      ? "skydropx_timeout"
+      : "skydropx_network_error";
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", errorName);
     return {
       status: 502,
       body: {
         ok: false,
-        error: error instanceof DOMException && error.name === "AbortError"
-          ? "skydropx_timeout"
-          : "skydropx_network_error",
+        error: errorName,
         order_id: orderId,
       },
     };
+  }
+
+  let shipmentData: JsonRecord = {};
+  try {
+    shipmentData = await shipmentResponse.json();
+  } catch (_) {
+    shipmentData = {};
   }
 
   if (!shipmentResponse.ok) {
@@ -1063,6 +1227,7 @@ async function triggerFulfillmentForOrder(
         providerErrorText.includes("package_type") ||
         providerErrorText.includes("carta porte")
       ) {
+        await updateFulfillmentJobStatus(adminClient, orderId, "failed", "skydropx_consignment_note_required");
         return {
           status: 422,
           body: {
@@ -1076,6 +1241,8 @@ async function triggerFulfillmentForOrder(
       }
     }
 
+    const errorMessage = shipmentResponse.status === 422 ? "skydropx_shipment_rejected" : "skydropx_shipment_failed";
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", errorMessage);
     return {
       status: shipmentResponse.status === 422 ? 422 : 502,
       body: {
@@ -1093,6 +1260,7 @@ async function triggerFulfillmentForOrder(
   const sanitized = sanitizeShipment(shipmentData);
   const skydropxShipmentId = getString(sanitized, "id");
   if (!skydropxShipmentId) {
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", "missing_skydropx_shipment_id");
     return { status: 502, body: { ok: false, error: "missing_skydropx_shipment_id", order_id: orderId } };
   }
 
@@ -1101,8 +1269,8 @@ async function triggerFulfillmentForOrder(
     {
       p_order_id: orderId,
       p_skydropx_shipment_id: skydropxShipmentId,
-      p_carrier: getString(sanitized, "carrier"),
-      p_service_name: getString(sanitized, "service_name"),
+      p_carrier: getString(sanitized, "carrier") ?? refreshedRate.rate.carrier,
+      p_service_name: getString(sanitized, "service_name") ?? refreshedRate.rate.service,
       p_tracking_number: getString(sanitized, "tracking_number"),
       p_tracking_url: getString(sanitized, "tracking_url"),
       p_label_url: getString(sanitized, "label_url"),
@@ -1112,11 +1280,14 @@ async function triggerFulfillmentForOrder(
   );
 
   if (shipmentStoreError) {
+    await updateFulfillmentJobStatus(adminClient, orderId, "failed", "shipment_store_failed");
     return {
       status: 500,
       body: { ok: false, error: "shipment_store_failed", order_id: orderId },
     };
   }
+
+  await updateFulfillmentJobStatus(adminClient, orderId, "completed");
 
   return {
     status: 200,
@@ -1124,7 +1295,7 @@ async function triggerFulfillmentForOrder(
       ok: true,
       environment,
       order_id: orderId,
-      stock: stockResult,
+      stock_status: stockStatus,
       shipment_created: true,
       unique_shipment: true,
       auto_advance: autoAdvance,
@@ -1150,12 +1321,20 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
   try {
     const bearerToken = getBearerToken(request);
-    if (!bearerToken) {
+    const apiKeyHeader = request.headers.get("apikey")?.trim() || null;
+    const token = bearerToken || apiKeyHeader;
+
+    if (!token) {
       return jsonResponse({ ok: false, error: "unauthorized" }, 401);
     }
 
-    const jwtRole = getJwtRoleFromBearerToken(bearerToken);
-    if (jwtRole !== "service_role") {
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() || "";
+    const jwtRole = getJwtRoleFromBearerToken(token);
+
+    if (
+      jwtRole !== "service_role" &&
+      (serviceRoleKey === "" || (token !== serviceRoleKey && bearerToken !== serviceRoleKey && apiKeyHeader !== serviceRoleKey))
+    ) {
       return jsonResponse({ ok: false, error: "forbidden" }, 403);
     }
 
