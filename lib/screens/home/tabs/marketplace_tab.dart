@@ -262,13 +262,11 @@ class MarketplaceTabState extends State<MarketplaceTab> {
       final results = await Future.wait([
         fetchFuture.timeout(const Duration(seconds: 30)),
         _loadCatalogCategories(),
-        if (showSpinner && !isLiveSearch)
-          Future.delayed(const Duration(seconds: 3)),
       ]);
 
       final p = results[0] as List<Product>;
       if (!_productsInitialLoadDone && mounted) {
-        await _precacheInitialProductImages(p);
+        _precacheInitialProductImages(p);
       }
       if (mounted) {
         setState(() {
