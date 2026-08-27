@@ -820,7 +820,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
   Widget _quickCats() {
     final categories = _quickCategories();
     return Container(
-      height: 84,
+      height: 94,
       color: Colors.white,
       child: ScrollConfiguration(
         behavior: MouseDragScrollBehavior(),
@@ -828,7 +828,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
           scrollDirection: Axis.horizontal,
           physics: const ClampingScrollPhysics(),
           clipBehavior: Clip.none,
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 5),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           itemCount: categories.length,
           itemBuilder: (_, index) {
             final category = categories[index];
@@ -844,10 +844,10 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                 borderRadius: BorderRadius.circular(10),
                 onTap: () => _openCategoryOverview(category),
                 child: SizedBox(
-                  width: 74,
-                  height: 72,
+                  width: 76,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
@@ -869,20 +869,23 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                           size: 22,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: active
-                              ? const Color(0xFF6B7280)
-                              : const Color(0xFF374151),
-                          fontSize: 10.5,
-                          fontWeight: active
-                              ? FontWeight.w800
-                              : FontWeight.w500,
+                      const SizedBox(height: 5),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: active
+                                ? const Color(0xFF6B7280)
+                                : const Color(0xFF374151),
+                            fontSize: 11,
+                            fontWeight: active
+                                ? FontWeight.w800
+                                : FontWeight.w500,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 3),
