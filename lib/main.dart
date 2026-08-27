@@ -46,6 +46,9 @@ class AppScrollBehavior extends MaterialScrollBehavior {
 }
 
 const SystemUiOverlayStyle _systemNavigationBarStyle = SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.dark,
+  statusBarBrightness: Brightness.light,
   systemNavigationBarColor: Colors.white,
   systemNavigationBarDividerColor: Colors.transparent,
   systemNavigationBarIconBrightness: Brightness.dark,

@@ -1,12 +1,13 @@
 flutter_native_splash:
-  color: "#191919"
-  color_dark: "#191919"
-  image: "assets/images/splash_mark.png"
-  image_dark: "assets/images/splash_mark.png"
+  color: "#FFFFFF"
+  color_dark: "#FFFFFF"
+  image: "assets/images/logo.png"
+  image_dark: "assets/images/logo.png"
   fullscreen: false
 
   android_12:
-    color: "#191919"
-    color_dark: "#191919"
-    image: "assets/images/splash_mark.png"
-    image_dark: "assets/images/splash_mark.png"
+    color: "#FFFFFF"
+    color_dark: "#FFFFFF"
+    image: "assets/images/logo.png"
+    image_dark: "assets/images/logo.png"
+
