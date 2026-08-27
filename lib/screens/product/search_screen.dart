@@ -420,7 +420,7 @@ class _SearchScreenState extends State<SearchScreen> {
             height: 240,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               itemCount: _recentlyViewed.length,
               itemBuilder: (context, index) {
                 final product = _recentlyViewed[index];

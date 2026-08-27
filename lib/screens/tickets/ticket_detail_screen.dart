@@ -590,6 +590,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 
   String _formatDate(DateTime d) {
+    final local = d.toLocal();
     final months = [
       'Ene',
       'Feb',
@@ -604,9 +605,9 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       'Nov',
       'Dic',
     ];
-    final hour = d.hour.toString().padLeft(2, '0');
-    final minute = d.minute.toString().padLeft(2, '0');
-    return '${d.day} ${months[d.month - 1]} ${d.year} - $hour:$minute hrs';
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.day} ${months[local.month - 1]} ${local.year} - $hour:$minute hrs';
   }
 
   bool get _canChat {
@@ -1719,16 +1720,20 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                ticket.ticketNumber,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: _kNavy,
+              Expanded(
+                child: Text(
+                  ticket.ticketNumber,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _kNavy,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -2127,28 +2132,66 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const Row(
             children: [
-              const Row(
-                children: [
-                  Icon(
-                    Icons.request_quote_outlined,
-                    color: _kPrimary,
-                    size: 20,
+              Icon(Icons.request_quote_outlined, color: _kPrimary, size: 20),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'COTIZACIÓN DE SERVICIO',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _kNavy,
+                    letterSpacing: 0.3,
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    'COTIZACIÓN DE SERVICIO',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: _kNavy,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Text(
+                quote.quoteNumber,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: _kNavy,
+                ),
+              ),
+              if (validStr != null)
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            Icons.event_outlined,
+                            size: 13,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ),
+                      TextSpan(
+                        text: 'Válida hasta: $validStr',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -2169,39 +2212,6 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                quote.quoteNumber,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: _kNavy,
-                ),
-              ),
-              if (validStr != null)
-                Row(
-                  children: [
-                    Icon(
-                      Icons.event_outlined,
-                      size: 13,
-                      color: Colors.grey.shade500,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Válida hasta: $validStr',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -3480,11 +3490,12 @@ class _ChatBubbleItemState extends State<_ChatBubbleItem>
         messageText != 'Envío de imagen';
 
     Widget timeRow({bool light = true}) {
+      final localCreatedAt = msg.createdAt.toLocal();
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}',
+            '${localCreatedAt.hour.toString().padLeft(2, '0')}:${localCreatedAt.minute.toString().padLeft(2, '0')}',
             style: TextStyle(
               color: light
                   ? Colors.white.withValues(alpha: 0.75)

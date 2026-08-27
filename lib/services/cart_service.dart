@@ -250,6 +250,23 @@ class CartService {
     }
   }
 
+  /// Comprueba de forma no intrusiva si el usuario actual tiene un carrito activo.
+  static Future<bool> hasActiveCart() async {
+    try {
+      final clientId = await AuthIdentityService.getEffectiveClientId();
+      if (clientId == null) return false;
+      final cart = await _client
+          .from('carts')
+          .select('id')
+          .eq('client_id', clientId)
+          .eq('status', 'active')
+          .maybeSingle();
+      return cart != null;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<String> _requireActiveCartId() async {
     final clientId = await AuthIdentityService.requireLinkedClientId();
     final cart = await _client

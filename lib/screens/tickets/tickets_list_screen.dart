@@ -496,6 +496,7 @@ class _TicketCard extends StatelessWidget {
   );
 
   String _formatDate(DateTime d) {
+    final local = d.toLocal();
     final months = [
       'Ene',
       'Feb',
@@ -510,6 +511,6 @@ class _TicketCard extends StatelessWidget {
       'Nov',
       'Dic',
     ];
-    return '${d.day} ${months[d.month - 1]} ${d.year}';
+    return '${local.day} ${months[local.month - 1]} ${local.year}';
   }
 }

@@ -8,7 +8,9 @@
     <application
         android:label="Go Medical"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:forceDarkAllowed="false"
+        android:theme="@style/LaunchTheme">
         <activity
             android:name=".MainActivity"
             android:exported="true"

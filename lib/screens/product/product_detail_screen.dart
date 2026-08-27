@@ -191,7 +191,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-
   Future<bool> _addToCart() async {
     if (_product == null) return false;
     if (_loadingAddToCart) return false;
@@ -740,6 +739,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       backgroundColor: Colors.white,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -898,9 +898,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ],
                         ),
                         child: Icon(
-                          _isFavorite
-                              ? Icons.favorite
-                              : Icons.favorite_border,
+                          _isFavorite ? Icons.favorite : Icons.favorite_border,
                           color: _isFavorite ? _kRed : Colors.grey.shade500,
                           size: 24,
                         ),
@@ -1200,7 +1198,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           )
                         : ElevatedButton.icon(
-                            onPressed: (canRequest &&
+                            onPressed:
+                                (canRequest &&
                                     !_loadingAddToCart &&
                                     !_loadingAddToQuote)
                                 ? _addToCart
@@ -1277,8 +1276,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           )
                         : ElevatedButton.icon(
-                            onPressed: (!_loadingAddToQuote &&
-                                    !_loadingAddToCart)
+                            onPressed:
+                                (!_loadingAddToQuote && !_loadingAddToCart)
                                 ? () => _requestQuote(p)
                                 : null,
                             icon: _loadingAddToQuote

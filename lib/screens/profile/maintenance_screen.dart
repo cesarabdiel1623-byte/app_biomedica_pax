@@ -208,11 +208,11 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
     _equipmentNameController.text = product is Map
         ? (product['name'] ?? '').toString()
         : '';
-    _equipmentModelController.text = product is Map
-        ? (product['model'] ?? '').toString()
-        : '';
     _brandController.text = product is Map
         ? (product['brand'] ?? '').toString()
+        : '';
+    _equipmentModelController.text = product is Map
+        ? (product['model'] ?? '').toString()
         : '';
     _serialController.text = (equipment['serial_number'] ?? '').toString();
   }
@@ -421,8 +421,8 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
       final selectedAddress = _selectedAddress!;
       final details = selectedAddress.details;
       final equipmentName = _equipmentNameController.text.trim();
-      final equipmentModel = _equipmentModelController.text.trim();
       final equipmentBrand = _brandController.text.trim();
+      final equipmentModel = _equipmentModelController.text.trim();
       final serial = _serialController.text.trim();
       final errorCode = _errorCodeController.text.trim();
       final failureDescription = _descriptionController.text.trim();
@@ -436,6 +436,13 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
         showsErrorCode: _showsErrorCode,
       );
 
+      final titleParts = [
+        equipmentName,
+        equipmentBrand,
+        equipmentModel,
+      ].where((s) => s.isNotEmpty).join(' ');
+      final ticketTitle = '$_serviceLabel: $titleParts'.trim();
+
       final ticket = await Supabase.instance.client
           .from('service_tickets')
           .insert({
@@ -443,7 +450,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
             'equipment_unit_id': _selectedEquipmentId == 'otro'
                 ? null
                 : _selectedEquipmentId,
-            'title': '$_serviceLabel: $equipmentName $equipmentModel'.trim(),
+            'title': ticketTitle,
             'description': failureDescription,
             'type': _databaseTicketType,
             'priority': _urgency,
@@ -547,6 +554,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
                 key: _formKey,
                 child: SingleChildScrollView(
                   controller: _scrollController,
+                  physics: const ClampingScrollPhysics(),
                   padding: EdgeInsets.zero,
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
@@ -554,55 +562,15 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (_accessNotice != null) _noticeBanner(_accessNotice!),
-                      _introHeader(),
+                      _contactSection(),
                       _equipmentSection(),
                       _diagnosticSection(),
                       _descriptionSection(),
-                      _contactSection(),
                       _submitButton(),
                     ],
                   ),
                 ),
               ),
-      ),
-    );
-  }
-
-  Widget _introHeader() {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.engineering_outlined, color: kPrimary, size: 28),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Solicitud de servicio biomédico',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: kNavy,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Registra el equipo, su estado y los datos de contacto para solicitar la atención.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -671,16 +639,6 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
         ),
         const SizedBox(height: 12),
         TextFormField(
-          controller: _equipmentModelController,
-          textCapitalization: TextCapitalization.characters,
-          decoration: _inputDecoration(
-            label: 'Modelo',
-            icon: Icons.view_in_ar_outlined,
-          ),
-          validator: _requiredValidator('Ingresa el modelo'),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
           controller: _brandController,
           textCapitalization: TextCapitalization.words,
           decoration: _inputDecoration(
@@ -688,6 +646,16 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
             icon: Icons.sell_outlined,
           ),
           validator: _requiredValidator('Ingresa la marca'),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: _equipmentModelController,
+          textCapitalization: TextCapitalization.characters,
+          decoration: _inputDecoration(
+            label: 'Modelo',
+            icon: Icons.view_in_ar_outlined,
+          ),
+          validator: _requiredValidator('Ingresa el modelo'),
         ),
         const SizedBox(height: 12),
         TextFormField(
@@ -1029,7 +997,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
 
   Widget _contactSection() {
     return _formSection(
-      title: 'Contacto y logística',
+      title: 'Contacto',
       icon: Icons.contact_phone_outlined,
       children: [
         TextFormField(
@@ -1266,7 +1234,7 @@ class _MaintenanceScreenState extends State<MaintenanceScreen> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 18),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

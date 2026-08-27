@@ -134,7 +134,7 @@ class _PromotionCardsSectionState extends State<PromotionCardsSection> {
             height: 184,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: _cards.length,
               separatorBuilder: (_, _) => const SizedBox(width: 10),
@@ -154,7 +154,8 @@ class _PromotionCardsSectionState extends State<PromotionCardsSection> {
     final textColor = _parseColor(creative.textColor, _kNavy);
     final accent = _parseColor(creative.accentColor, _kPrimary);
     final isBackground = displayCard.assetRole?.toLowerCase() == 'background';
-    final isSquareRender = creative.isFinalRender ||
+    final isSquareRender =
+        creative.isFinalRender ||
         (displayCard.assetRole?.toLowerCase() == 'final_render');
     final cardWidth = isSquareRender ? 184.0 : 292.0;
     final imageFit = isSquareRender

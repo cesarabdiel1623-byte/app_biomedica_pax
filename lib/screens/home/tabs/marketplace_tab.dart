@@ -34,6 +34,20 @@ class MouseDragScrollBehavior extends MaterialScrollBehavior {
     PointerDeviceKind.mouse,
     PointerDeviceKind.trackpad,
   };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const ClampingScrollPhysics();
+  }
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
 }
 
 class MarketplaceTab extends StatefulWidget {
@@ -364,7 +378,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
           behavior: MouseDragScrollBehavior(),
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
+            physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             itemCount: list.length,
             itemBuilder: (context, i) {
@@ -812,7 +826,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
         behavior: MouseDragScrollBehavior(),
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
+          physics: const ClampingScrollPhysics(),
           clipBehavior: Clip.none,
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 5),
           itemCount: categories.length,

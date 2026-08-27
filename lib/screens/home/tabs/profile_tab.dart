@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../profile/orders_screen.dart';
 import '../../profile/quotes_screen.dart';
+import '../../profile/coupons_screen.dart';
 import '../../profile/edit_profile_screen.dart';
 import '../../profile/notifications_screen.dart';
 import '../../tickets/tickets_list_screen.dart';
@@ -77,6 +78,7 @@ class _ProfileTabState extends State<ProfileTab> {
         .join();
 
     return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
       child: Column(
         children: [
           Container(
@@ -143,7 +145,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   index: 0,
                   child: _menuTile(
                     Icons.shopping_bag_outlined,
-                    'Mis Compras',
+                    'Compras',
                     'Historial de tus compras y pedidos',
                     const Color(0xFF10B981),
                     () {
@@ -178,6 +180,22 @@ class _ProfileTabState extends State<ProfileTab> {
                 ProfileStaggeredSlide(
                   index: 2,
                   child: _menuTile(
+                    Icons.confirmation_number_outlined,
+                    'Cupones',
+                    'Descuentos disponibles para ti',
+                    const Color(0xFFF59E0B),
+                    () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CouponsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                ProfileStaggeredSlide(
+                  index: 3,
+                  child: _menuTile(
                     Icons.favorite_outline,
                     'Favoritos',
                     'Tus equipos guardados',
@@ -192,7 +210,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ),
                 ProfileStaggeredSlide(
-                  index: 3,
+                  index: 4,
                   child: _menuTile(
                     Icons.history_outlined,
                     'Historial',
@@ -208,7 +226,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ),
                 ProfileStaggeredSlide(
-                  index: 4,
+                  index: 5,
                   child: _menuTile(
                     Icons.question_answer_outlined,
                     'Preguntas',
@@ -224,7 +242,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ),
                 ProfileStaggeredSlide(
-                  index: 5,
+                  index: 6,
                   child: _menuTile(
                     Icons.star_outline,
                     'Opiniones',
@@ -242,7 +260,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 _divider(),
                 _sectionLabel('Soporte'),
                 ProfileStaggeredSlide(
-                  index: 6,
+                  index: 7,
                   child: _menuTile(
                     Icons.build_circle_outlined,
                     'Servicios',
@@ -258,7 +276,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ),
                 ProfileStaggeredSlide(
-                  index: 7,
+                  index: 8,
                   child: _menuTile(
                     Icons.support_agent_outlined,
                     'Ayuda y Soporte',
@@ -270,7 +288,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 _divider(),
                 _sectionLabel('Configuración'),
                 ProfileStaggeredSlide(
-                  index: 8,
+                  index: 9,
                   child: _menuTile(
                     Icons.person_outline,
                     'Editar Perfil',
@@ -290,7 +308,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ),
                 ProfileStaggeredSlide(
-                  index: 9,
+                  index: 10,
                   child: _menuTile(
                     Icons.notifications_outlined,
                     'Notificaciones',

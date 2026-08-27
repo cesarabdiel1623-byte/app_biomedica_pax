@@ -276,7 +276,7 @@ class _ProductSection extends StatelessWidget {
           height: 320,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
+            physics: const ClampingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             itemCount: section.products.length,
             separatorBuilder: (_, _) => const SizedBox(width: 8),

@@ -439,5 +439,82 @@ Mantenimiento común de cada dos meses
         isTrue,
       );
     });
+
+    test('marca y modelo se mapean y muestran con fidelidad contractual', () {
+      final ticket = ServiceTicket.fromJson({
+        'id': 'tck-e2e',
+        'ticket_number': 'TCK-20260824-F01697F6',
+        'title':
+            'Mantenimiento preventivo: Ultrasonido e2e test MARCA TEST Modelo Test-2026',
+        'status': 'in_progress',
+        'priority': 'low',
+        'type': 'preventivo',
+        'created_at': '2026-08-24T16:38:59.974Z',
+        'equipment_name': 'Ultrasonido e2e test',
+        'equipment_brand': 'MARCA TEST',
+        'equipment_model': 'Modelo Test-2026',
+      });
+
+      expect(ticket.equipmentBrand, 'MARCA TEST');
+      expect(ticket.equipmentModel, 'Modelo Test-2026');
+      expect(ticket.equipmentName, 'Ultrasonido e2e test');
+
+      final order = ServiceOrderPresentation.fromTicket(ticket);
+      expect(order.equipmentBrand, 'MARCA TEST');
+      expect(order.equipmentModel, 'Modelo Test-2026');
+      expect(order.equipmentName, 'Ultrasonido e2e test');
+
+      final maintenanceSource = File(
+        'lib/screens/profile/maintenance_screen.dart',
+      ).readAsStringSync();
+      expect(
+        maintenanceSource.contains("'equipment_brand': equipmentBrand"),
+        isTrue,
+      );
+      expect(
+        maintenanceSource.contains("'equipment_model': equipmentModel"),
+        isTrue,
+      );
+    });
+
+    test(
+      'scheduledStartAt en UTC se formatea mediante toLocal correctamente',
+      () {
+        final utcString = '2026-08-25T16:00:00.000Z';
+        final ticket = ServiceTicket.fromJson({
+          'id': 'tck-tz',
+          'ticket_number': 'TCK-TZ',
+          'title': 'Test Horario',
+          'status': 'assigned',
+          'priority': 'medium',
+          'type': 'preventivo',
+          'created_at': '2026-08-24T16:00:00Z',
+          'scheduled_start_at': utcString,
+        });
+
+        expect(ticket.scheduledStartAt, isNotNull);
+        final parsed = ticket.scheduledStartAt!;
+        expect(parsed.isUtc, isTrue);
+
+        final local = parsed.toLocal();
+        expect(local.isUtc, isFalse);
+
+        final detailSource = File(
+          'lib/screens/tickets/ticket_detail_screen.dart',
+        ).readAsStringSync();
+        expect(detailSource.contains('final local = d.toLocal();'), isTrue);
+        expect(
+          detailSource.contains(
+            'final localCreatedAt = msg.createdAt.toLocal();',
+          ),
+          isTrue,
+        );
+
+        final listSource = File(
+          'lib/screens/tickets/tickets_list_screen.dart',
+        ).readAsStringSync();
+        expect(listSource.contains('final local = d.toLocal();'), isTrue);
+      },
+    );
   });
 }

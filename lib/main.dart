@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'models/payment_test_result.dart';
 import 'screens/payment/payment_result_screen.dart';
 import 'services/payment_deep_link_service.dart';
@@ -18,14 +19,43 @@ import 'services/registration_gate_service.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
-Future<void> main() async {
-  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
 
-  await Future.wait([
-    Constants.init(),
-    Future.delayed(const Duration(seconds: 2)),
-  ]);
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const ClampingScrollPhysics();
+  }
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+}
+
+const SystemUiOverlayStyle _systemNavigationBarStyle = SystemUiOverlayStyle(
+  systemNavigationBarColor: Colors.white,
+  systemNavigationBarDividerColor: Colors.transparent,
+  systemNavigationBarIconBrightness: Brightness.dark,
+  systemNavigationBarContrastEnforced: false,
+);
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(_systemNavigationBarStyle);
+  await Constants.init();
 
   try {
     await QuoteService.init();
@@ -158,9 +188,24 @@ class _GoMedicalAppState extends State<GoMedicalApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scrollBehavior: const AppScrollBehavior(),
       navigatorKey: appNavigatorKey,
       title: 'Go Medical',
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: _systemNavigationBarStyle,
+          child: ColoredBox(
+            color: Colors.white,
+            child: SafeArea(
+              top: false,
+              left: false,
+              right: false,
+              child: child ?? const SizedBox.shrink(),
+            ),
+          ),
+        );
+      },
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
@@ -252,7 +297,6 @@ class MissingConfigScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    FlutterNativeSplash.remove();
     final missingKeys = Constants.missingSupabaseKeys.join(', ');
 
     return Scaffold(
@@ -322,7 +366,6 @@ class _AuthGateState extends State<AuthGate> {
         if (session != null) {
           final user = Supabase.instance.client.auth.currentUser;
           if (user == null) {
-            FlutterNativeSplash.remove();
             return const LoginScreen();
           }
 
@@ -336,8 +379,6 @@ class _AuthGateState extends State<AuthGate> {
                 );
               }
 
-              FlutterNativeSplash.remove();
-
               final gateState =
                   gateSnapshot.data ?? RegistrationGateState.incomplete;
               if (gateState == RegistrationGateState.complete) {
@@ -348,7 +389,6 @@ class _AuthGateState extends State<AuthGate> {
           );
         }
 
-        FlutterNativeSplash.remove();
         return const LoginScreen();
       },
     );
