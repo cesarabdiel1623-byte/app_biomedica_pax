@@ -1015,21 +1015,21 @@ class CartTabState extends State<CartTab> {
     final isUnavailable = _isUnavailable(item);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.3),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.015),
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -1045,8 +1045,9 @@ class CartTabState extends State<CartTab> {
             child: Stack(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+                  padding: const EdgeInsets.fromLTRB(10, 12, 10, 14),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SizedBox(
                         height: 24,
@@ -1068,12 +1069,12 @@ class CartTabState extends State<CartTab> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 6),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: SizedBox(
-                          width: 72,
-                          height: 72,
+                          width: 76,
+                          height: 76,
                           child: p?.mainImageUrl != null
                               ? UiHelpers.networkImage(
                                   p!.mainImageUrl!,
@@ -1095,14 +1096,17 @@ class CartTabState extends State<CartTab> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              p?.name ?? 'Producto',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF0F172A),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 32),
+                              child: Text(
+                                p?.name ?? 'Producto',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0F172A),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -1111,7 +1115,7 @@ class CartTabState extends State<CartTab> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 15,
+                                fontSize: 15.5,
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF0F172A),
                               ),
@@ -1121,25 +1125,22 @@ class CartTabState extends State<CartTab> {
                                 padding: const EdgeInsets.only(top: 1),
                                 child: Row(
                                   children: [
-                                    Flexible(
-                                      child: Text(
-                                        p.formattedOldPrice,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          color: Colors.grey.shade400,
-                                          decoration:
-                                              TextDecoration.lineThrough,
-                                        ),
+                                    Text(
+                                      p.formattedOldPrice,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade400,
+                                        decoration: TextDecoration.lineThrough,
                                       ),
                                     ),
                                     const SizedBox(width: 5),
                                     Text(
                                       '-${p.discountPercent}%',
                                       style: const TextStyle(
-                                        fontSize: 10.5,
-                                        color: Color(0xFF16A34A),
+                                        fontSize: 11,
+                                        color: Color(0xFFDC2626),
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
@@ -1176,157 +1177,150 @@ class CartTabState extends State<CartTab> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const SizedBox(height: 20),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: const Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                GestureDetector(
-                                  onTap: () async {
-                                    if (item.quantity <= 1) return;
-                                    setState(() {
-                                      _clearCartPricingAmounts();
-                                      item.quantity--;
-                                    });
-                                    try {
-                                      await CartService.updateQuantity(
-                                        item.id,
-                                        item.quantity,
-                                      );
-                                      load(showSpinner: false);
-                                    } catch (e) {
-                                      setState(() {
-                                        _clearCartPricingAmounts();
-                                        item.quantity++;
-                                      });
-                                      if (context.mounted) {
-                                        UiHelpers.showErrorToast(
-                                          context,
-                                          'Error al actualizar: ${e.toString().replaceAll('Exception: ', '')}',
-                                        );
-                                      }
-                                    }
-                                  },
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 4,
-                                    ),
-                                    child: Icon(
-                                      Icons.remove,
-                                      size: 13,
-                                      color: Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                  child: Text(
-                                    '${item.quantity}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap:
-                                      (p != null &&
-                                          p.stock != null &&
-                                          item.quantity >= p.stock!)
-                                      ? null
-                                      : () async {
-                                          final stock = p?.stock ?? 999;
-                                          if (item.quantity >= stock) return;
-                                          setState(() {
-                                            _clearCartPricingAmounts();
-                                            item.quantity++;
-                                          });
-                                          try {
-                                            await CartService.updateQuantity(
-                                              item.id,
-                                              item.quantity,
-                                            );
-                                            load(showSpinner: false);
-                                          } catch (e) {
-                                            setState(() {
-                                              _clearCartPricingAmounts();
-                                              item.quantity--;
-                                            });
-                                            if (context.mounted) {
-                                              final errStr = e.toString();
-                                              if (errStr.contains(
-                                                'stock_limit_reached',
-                                              )) {
-                                                final limit =
-                                                    int.tryParse(
-                                                      errStr.split(':').last,
-                                                    ) ??
-                                                    stock;
-                                                UiHelpers.showStockLimitToast(
-                                                  context,
-                                                  limit,
-                                                );
-                                              } else {
-                                                UiHelpers.showErrorToast(
-                                                  context,
-                                                  'Error al actualizar: ${errStr.replaceAll('Exception: ', '')}',
-                                                );
-                                              }
-                                            }
-                                          }
-                                        },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 4,
-                                    ),
-                                    child: Icon(
-                                      Icons.add,
-                                      size: 13,
-                                      color:
-                                          (p != null &&
-                                              p.stock != null &&
-                                              item.quantity >= p.stock!)
-                                          ? Colors.grey.shade300
-                                          : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
                 Positioned(
-                  top: 4,
-                  right: 4,
+                  top: 6,
+                  right: 6,
                   child: GestureDetector(
                     onTap: () => _removeItem(index, item, fromSwipe: false),
                     child: const Padding(
                       padding: EdgeInsets.all(6),
                       child: Icon(
                         Icons.delete_outline,
-                        size: 18,
+                        size: 20,
                         color: Color(0xFFEF4444),
                       ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 12,
+                  right: 12,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: () async {
+                            if (item.quantity <= 1) return;
+                            setState(() {
+                              _clearCartPricingAmounts();
+                              item.quantity--;
+                            });
+                            try {
+                              await CartService.updateQuantity(
+                                item.id,
+                                item.quantity,
+                              );
+                              load(showSpinner: false);
+                            } catch (e) {
+                              setState(() {
+                                _clearCartPricingAmounts();
+                                item.quantity++;
+                              });
+                              if (context.mounted) {
+                                UiHelpers.showErrorToast(
+                                  context,
+                                  'Error al actualizar: ${e.toString().replaceAll('Exception: ', '')}',
+                                );
+                              }
+                            }
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            child: Icon(
+                              Icons.remove,
+                              size: 14,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(
+                            '${item.quantity}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap:
+                              (p != null &&
+                                  p.stock != null &&
+                                  item.quantity >= p.stock!)
+                              ? null
+                              : () async {
+                                  final stock = p?.stock ?? 999;
+                                  if (item.quantity >= stock) return;
+                                  setState(() {
+                                    _clearCartPricingAmounts();
+                                    item.quantity++;
+                                  });
+                                  try {
+                                    await CartService.updateQuantity(
+                                      item.id,
+                                      item.quantity,
+                                    );
+                                    load(showSpinner: false);
+                                  } catch (e) {
+                                    setState(() {
+                                      _clearCartPricingAmounts();
+                                      item.quantity--;
+                                    });
+                                    if (context.mounted) {
+                                      final errStr = e.toString();
+                                      if (errStr.contains(
+                                        'stock_limit_reached',
+                                      )) {
+                                        final limit =
+                                            int.tryParse(
+                                              errStr.split(':').last,
+                                            ) ??
+                                            stock;
+                                        UiHelpers.showStockLimitToast(
+                                          context,
+                                          limit,
+                                        );
+                                      } else {
+                                        UiHelpers.showErrorToast(
+                                          context,
+                                          'Error al actualizar: ${errStr.replaceAll('Exception: ', '')}',
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            child: Icon(
+                              Icons.add,
+                              size: 14,
+                              color:
+                                  (p != null &&
+                                      p.stock != null &&
+                                      item.quantity >= p.stock!)
+                                  ? Colors.grey.shade300
+                                  : const Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
