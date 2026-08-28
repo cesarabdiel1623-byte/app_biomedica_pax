@@ -21,7 +21,6 @@ import '../auth/login_screen.dart';
 import 'ask_question_screen.dart';
 import 'all_questions_screen.dart';
 import 'all_reviews_screen.dart';
-import 'write_review_screen.dart';
 import 'quote_cart_screen.dart';
 
 const _kPrimary = Color(0xFF0D9488);
@@ -1162,7 +1161,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 left: Radius.circular(24),
                               ),
                               onTap: _quantity > 1
-                                  ? () => setState(() => _quantity--)
+                                  ? () => setState(() {
+                                      _quantity--;
+                                      _addedToCartSuccess = false;
+                                      _addedToQuoteSuccess = false;
+                                    })
                                   : null,
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -1197,7 +1200,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 right: Radius.circular(24),
                               ),
                               onTap: _quantity < maxQuantity
-                                  ? () => setState(() => _quantity++)
+                                  ? () => setState(() {
+                                      _quantity++;
+                                      _addedToCartSuccess = false;
+                                      _addedToQuoteSuccess = false;
+                                    })
                                   : null,
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -1651,15 +1658,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const Text(
             'Preguntas',
             style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
             ),
           ),
           const SizedBox(height: 6),
           const Text(
             'Consulta dudas frecuentes o haz una pregunta sobre este producto.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
           ),
           const SizedBox(height: 12),
           ElevatedButton(
@@ -1691,9 +1698,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: _kPrimary,
-              minimumSize: const Size(double.infinity, 52),
+              minimumSize: const Size(double.infinity, 50),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(28),
               ),
               elevation: 0,
             ),
@@ -1757,45 +1764,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Opiniones del producto',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              if (_hasPurchased)
-                TextButton(
-                  onPressed: () {
-                    if (_product != null) {
-                      Navigator.of(context)
-                          .push(
-                            MaterialPageRoute(
-                              builder: (context) => WriteReviewScreen(
-                                product: _product!,
-                                existingReview: _userReview,
-                              ),
-                            ),
-                          )
-                          .then((_) {
-                            _loadReviewsSilently();
-                          });
-                    }
-                  },
-                  child: Text(
-                    _userReview != null ? 'Editar opinión' : 'Escribir opinión',
-                    style: const TextStyle(
-                      color: _kPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-            ],
+          const Text(
+            'Opiniones del producto',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+            ),
           ),
           if (_reviews.isEmpty)
             Padding(
