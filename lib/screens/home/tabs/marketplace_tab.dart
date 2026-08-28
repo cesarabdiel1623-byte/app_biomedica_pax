@@ -818,7 +818,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
   Widget _quickCats() {
     final categories = _quickCategories();
     return Container(
-      height: 104,
+      height: 118,
       color: Colors.white,
       child: ScrollConfiguration(
         behavior: MouseDragScrollBehavior(),
@@ -826,7 +826,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
           scrollDirection: Axis.horizontal,
           physics: const ClampingScrollPhysics(),
           clipBehavior: Clip.none,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           itemCount: categories.length,
           itemBuilder: (_, index) {
             final category = categories[index];
@@ -839,10 +839,10 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                 right: index == categories.length - 1 ? 0 : 6,
               ),
               child: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 onTap: () => _openCategoryOverview(category),
                 child: SizedBox(
-                  width: 78,
+                  width: 86,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
@@ -850,11 +850,11 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
                         curve: Curves.easeOut,
-                        width: active ? 52 : 48,
-                        height: active ? 52 : 48,
+                        width: active ? 60 : 56,
+                        height: active ? 60 : 56,
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: active ? 0.16 : 0.10),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: color.withValues(
                               alpha: active ? 0.38 : 0.22,
@@ -864,10 +864,10 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                         child: Icon(
                           _categoryIcon(category.slug),
                           color: color,
-                          size: 26,
+                          size: 30,
                         ),
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 6),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 2),
                         child: Text(
@@ -879,7 +879,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                             color: active
                                 ? const Color(0xFF6B7280)
                                 : const Color(0xFF374151),
-                            fontSize: 11,
+                            fontSize: 11.5,
                             fontWeight: active
                                 ? FontWeight.w800
                                 : FontWeight.w500,
@@ -890,7 +890,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
                         curve: Curves.easeOut,
-                        width: active ? 26 : 0,
+                        width: active ? 28 : 0,
                         height: 3,
                         decoration: BoxDecoration(
                           color: active ? color : Colors.transparent,
