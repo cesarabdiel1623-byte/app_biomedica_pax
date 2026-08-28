@@ -105,162 +105,112 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Encabezado descriptivo
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: _kPrimary.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.help_outline_rounded,
-                      color: _kPrimary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '¿Tienes alguna duda?',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Nuestro equipo técnico te responderá a la brevedad.',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 22),
-
-              // Chips de sugerencias rápidas
               const Text(
-                'Sugerencias rápidas:',
+                'Escribe tu pregunta',
                 style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF475569),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
                 ),
               ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _suggestionChip('¿Qué accesorios incluye la caja?'),
-                  _suggestionChip('¿Es compatible con mi equipo?'),
-                  _suggestionChip('¿Cuentan con factura y garantía?'),
-                  _suggestionChip('¿Cuál es el tiempo de entrega?'),
-                ],
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
 
-              // Campo de texto para la pregunta
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+              TextField(
+                controller: _questionController,
+                maxLines: 6,
+                maxLength: 500,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                style: const TextStyle(
+                  fontSize: 14.5,
+                  color: Color(0xFF0F172A),
+                  height: 1.4,
                 ),
-                child: TextField(
-                  controller: _questionController,
-                  maxLines: 5,
-                  maxLength: 500,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.sentences,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    color: Color(0xFF0F172A),
-                    height: 1.45,
+                decoration: InputDecoration(
+                  hintText:
+                      'Ej. ¿El equipo cuenta con certificación COFEPRIS y qué accesorios incluye la caja?',
+                  hintStyle: TextStyle(
+                    fontSize: 13.5,
+                    color: Colors.grey.shade400,
+                    height: 1.4,
                   ),
-                  decoration: InputDecoration(
-                    hintText:
-                        'Escribe tu pregunta detallada aquí (especificaciones técnicas, voltaje, compatibilidad, etc.)...',
-                    hintStyle: TextStyle(
-                      fontSize: 13.5,
-                      color: Colors.grey.shade400,
-                      height: 1.4,
-                    ),
-                    contentPadding: const EdgeInsets.all(16),
-                    border: InputBorder.none,
-                    counterStyle: const TextStyle(
-                      fontSize: 11.5,
-                      color: Color(0xFF94A3B8),
-                      fontWeight: FontWeight.w500,
-                    ),
+                  contentPadding: const EdgeInsets.all(16),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  counterStyle: const TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: _kPrimary, width: 1.5),
                   ),
                 ),
               ),
               const SizedBox(height: 14),
 
-              // Nota informativa moderna
+              // Nota informativa bien acomodada
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFDCFCE7)),
+                  color: const Color(0xFFF0FDFA),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFCCFBF1)),
                 ),
                 child: const Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.verified_outlined,
-                      color: Color(0xFF16A34A),
-                      size: 18,
+                      Icons.info_outline_rounded,
+                      color: _kPrimary,
+                      size: 20,
                     ),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Tu pregunta será revisada por nuestro equipo de ingeniería biomédica y se publicará junto con la respuesta para ayudar a la comunidad médica.',
+                        'Tu pregunta será revisada por nuestro equipo técnico y se publicará junto con la respuesta correspondiente.',
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF166534),
-                          height: 1.4,
+                          fontSize: 12.5,
+                          color: Color(0xFF115E59),
+                          height: 1.35,
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
-              // Botón de Enviar Pregunta (54px, pastilla circular)
+              // Botón de Enviar
               SizedBox(
                 width: double.infinity,
                 height: 54,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: _isSending ? null : _submitQuestion,
-                  icon: _isSending
-                      ? const SizedBox.shrink()
-                      : const Icon(
-                          Icons.send_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                  label: _isSending
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kPrimary,
+                    disabledBackgroundColor: _kPrimary.withValues(alpha: 0.55),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isSending
                       ? const SizedBox(
                           width: 22,
                           height: 22,
@@ -277,47 +227,9 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _kPrimary,
-                    disabledBackgroundColor: _kPrimary.withValues(alpha: 0.55),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    elevation: 0,
-                  ),
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _suggestionChip(String text) {
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _questionController.text = text;
-          _questionController.selection = TextSelection.fromPosition(
-            TextPosition(offset: _questionController.text.length),
-          );
-        });
-      },
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF475569),
-            fontWeight: FontWeight.w600,
           ),
         ),
       ),
