@@ -884,7 +884,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
             const SizedBox(height: 8),
 
-            // ── Galería de Imágenes Limpia con Badge de Descuento ──
+            // ── Galería de Imágenes Limpia ──
             SizedBox(
               height: 300,
               width: double.infinity,
@@ -918,30 +918,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       );
                     },
                   ),
-                  // Badge de descuento flotante en la imagen (rojo, idéntico al inicio)
-                  if (p.hasDiscount)
-                    Positioned(
-                      top: 10,
-                      left: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3.5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDC2626),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '-${p.discountPercent}%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ),
                   // Botón flotante de favorito circular
                   Positioned(
                     top: 8,
@@ -1007,55 +983,58 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const Divider(height: 1, color: Color(0xFFF1F5F9)),
             const SizedBox(height: 14),
 
-            // ── Bloque de Precio (Idéntico a la tarjeta de producto) ──
+            // ── Bloque de Precio ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (p.hasDiscount) ...[
-                    Row(
-                      children: [
+                    Text(
+                      'Antes: ${p.formattedOldPrice}',
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        decoration: TextDecoration.lineThrough,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                  ],
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        p.formattedPrice,
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      if (p.hasDiscount) ...[
+                        const SizedBox(width: 10),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2.5,
+                            horizontal: 9,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFEE2E2),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            '-${p.discountPercent}%',
+                            '-${p.discountPercent}% OFF',
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 12.5,
                               fontWeight: FontWeight.w800,
                               color: Color(0xFFDC2626),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          p.formattedOldPrice,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            decoration: TextDecoration.lineThrough,
-                            color: Color(0xFF94A3B8),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
                       ],
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                  Text(
-                    p.formattedPrice,
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.5,
-                    ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   const Row(
