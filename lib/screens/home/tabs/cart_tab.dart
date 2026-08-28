@@ -1109,7 +1109,47 @@ class CartTabState extends State<CartTab> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            if (p != null && p.hasDiscount) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEE2E2),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: Text(
+                                      '-${p.discountPercent}%',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xFFDC2626),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      p.formattedOldPrice,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade400,
+                                        decoration: TextDecoration.lineThrough,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                            ] else ...[
+                              const SizedBox(height: 4),
+                            ],
                             Text(
                               p?.formattedPrice ?? '',
                               maxLines: 1,
@@ -1120,33 +1160,6 @@ class CartTabState extends State<CartTab> {
                                 color: Color(0xFF0F172A),
                               ),
                             ),
-                            if (p != null && p.hasDiscount)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 1),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      p.formattedOldPrice,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade400,
-                                        decoration: TextDecoration.lineThrough,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      '-${p.discountPercent}%',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: Color(0xFFDC2626),
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             if (p != null) ...[
                               const SizedBox(height: 5),
                               Row(
