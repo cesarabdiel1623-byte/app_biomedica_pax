@@ -780,58 +780,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Cabecera: Condición, Ventas, Categoría y SKU ──
+            // ── Cabecera: Condición y Ventas ──
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        p.salesCount > 0
-                            ? 'Nuevo  |  ${_formatSoldCount(p.salesCount)}'
-                            : 'Nuevo',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (p.salesCount >= 50) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text(
-                            'MÁS VENDIDO',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                  Text(
+                    p.salesCount > 0
+                        ? 'Nuevo  |  ${_formatSoldCount(p.salesCount)}'
+                        : 'Nuevo',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  if (p.sku.isNotEmpty)
-                    Text(
-                      'SKU: ${p.sku}',
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: Color(0xFF94A3B8),
-                        fontWeight: FontWeight.w600,
+                  if (p.salesCount >= 50) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'MÁS VENDIDO',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.4,
+                        ),
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -851,24 +836,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
 
-            // ── Valoración y Calificaciones ──
+            // ── Valoración y Calificaciones (Clickeable) ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              child: Row(
-                children: [
-                  _starsWidget(ratingVal),
-                  const SizedBox(width: 8),
-                  Text(
-                    reviewsCountVal == 0
-                        ? 'Sin calificaciones aún'
-                        : '${ratingVal.toStringAsFixed(1)} (${_formatOpinionsCount(reviewsCountVal)})',
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      color: Color(0xFF64748B),
-                      fontWeight: FontWeight.w600,
-                    ),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => AllProductReviewsScreen(
+                            productId: p.id,
+                            productName: p.name,
+                          ),
+                        ),
+                      )
+                      .then((_) => _loadReviewsSilently());
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _starsWidget(ratingVal),
+                      const SizedBox(width: 8),
+                      Text(
+                        reviewsCountVal == 0
+                            ? 'Sin calificaciones aún'
+                            : '${ratingVal.toStringAsFixed(1)} (${_formatOpinionsCount(reviewsCountVal)})',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
 
@@ -1719,9 +1729,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: _kPrimary,
-              minimumSize: const Size(double.infinity, 50),
+              minimumSize: const Size(double.infinity, 54),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(30),
               ),
               elevation: 0,
             ),
@@ -1730,7 +1740,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 15,
+                fontSize: 16.5,
               ),
             ),
           ),
@@ -1795,7 +1805,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           if (_reviews.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
+              padding: const EdgeInsets.symmetric(vertical: 20),
               child: Center(
                 child: Column(
                   children: [
@@ -2009,37 +2019,37 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 );
               },
             ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context)
-                    .push(
-                      MaterialPageRoute(
-                        builder: (_) => AllProductReviewsScreen(
-                          productId: p.id,
-                          productName: p.name,
-                        ),
-                      ),
-                    )
-                    .then((_) => _loadReviewsSilently());
-              },
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ver más opiniones',
-                    style: TextStyle(
-                      color: _kPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13.5,
-                    ),
-                  ),
-                  SizedBox(width: 4),
-                  Icon(Icons.chevron_right_rounded, color: _kPrimary, size: 18),
-                ],
-              ),
-            ),
           ],
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context)
+                  .push(
+                    MaterialPageRoute(
+                      builder: (_) => AllProductReviewsScreen(
+                        productId: p.id,
+                        productName: p.name,
+                      ),
+                    ),
+                  )
+                  .then((_) => _loadReviewsSilently());
+            },
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Text(
+                  'Ver todas las opiniones',
+                  style: TextStyle(
+                    color: _kPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
+                ),
+                SizedBox(width: 4),
+                Icon(Icons.chevron_right_rounded, color: _kPrimary, size: 18),
+              ],
+            ),
+          ),
         ],
       ),
     );
