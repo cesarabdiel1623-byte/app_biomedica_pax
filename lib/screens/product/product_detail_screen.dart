@@ -837,49 +837,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
 
-            // ── Valoración y Calificaciones (Clickeable) ──
+            // ── Valoración y Calificaciones ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-              child: InkWell(
-                onTap: () {
-                  Navigator.of(context)
-                      .push(
-                        MaterialPageRoute(
-                          builder: (_) => AllProductReviewsScreen(
-                            productId: p.id,
-                            productName: p.name,
-                          ),
-                        ),
-                      )
-                      .then((_) => _loadReviewsSilently());
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _starsWidget(ratingVal),
-                      const SizedBox(width: 8),
-                      Text(
-                        reviewsCountVal == 0
-                            ? 'Sin calificaciones aún'
-                            : '${ratingVal.toStringAsFixed(1)} (${_formatOpinionsCount(reviewsCountVal)})',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        size: 16,
-                        color: Color(0xFF94A3B8),
-                      ),
-                    ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _starsWidget(ratingVal),
+                  const SizedBox(width: 8),
+                  Text(
+                    reviewsCountVal == 0
+                        ? 'Sin calificaciones aún'
+                        : '${ratingVal.toStringAsFixed(1)} (${_formatOpinionsCount(reviewsCountVal)})',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
 
