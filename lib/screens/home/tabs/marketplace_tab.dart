@@ -818,7 +818,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
   Widget _quickCats() {
     final categories = _quickCategories();
     return Container(
-      height: 94,
+      height: 104,
       color: Colors.white,
       child: ScrollConfiguration(
         behavior: MouseDragScrollBehavior(),
@@ -839,10 +839,10 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                 right: index == categories.length - 1 ? 0 : 6,
               ),
               child: InkWell(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 onTap: () => _openCategoryOverview(category),
                 child: SizedBox(
-                  width: 76,
+                  width: 78,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
@@ -850,11 +850,11 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
                         curve: Curves.easeOut,
-                        width: active ? 44 : 42,
-                        height: active ? 44 : 42,
+                        width: active ? 52 : 48,
+                        height: active ? 52 : 48,
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: active ? 0.16 : 0.10),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: color.withValues(
                               alpha: active ? 0.38 : 0.22,
@@ -864,7 +864,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                         child: Icon(
                           _categoryIcon(category.slug),
                           color: color,
-                          size: 22,
+                          size: 26,
                         ),
                       ),
                       const SizedBox(height: 5),
@@ -890,7 +890,7 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
                         curve: Curves.easeOut,
-                        width: active ? 24 : 0,
+                        width: active ? 26 : 0,
                         height: 3,
                         decoration: BoxDecoration(
                           color: active ? color : Colors.transparent,
