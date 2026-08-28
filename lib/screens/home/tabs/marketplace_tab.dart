@@ -10,6 +10,7 @@ import '../../../services/auth_identity_service.dart';
 import '../../../services/quote_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../utils/ui_helpers.dart';
+import '../../../utils/responsive_grid.dart';
 import '../../product/category_products_screen.dart';
 import '../../product/category_catalog_screen.dart';
 import '../../product/search_screen.dart';
@@ -559,19 +560,32 @@ class MarketplaceTabState extends State<MarketplaceTab> {
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
                               ),
-                              sliver: SliverGrid(
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      mainAxisExtent: 315,
-                                      mainAxisSpacing: 8,
-                                      crossAxisSpacing: 8,
+                              sliver: SliverLayoutBuilder(
+                                builder: (context, constraints) {
+                                  final textScale = MediaQuery.textScalerOf(
+                                    context,
+                                  ).scale(1);
+                                  return SliverGrid(
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount:
+                                              ResponsiveGrid.productColumnCount(
+                                                constraints.crossAxisExtent,
+                                              ),
+                                          mainAxisExtent:
+                                              ResponsiveGrid.productCardExtent(
+                                                textScale,
+                                              ),
+                                          mainAxisSpacing: 8,
+                                          crossAxisSpacing: 8,
+                                        ),
+                                    delegate: SliverChildBuilderDelegate(
+                                      (ctx, i) =>
+                                          ProductCard(product: _products[i]),
+                                      childCount: _products.length,
                                     ),
-                                delegate: SliverChildBuilderDelegate(
-                                  (ctx, i) =>
-                                      ProductCard(product: _products[i]),
-                                  childCount: _products.length,
-                                ),
+                                  );
+                                },
                               ),
                             ),
                           ],

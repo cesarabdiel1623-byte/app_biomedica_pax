@@ -740,81 +740,117 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
         physics: const ClampingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.only(bottom: 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Cabecera: MÁS VENDIDO (cuadro rojo) y Ventas a la izquierda ──
-            if (p.salesCount > 0)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    if (p.salesCount >= 50) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'MÁS VENDIDO',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+            // ── Cabecera: Categoría, SKU y Ventas ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (p.category.isNotEmpty) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _kPrimary.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            p.category.toUpperCase(),
+                            style: const TextStyle(
+                              color: _kPrimary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
+                        const SizedBox(width: 8),
+                      ],
+                      if (p.salesCount >= 50) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'MÁS VENDIDO',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (p.salesCount > 0)
+                        Text(
+                          _formatSoldCount(p.salesCount),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                     ],
+                  ),
+                  if (p.sku.isNotEmpty)
                     Text(
-                      _formatSoldCount(p.salesCount),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w500,
+                      'SKU: ${p.sku}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
+            ),
 
-            // ── Título ──
+            // ── Título del Producto ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Text(
                 p.name,
                 style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
                   height: 1.3,
+                  letterSpacing: -0.3,
                 ),
               ),
             ),
 
-            // ── Valoración Fila (siempre visible) ──
+            // ── Valoración y Calificaciones ──
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
               child: Row(
                 children: [
                   _starsWidget(ratingVal),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   Text(
                     reviewsCountVal == 0
-                        ? 'Sin calificación'
+                        ? 'Sin calificaciones aún'
                         : '${ratingVal.toStringAsFixed(1)} (${_formatOpinionsCount(reviewsCountVal)})',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                      fontWeight: FontWeight.w500,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -822,218 +858,316 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
 
             const SizedBox(height: 12),
-            const Divider(height: 1, color: Color(0xFFE2E8F0)),
-            // ── Galería de Imágenes con Contador pastilla y Botones Flotantes (Compartir + Corazón) ──
-            SizedBox(
-              height: 280,
-              width: double.infinity,
-              child: Stack(
-                children: [
-                  PageView.builder(
-                    itemCount: imageUrls.length,
-                    onPageChanged: (i) => setState(() => _currentImage = i),
-                    itemBuilder: (_, i) {
-                      final url = imageUrls[i];
-                      return GestureDetector(
-                        onTap: () => _openFullScreenGallery(imageUrls, i),
-                        child: Container(
-                          color: Colors.white,
-                          padding: const EdgeInsets.all(12),
-                          child: url.isNotEmpty
-                              ? UiHelpers.networkImage(
-                                  url,
-                                  fit: BoxFit.contain,
-                                  iconSize: 68,
-                                )
-                              : Icon(
-                                  Icons.medical_services_outlined,
-                                  size: 68,
-                                  color: Colors.grey.shade300,
+
+            // ── Hero Gallery: Vitrina de Producto con fondo suave y badges ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                height: 310,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    children: [
+                      PageView.builder(
+                        itemCount: imageUrls.length,
+                        onPageChanged: (i) => setState(() => _currentImage = i),
+                        itemBuilder: (_, i) {
+                          final url = imageUrls[i];
+                          return GestureDetector(
+                            onTap: () => _openFullScreenGallery(imageUrls, i),
+                            child: Container(
+                              color: Colors.transparent,
+                              padding: const EdgeInsets.all(20),
+                              child: url.isNotEmpty
+                                  ? UiHelpers.networkImage(
+                                      url,
+                                      fit: BoxFit.contain,
+                                      iconSize: 72,
+                                    )
+                                  : Icon(
+                                      Icons.medical_services_outlined,
+                                      size: 72,
+                                      color: Colors.grey.shade300,
+                                    ),
+                            ),
+                          );
+                        },
+                      ),
+                      // Badge de descuento flotante en la imagen
+                      if (p.hasDiscount)
+                        Positioned(
+                          top: 12,
+                          left: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFFDC2626,
+                                  ).withValues(alpha: 0.25),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
                                 ),
+                              ],
+                            ),
+                            child: Text(
+                              '-${p.discountPercent}% OFF',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
                         ),
-                      );
-                    },
-                  ),
-                  if (imageUrls.length > 1)
-                    Positioned(
-                      bottom: 12,
-                      left: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          '${_currentImage + 1} / ${imageUrls.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                      // Botón flotante de favorito
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: GestureDetector(
+                          onTap: _toggleFavorite,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              _isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border_rounded,
+                              color: _isFavorite
+                                  ? _kRed
+                                  : const Color(0xFF64748B),
+                              size: 22,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  // Botón flotante de favorito
-                  Positioned(
-                    bottom: 12,
-                    right: 16,
-                    child: GestureDetector(
-                      onTap: _toggleFavorite,
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                      // Paginador en pastilla
+                      if (imageUrls.length > 1)
+                        Positioned(
+                          bottom: 12,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.60),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${_currentImage + 1} / ${imageUrls.length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ],
+                          ),
                         ),
-                        child: Icon(
-                          _isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: _isFavorite ? _kRed : Colors.grey.shade500,
-                          size: 24,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // ── Precio y Descuento ──
+            // ── Tarjeta de Precio y Mercado Pago ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (p.hasDiscount) ...[
-                    Text(
-                      p.formattedOldPrice,
-                      style: TextStyle(
-                        fontSize: 14,
-                        decoration: TextDecoration.lineThrough,
-                        color: Colors.grey.shade400,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                  ],
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (p.hasDiscount) ...[
                       Text(
-                        p.formattedPrice,
+                        'Antes: ${p.formattedOldPrice}',
                         style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                          letterSpacing: -0.5,
+                          fontSize: 13.5,
+                          decoration: TextDecoration.lineThrough,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      if (p.hasDiscount) ...[
-                        const SizedBox(width: 10),
+                      const SizedBox(height: 2),
+                    ],
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
                         Text(
-                          '-${p.discountPercent}%',
+                          p.formattedPrice,
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF16A34A),
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF0F172A),
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        if (p.hasDiscount) ...[
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '-${p.discountPercent}% OFF',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF16A34A),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 14,
+                          color: Color(0xFF0D9488),
+                        ),
+                        SizedBox(width: 5),
+                        Text(
+                          'IVA incluido • Facturación disponible',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF475569),
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'IVA incluido',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF475569), // slate-600
-                      fontWeight: FontWeight.w400,
                     ),
-                  ),
-                  const SizedBox(height: 6),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 10),
 
-                  // ── Formas de pago ──
-                  InkWell(
-                    onTap: _showPaymentMethodsSheet,
-                    borderRadius: BorderRadius.circular(6),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 6,
-                        horizontal: 8,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Método de pago',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF3483FA),
-                              fontWeight: FontWeight.w600,
+                    // Enlace a medios de pago con badge de Mercado Pago
+                    InkWell(
+                      onTap: _showPaymentMethodsSheet,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 4,
+                          horizontal: 2,
+                        ),
+                        child: Row(
+                          children: [
+                            _mercadoPagoBadge(size: 26, padding: 3),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                'Paga en hasta 12 meses con Mercado Pago',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: Color(0xFF2563EB),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          _mercadoPagoBadge(),
-                        ],
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: Color(0xFF2563EB),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
-            const SizedBox(height: 12),
-            const Divider(height: 1, color: Color(0xFFE2E8F0)),
-            const SizedBox(height: 12),
-
-            // ── Disponibilidad, envío y garantía ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  _benefitRow(
-                    Icons.inventory_2_outlined,
-                    _availabilityTitle(p),
-                    _availabilitySubtitle(p),
-                    p.stockStatusColor,
-                  ),
-                  const SizedBox(height: 12),
-                  _benefitRow(
-                    Icons.local_shipping_outlined,
-                    _shippingTitle(p),
-                    _shippingSubtitle(p),
-                    _kPrimary,
-                  ),
-                  const SizedBox(height: 12),
-                  _benefitRow(
-                    Icons.verified_user_outlined,
-                    _warrantyTitle(p),
-                    'Consulta cobertura y condiciones al finalizar tu compra.',
-                    _kNavy,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-            const Divider(height: 1, color: Color(0xFFE2E8F0)),
             const SizedBox(height: 16),
 
-            // ── Stock y Selector de Cantidad Inline ──
+            // ── Tarjeta de Confianza: Disponibilidad, Envío y Garantía ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    _benefitRow(
+                      Icons.inventory_2_outlined,
+                      _availabilityTitle(p),
+                      _availabilitySubtitle(p),
+                      p.stockStatusColor,
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    ),
+                    _benefitRow(
+                      Icons.local_shipping_outlined,
+                      _shippingTitle(p),
+                      _shippingSubtitle(p),
+                      _kPrimary,
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    ),
+                    _benefitRow(
+                      Icons.verified_user_outlined,
+                      _warrantyTitle(p),
+                      'Consulta cobertura y condiciones al finalizar tu compra.',
+                      const Color(0xFF3B82F6),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Selector de Cantidad ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -1043,112 +1177,118 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     'Cantidad',
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
-                      vertical: 12,
+                      vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Row(
                       children: [
-                        // Lado Izquierdo: Disponibilidad con icono de paquete
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.inventory_2_outlined,
-                              size: 20,
-                              color: Colors.grey.shade600,
+                              size: 18,
+                              color: const Color(0xFF64748B),
                             ),
                             const SizedBox(width: 6),
                             Text(
                               canRequest ? _stockQuantityLabel(p) : 'Agotado',
-                              style: TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey.shade700,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF475569),
                               ),
                             ),
                           ],
                         ),
-
-                        // En Medio: Cantidad seleccionada
-                        Expanded(
-                          child: Center(
-                            child: Text(
-                              'Cantidad: $_quantity',
-                              style: const TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF111827),
+                        const Spacer(),
+                        if (canRequest)
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFFCBD5E1),
                               ),
                             ),
-                          ),
-                        ),
-
-                        // Lado Derecho: Botones de quitar (-) y agregar (+)
-                        if (canRequest)
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              GestureDetector(
-                                onTap: _quantity > 1
-                                    ? () => setState(() => _quantity--)
-                                    : null,
-                                child: Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(
-                                    color: _quantity > 1
-                                        ? Colors.white
-                                        : Colors.grey.shade200,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: const BorderRadius.horizontal(
+                                      left: Radius.circular(9),
+                                    ),
+                                    onTap: _quantity > 1
+                                        ? () => setState(() => _quantity--)
+                                        : null,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      child: Icon(
+                                        Icons.remove,
+                                        size: 16,
+                                        color: _quantity > 1
+                                            ? _kPrimary
+                                            : const Color(0xFF94A3B8),
+                                      ),
                                     ),
                                   ),
-                                  child: Icon(
-                                    Icons.remove,
-                                    size: 16,
-                                    color: _quantity > 1
-                                        ? _kPrimary
-                                        : Colors.grey,
-                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: _quantity < maxQuantity
-                                    ? () => setState(() => _quantity++)
-                                    : null,
-                                child: Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(
-                                    color: _quantity < maxQuantity
-                                        ? Colors.white
-                                        : Colors.grey.shade200,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.grey.shade300,
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                  child: Text(
+                                    '$_quantity',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF0F172A),
                                     ),
                                   ),
-                                  child: Icon(
-                                    Icons.add,
-                                    size: 16,
-                                    color: _quantity < maxQuantity
-                                        ? _kPrimary
-                                        : Colors.grey,
+                                ),
+                                Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: const BorderRadius.horizontal(
+                                      right: Radius.circular(9),
+                                    ),
+                                    onTap: _quantity < maxQuantity
+                                        ? () => setState(() => _quantity++)
+                                        : null,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      child: Icon(
+                                        Icons.add,
+                                        size: 16,
+                                        color: _quantity < maxQuantity
+                                            ? _kPrimary
+                                            : const Color(0xFF94A3B8),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                       ],
                     ),
@@ -1193,7 +1333,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               backgroundColor: _kPrimary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                           )
@@ -1207,7 +1347,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             icon: _loadingAddToCart
                                 ? const SizedBox.shrink()
                                 : const Icon(
-                                    Icons.add_shopping_cart_outlined,
+                                    Icons.add_shopping_cart_rounded,
                                     size: 20,
                                     color: Colors.white,
                                   ),
@@ -1234,7 +1374,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               backgroundColor: _kPrimary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                           ),
@@ -1246,7 +1386,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     width: double.infinity,
                     height: 52,
                     child: _addedToQuoteSuccess
-                        ? ElevatedButton.icon(
+                        ? OutlinedButton.icon(
                             onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -1257,25 +1397,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             icon: const Icon(
                               Icons.description_outlined,
                               size: 20,
-                              color: Colors.white,
+                              color: Color(0xFF1E3A5F),
                             ),
                             label: const Text(
                               'Ver cotización',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: Color(0xFF1E3A5F),
                               ),
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF3483FA),
-                              elevation: 0,
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: Color(0xFF1E3A5F),
+                                width: 1.5,
+                              ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                           )
-                        : ElevatedButton.icon(
+                        : OutlinedButton.icon(
                             onPressed:
                                 (!_loadingAddToQuote && !_loadingAddToCart)
                                 ? () => _requestQuote(p)
@@ -1285,30 +1427,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 : const Icon(
                                     Icons.request_quote_outlined,
                                     size: 20,
-                                    color: Colors.white,
+                                    color: Color(0xFF1E3A5F),
                                   ),
                             label: _loadingAddToQuote
                                 ? const SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
-                                      color: Colors.white,
+                                      color: Color(0xFF1E3A5F),
                                       strokeWidth: 2,
                                     ),
                                   )
                                 : const Text(
-                                    'Cotizar',
+                                    'Solicitar Cotización',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      color: Color(0xFF1E3A5F),
                                     ),
                                   ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF3483FA),
-                              elevation: 0,
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: Color(0xFF1E3A5F),
+                                width: 1.5,
+                              ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                           ),
@@ -1336,64 +1480,84 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             // ── Detalles del Producto ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Detalles del producto',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (p.description != null && p.description!.isNotEmpty)
-                    Text(
-                      p.description!,
-                      maxLines: 5,
-                      overflow: TextOverflow.ellipsis,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Detalles del producto',
                       style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade600,
-                        height: 1.5,
-                      ),
-                    )
-                  else
-                    Text(
-                      'Sin descripción disponible.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade400,
-                        fontStyle: FontStyle.italic,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
                       ),
                     ),
+                    const SizedBox(height: 10),
 
-                  const SizedBox(height: 16),
+                    if (p.description != null && p.description!.isNotEmpty)
+                      Text(
+                        p.description!,
+                        maxLines: 5,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          color: Color(0xFF475569),
+                          height: 1.55,
+                        ),
+                      )
+                    else
+                      const Text(
+                        'Sin descripción disponible.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF94A3B8),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
 
-                  GestureDetector(
-                    onTap: () => _showProductDetailsSheet(p),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Ver ficha completa',
-                          style: TextStyle(
-                            color: _kPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13.5,
-                          ),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    const SizedBox(height: 12),
+
+                    InkWell(
+                      onTap: () => _showProductDetailsSheet(p),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.assignment_outlined,
+                              size: 18,
+                              color: _kPrimary,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Ver ficha técnica y especificaciones',
+                              style: TextStyle(
+                                color: _kPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                            Spacer(),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: _kPrimary,
+                              size: 20,
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.chevron_right,
-                          color: _kPrimary,
-                          size: 18,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
@@ -1446,11 +1610,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
         if (index < fullStars) {
-          return const Icon(Icons.star, color: _kAmber, size: 14);
+          return const Icon(Icons.star_rounded, color: _kAmber, size: 16);
         } else if (index == fullStars && hasHalf) {
-          return const Icon(Icons.star_half, color: _kAmber, size: 14);
+          return const Icon(Icons.star_half_rounded, color: _kAmber, size: 16);
         } else {
-          return Icon(Icons.star_border, color: Colors.grey.shade300, size: 14);
+          return const Icon(
+            Icons.star_border_rounded,
+            color: Color(0xFFCBD5E1),
+            size: 16,
+          );
         }
       }),
     );
@@ -1465,8 +1633,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: iconColor),
-        const SizedBox(width: 12),
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.10),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 20, color: iconColor),
+        ),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1474,18 +1650,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade500,
-                  height: 1.3,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF64748B),
+                  height: 1.35,
                 ),
               ),
             ],

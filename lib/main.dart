@@ -57,6 +57,9 @@ const SystemUiOverlayStyle _systemNavigationBarStyle = SystemUiOverlayStyle(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
   SystemChrome.setSystemUIOverlayStyle(_systemNavigationBarStyle);
   await Constants.init();
 

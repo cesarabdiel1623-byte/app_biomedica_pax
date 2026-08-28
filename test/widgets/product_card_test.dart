@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gomedical_app/models/product.dart';
 import 'package:gomedical_app/screens/home/widgets/product_card.dart';
+import 'package:gomedical_app/utils/responsive_grid.dart';
 
 void main() {
   testWidgets('ProductCard renders name, price and stock label correctly', (
@@ -130,5 +131,81 @@ void main() {
 
     // Home cards keep the same compact product layout used by catalog cards.
     expect(find.text('Seminuevo'), findsNothing);
+  });
+
+  testWidgets('product grid stays overflow-free across phone and tablet widths', (
+    WidgetTester tester,
+  ) async {
+    final product = Product(
+      id: 'prod-responsive',
+      sku: 'SKU-RESPONSIVE',
+      name: 'Banco de baterías para ventilador con nombre comercial extendido',
+      category: 'refacciones',
+      application: 'general',
+      unitPriceMxn: 12343,
+      costPriceMxn: 9000,
+      oldPrice: 14026,
+      currency: 'MXN',
+      unit: 'pieza',
+      isActive: true,
+      requiresSerial: false,
+      trackInventory: true,
+      currentStock: 8,
+      minimumStock: 2,
+      shippingInfo: 'Envío estándar disponible',
+      createdAt: DateTime.now(),
+      activePromotion: ActiveProductPromotion(
+        productId: 'prod-responsive',
+        discountType: 'percentage',
+        discountValue: 12,
+      ),
+    );
+
+    for (final scenario in <({double width, double scale})>[
+      (width: 320, scale: 1),
+      (width: 360, scale: 1.3),
+      (width: 600, scale: 1.5),
+      (width: 800, scale: 1.5),
+    ]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(
+              size: Size(scenario.width, 1000),
+              textScaler: TextScaler.linear(scenario.scale),
+            ),
+            child: Scaffold(
+              body: SizedBox(
+                width: scenario.width,
+                height: 1000,
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: ResponsiveGrid.productColumnCount(
+                      scenario.width - 24,
+                    ),
+                    mainAxisExtent: ResponsiveGrid.productCardExtent(
+                      scenario.scale,
+                    ),
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                  ),
+                  itemCount: 6,
+                  itemBuilder: (_, _) => ProductCard(product: product),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'Unexpected layout exception at ${scenario.width}px and ${scenario.scale}x text',
+      );
+    }
   });
 }

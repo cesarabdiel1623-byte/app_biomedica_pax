@@ -9,6 +9,7 @@ import '../../widgets/standard_section_header.dart';
 import '../home/widgets/product_card.dart';
 import 'product_detail_screen.dart';
 import '../../utils/ui_helpers.dart';
+import '../../utils/responsive_grid.dart';
 
 const _kPrimary = Color(0xFF0D9488); // Teal principal
 const _kNavy = Color(0xFF1E3A5F); // Azul navy
@@ -642,17 +643,24 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisExtent: 315,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-              ),
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final product = _results[index];
-                return ProductCard(product: product, enableHero: false);
-              }, childCount: _results.length),
+            sliver: SliverLayoutBuilder(
+              builder: (context, constraints) {
+                final textScale = MediaQuery.textScalerOf(context).scale(1);
+                return SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: ResponsiveGrid.productColumnCount(
+                      constraints.crossAxisExtent,
+                    ),
+                    mainAxisExtent: ResponsiveGrid.productCardExtent(textScale),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final product = _results[index];
+                    return ProductCard(product: product, enableHero: false);
+                  }, childCount: _results.length),
+                );
+              },
             ),
           ),
         ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../../utils/ui_helpers.dart';
+import '../../utils/responsive_grid.dart';
 import '../../widgets/load_error_state.dart';
 import '../home/widgets/product_card.dart';
 
@@ -137,17 +138,24 @@ class _PromotionProductsScreenState extends State<PromotionProductsScreen> {
     return RefreshIndicator(
       color: _kPrimary,
       onRefresh: () => _load(showSpinner: false),
-      child: GridView.builder(
-        physics: UiHelpers.refreshScrollPhysics,
-        padding: const EdgeInsets.all(10),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisExtent: 315,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-        ),
-        itemCount: _products.length,
-        itemBuilder: (_, index) => ProductCard(product: _products[index]),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final textScale = MediaQuery.textScalerOf(context).scale(1);
+          return GridView.builder(
+            physics: UiHelpers.refreshScrollPhysics,
+            padding: const EdgeInsets.all(10),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: ResponsiveGrid.productColumnCount(
+                constraints.maxWidth - 20,
+              ),
+              mainAxisExtent: ResponsiveGrid.productCardExtent(textScale),
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+            ),
+            itemCount: _products.length,
+            itemBuilder: (_, index) => ProductCard(product: _products[index]),
+          );
+        },
       ),
     );
   }

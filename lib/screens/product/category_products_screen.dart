@@ -3,6 +3,7 @@ import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../product/product_detail_screen.dart';
 import '../../utils/ui_helpers.dart';
+import '../../utils/responsive_grid.dart';
 import '../../widgets/load_error_state.dart';
 import '../home/widgets/product_card.dart';
 
@@ -220,17 +221,24 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
       displacement: 42,
       triggerMode: RefreshIndicatorTriggerMode.onEdge,
       onRefresh: () => _loadProducts(showSpinner: false),
-      child: GridView.builder(
-        physics: UiHelpers.refreshScrollPhysics,
-        padding: const EdgeInsets.all(12),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisExtent: 315,
-          mainAxisSpacing: 8,
-          crossAxisSpacing: 8,
-        ),
-        itemCount: _products.length,
-        itemBuilder: (context, i) => ProductCard(product: _products[i]),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final textScale = MediaQuery.textScalerOf(context).scale(1);
+          return GridView.builder(
+            physics: UiHelpers.refreshScrollPhysics,
+            padding: const EdgeInsets.all(12),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: ResponsiveGrid.productColumnCount(
+                constraints.maxWidth - 24,
+              ),
+              mainAxisExtent: ResponsiveGrid.productCardExtent(textScale),
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+            ),
+            itemCount: _products.length,
+            itemBuilder: (context, i) => ProductCard(product: _products[i]),
+          );
+        },
       ),
     );
   }

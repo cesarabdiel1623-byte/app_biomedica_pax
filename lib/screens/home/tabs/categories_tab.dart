@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/catalog_category.dart';
 import '../../../services/catalog_service.dart';
 import '../../../utils/ui_helpers.dart';
+import '../../../utils/responsive_grid.dart';
 import '../../../widgets/load_error_state.dart';
 import '../../../widgets/standard_section_header.dart';
 import '../../product/category_products_screen.dart';
@@ -374,71 +375,79 @@ class CategoriesTabState extends State<CategoriesTab> {
         triggerMode: RefreshIndicatorTriggerMode.onEdge,
         onRefresh: () =>
             _loadCategories(showSpinner: false, refreshImages: true),
-        child: GridView.builder(
-          physics: UiHelpers.refreshScrollPhysics,
-          padding: EdgeInsets.zero,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 6,
-            mainAxisSpacing: 8,
-            mainAxisExtent: 132,
-          ),
-          itemCount: category.subcategories.length,
-          itemBuilder: (_, index) {
-            final subcategory = category.subcategories[index];
-            final imageUrl = CatalogService.resolveSubcategoryImageUrl(
-              subcategory.imagePath,
-            );
-
-            return InkWell(
-              key: ValueKey<String>('subcategory-${subcategory.id}'),
-              borderRadius: BorderRadius.circular(8),
-              onTap: () => _openProducts(category, subcategory: subcategory),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final textScale = MediaQuery.textScalerOf(context).scale(1);
+            return GridView.builder(
+              physics: UiHelpers.refreshScrollPhysics,
+              padding: EdgeInsets.zero,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: ResponsiveGrid.subcategoryColumnCount(
+                  constraints.maxWidth,
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: 58,
-                      height: 58,
-                      child: imageUrl != null
-                          ? UiHelpers.networkImage(
-                              imageUrl,
-                              fit: BoxFit.contain,
-                              iconSize: 26,
-                              cacheWidth: 160,
-                              cacheHeight: 160,
-                            )
-                          : Icon(
-                              _iconFor(subcategory.slug),
-                              color: Colors.grey.shade500,
-                              size: 28,
-                            ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        subcategory.name,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11.2,
-                          height: 1.15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF334155),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                crossAxisSpacing: 6,
+                mainAxisSpacing: 8,
+                mainAxisExtent: ResponsiveGrid.subcategoryCardExtent(textScale),
               ),
+              itemCount: category.subcategories.length,
+              itemBuilder: (_, index) {
+                final subcategory = category.subcategories[index];
+                final imageUrl = CatalogService.resolveSubcategoryImageUrl(
+                  subcategory.imagePath,
+                );
+
+                return InkWell(
+                  key: ValueKey<String>('subcategory-${subcategory.id}'),
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () =>
+                      _openProducts(category, subcategory: subcategory),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 58,
+                          height: 58,
+                          child: imageUrl != null
+                              ? UiHelpers.networkImage(
+                                  imageUrl,
+                                  fit: BoxFit.contain,
+                                  iconSize: 26,
+                                  cacheWidth: 160,
+                                  cacheHeight: 160,
+                                )
+                              : Icon(
+                                  _iconFor(subcategory.slug),
+                                  color: Colors.grey.shade500,
+                                  size: 28,
+                                ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            subcategory.name,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11.2,
+                              height: 1.15,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF334155),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
