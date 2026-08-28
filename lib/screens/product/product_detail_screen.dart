@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../home/widgets/staggered_fade_slide.dart';
+import '../home/widgets/product_card.dart';
 import '../home/home_screen.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
@@ -2043,9 +2044,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           child: Text(
             'También podrían gustarte',
             style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
             ),
           ),
         ),
@@ -2060,110 +2061,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           )
         else
           SizedBox(
-            height: 220,
+            height: 336,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
+              physics: const ClampingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 12),
               itemCount: _similarProducts.length,
-              itemBuilder: (_, idx) {
+              itemBuilder: (context, idx) {
                 final sp = _similarProducts[idx];
-                return GestureDetector(
-                  onTap: () async {
-                    final res = await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ProductDetailScreen(
-                          productId: sp.id,
-                          searchQuery: widget.searchQuery,
-                        ),
-                      ),
-                    );
-                    if (res == true && mounted) {
-                      Navigator.of(context).pop(true);
-                    }
-                  },
-                  child: Container(
-                    width: 140,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Image
-                        Container(
-                          height: 100,
-                          width: double.infinity,
-                          color: const Color(0xFFF8FAFC),
-                          padding: const EdgeInsets.all(8),
-                          child: sp.mainImageUrl != null
-                              ? UiHelpers.networkImage(
-                                  sp.mainImageUrl!,
-                                  fit: BoxFit.contain,
-                                  iconSize: 28,
-                                )
-                              : Icon(
-                                  Icons.medical_services_outlined,
-                                  color: Colors.grey.shade300,
-                                  size: 28,
-                                ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                sp.name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF1F2937),
-                                  height: 1.3,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                sp.formattedPrice,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF111827),
-                                ),
-                              ),
-                              if (sp.hasDiscount) ...[
-                                const SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Text(
-                                      sp.formattedOldPrice,
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey.shade400,
-                                        decoration: TextDecoration.lineThrough,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${sp.discountPercent}%',
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: _kGreen,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 4,
                   ),
+                  child: SizedBox(width: 185, child: ProductCard(product: sp)),
                 );
               },
             ),
