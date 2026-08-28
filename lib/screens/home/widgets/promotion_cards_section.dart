@@ -257,11 +257,13 @@ class _PromotionCardsSectionState extends State<PromotionCardsSection> {
                           ),
                           if (product.hasDiscount)
                             Text(
-                              '${product.formattedOldPrice}  ${product.discountPercent}% OFF',
+                              'Antes: ${product.formattedOldPrice}',
                               style: TextStyle(
-                                color: accent,
+                                color: textColor.withValues(alpha: 0.7),
                                 fontSize: 10,
-                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: textColor,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           Text(

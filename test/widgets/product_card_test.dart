@@ -82,13 +82,14 @@ void main() {
         ),
       );
 
-      // Verify discount badge and discount pill text
-      expect(find.text('-30%'), findsNWidgets(2));
+      // Verify discount badge on image
+      expect(find.text('-30%'), findsOneWidget);
 
       // Verify current price is rendered
       expect(find.text('\$350 MXN'), findsOneWidget);
 
-      expect(find.text('\$500 MXN'), findsOneWidget);
+      // Verify old price is rendered with 'Antes: '
+      expect(find.text('Antes: \$500 MXN'), findsOneWidget);
     },
   );
 
