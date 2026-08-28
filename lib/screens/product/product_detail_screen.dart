@@ -781,7 +781,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Cabecera: Categoría, SKU y Ventas ──
+            // ── Cabecera: Condición, Ventas, Categoría y SKU ──
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
               child: Row(
@@ -790,37 +790,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (p.category.isNotEmpty) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _kPrimary.withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            p.category.toUpperCase(),
-                            style: const TextStyle(
-                              color: _kPrimary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.6,
-                            ),
-                          ),
+                      Text(
+                        p.salesCount > 0
+                            ? 'Nuevo  |  ${_formatSoldCount(p.salesCount)}'
+                            : 'Nuevo',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(width: 8),
-                      ],
+                      ),
                       if (p.salesCount >= 50) ...[
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
-                            vertical: 3,
+                            vertical: 2.5,
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEF4444),
-                            borderRadius: BorderRadius.circular(4),
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Text(
                             'MÁS VENDIDO',
@@ -828,28 +817,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               color: Colors.white,
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                              letterSpacing: 0.4,
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
                       ],
-                      if (p.salesCount > 0)
-                        Text(
-                          _formatSoldCount(p.salesCount),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
                     ],
                   ),
                   if (p.sku.isNotEmpty)
                     Text(
                       'SKU: ${p.sku}',
                       style: const TextStyle(
-                        fontSize: 11,
+                        fontSize: 11.5,
                         color: Color(0xFF94A3B8),
                         fontWeight: FontWeight.w600,
                       ),
@@ -896,7 +875,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
             const SizedBox(height: 8),
 
-            // ── Galería de Imágenes Limpia (Sin recuadro gris encajonado) ──
+            // ── Galería de Imágenes Limpia (Sin badge de descuento repetido) ──
             SizedBox(
               height: 300,
               width: double.infinity,
@@ -930,32 +909,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       );
                     },
                   ),
-                  // Badge de descuento flotante en la imagen
-                  if (p.hasDiscount)
-                    Positioned(
-                      top: 8,
-                      left: 16,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDC2626),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '-${p.discountPercent}% OFF',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ),
-                    ),
-                  // Botón flotante de favorito
+                  // Botón flotante de favorito circular
                   Positioned(
                     top: 8,
                     right: 16,
@@ -985,7 +939,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                     ),
                   ),
-                  // Paginador en pastilla
+                  // Paginador en pastilla circular
                   if (imageUrls.length > 1)
                     Positioned(
                       bottom: 8,
@@ -999,7 +953,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.60),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Text(
                             '${_currentImage + 1} / ${imageUrls.length}',
@@ -1020,7 +974,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const Divider(height: 1, color: Color(0xFFF1F5F9)),
             const SizedBox(height: 14),
 
-            // ── Bloque de Precio (Directo sobre fondo blanco, sin cajas) ──
+            // ── Bloque de Precio ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -1054,12 +1008,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         const SizedBox(width: 10),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
+                            horizontal: 9,
+                            vertical: 4,
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFDCFCE7),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             '-${p.discountPercent}% OFF',
@@ -1097,7 +1051,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   // Enlace a medios de pago limpio y sutil
                   InkWell(
                     onTap: _showPaymentMethodsSheet,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(20),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
@@ -1131,7 +1085,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const Divider(height: 1, color: Color(0xFFF1F5F9)),
             const SizedBox(height: 14),
 
-            // ── Beneficios: Disponibilidad, Envío y Garantía (Limpio sobre fondo blanco) ──
+            // ── Beneficios: Disponibilidad, Envío y Garantía ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -1164,7 +1118,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const Divider(height: 1, color: Color(0xFFF1F5F9)),
             const SizedBox(height: 14),
 
-            // ── Selector de Cantidad (Limpio, integrado en una fila) ──
+            // ── Selector de Cantidad con bordes circulares ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -1195,7 +1149,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(color: const Color(0xFFCBD5E1)),
                       ),
                       child: Row(
@@ -1205,14 +1159,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: const BorderRadius.horizontal(
-                                left: Radius.circular(9),
+                                left: Radius.circular(24),
                               ),
                               onTap: _quantity > 1
                                   ? () => setState(() => _quantity--)
                                   : null,
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
+                                  horizontal: 14,
                                   vertical: 8,
                                 ),
                                 child: Icon(
@@ -1240,14 +1194,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             color: Colors.transparent,
                             child: InkWell(
                               borderRadius: const BorderRadius.horizontal(
-                                right: Radius.circular(9),
+                                right: Radius.circular(24),
                               ),
                               onTap: _quantity < maxQuantity
                                   ? () => setState(() => _quantity++)
                                   : null,
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
+                                  horizontal: 14,
                                   vertical: 8,
                                 ),
                                 child: Icon(
@@ -1267,14 +1221,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
-            // ── Botones de Acción: Carrito y Cotización ──
+            // ── Botones de Acción con Bordes Circulares (Pills) ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  // 1. Agregar al carrito / Ver carrito (Verde _kPrimary)
+                  // 1. Agregar al carrito / Ver carrito (Verde Teal Circular)
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -1303,7 +1257,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               backgroundColor: _kPrimary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(28),
                               ),
                             ),
                           )
@@ -1344,19 +1298,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               backgroundColor: _kPrimary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(28),
                               ),
                             ),
                           ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
-                  // 2. Cotizar / Ver cotización (Azul marino)
+                  // 2. Cotizar / Solicitar Cotización (Azul Sólido Circular)
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: _addedToQuoteSuccess
-                        ? OutlinedButton.icon(
+                        ? ElevatedButton.icon(
                             onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -1367,27 +1321,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             icon: const Icon(
                               Icons.description_outlined,
                               size: 20,
-                              color: Color(0xFF1E3A5F),
+                              color: Colors.white,
                             ),
                             label: const Text(
                               'Ver cotización',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E3A5F),
+                                color: Colors.white,
                               ),
                             ),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                color: Color(0xFF1E3A5F),
-                                width: 1.5,
-                              ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3483FA),
+                              elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(28),
                               ),
                             ),
                           )
-                        : OutlinedButton.icon(
+                        : ElevatedButton.icon(
                             onPressed:
                                 (!_loadingAddToQuote && !_loadingAddToCart)
                                 ? () => _requestQuote(p)
@@ -1397,14 +1349,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 : const Icon(
                                     Icons.request_quote_outlined,
                                     size: 20,
-                                    color: Color(0xFF1E3A5F),
+                                    color: Colors.white,
                                   ),
                             label: _loadingAddToQuote
                                 ? const SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
-                                      color: Color(0xFF1E3A5F),
+                                      color: Colors.white,
                                       strokeWidth: 2,
                                     ),
                                   )
@@ -1413,16 +1365,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF1E3A5F),
+                                      color: Colors.white,
                                     ),
                                   ),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(
-                                color: Color(0xFF1E3A5F),
-                                width: 1.5,
-                              ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3483FA),
+                              elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(28),
                               ),
                             ),
                           ),
@@ -1488,7 +1438,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                   InkWell(
                     onTap: () => _showProductDetailsSheet(p),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(20),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(vertical: 4),
                       child: Row(
