@@ -106,73 +106,59 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator(color: _kPrimary))
-            : Column(
-                children: [
-                  // Product info header
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    color: Colors.white,
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.shopping_bag_outlined,
-                          color: _kPrimary,
-                          size: 18,
+            : _reviews.isEmpty
+            ? RefreshIndicator(
+                onRefresh: () => _loadReviews(showSpinner: false),
+                color: _kPrimary,
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: Center(
+                        child: _buildEmptyState(
+                          message: 'Aún no hay opiniones para este producto.',
+                          subtitle:
+                              'Comparte tu opinión después de realizar tu compra.',
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            widget.productName,
-                            style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.bold,
-                              color: _kNavy,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
-
-                  Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: () => _loadReviews(showSpinner: false),
-                      color: _kPrimary,
-                      child: ListView(
-                        physics: UiHelpers.refreshScrollPhysics,
-                        padding: const EdgeInsets.all(16),
-                        children: [
-                          if (_reviews.isNotEmpty) ...[
-                            // Ratings summary card
-                            _buildRatingsSummaryCard(counts, totalReviews),
-                            const SizedBox(height: 16),
-                            // Filter bar
-                            _buildFilterBar(),
-                            const SizedBox(height: 16),
-                          ],
-
-                          _filteredReviews.isEmpty
-                              ? _buildEmptyState()
-                              : ListView.separated(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: _filteredReviews.length,
-                                  separatorBuilder: (_, _) =>
-                                      const SizedBox(height: 16),
-                                  itemBuilder: (context, index) {
-                                    final rev = _filteredReviews[index];
-                                    return _buildReviewCard(rev);
-                                  },
-                                ),
-                        ],
                       ),
                     ),
                   ),
-                ],
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: () => _loadReviews(showSpinner: false),
+                color: _kPrimary,
+                child: ListView(
+                  physics: UiHelpers.refreshScrollPhysics,
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    // Ratings summary card
+                    _buildRatingsSummaryCard(counts, totalReviews),
+                    const SizedBox(height: 16),
+                    // Filter bar
+                    _buildFilterBar(),
+                    const SizedBox(height: 16),
+
+                    _filteredReviews.isEmpty
+                        ? _buildEmptyState(
+                            message: 'No hay opiniones para este filtro.',
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _filteredReviews.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 16),
+                            itemBuilder: (context, index) {
+                              final rev = _filteredReviews[index];
+                              return _buildReviewCard(rev);
+                            },
+                          ),
+                  ],
+                ),
               ),
       ),
     );
@@ -484,7 +470,10 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({
+    String message = 'No hay opiniones para este filtro.',
+    String? subtitle,
+  }) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -493,19 +482,30 @@ class _AllProductReviewsScreenState extends State<AllProductReviewsScreen> {
           children: [
             Icon(
               Icons.rate_review_outlined,
-              size: 48,
-              color: Colors.grey.shade400,
+              size: 52,
+              color: Colors.grey.shade300,
             ),
             const SizedBox(height: 12),
-            const Text(
-              'No hay opiniones para este filtro.',
+            Text(
+              message,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
+              style: const TextStyle(
+                fontSize: 14.5,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey,
+                color: Color(0xFF64748B),
               ),
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+            ],
           ],
         ),
       ),
