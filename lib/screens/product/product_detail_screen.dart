@@ -1011,7 +1011,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFDCFCE7),
+                            color: const Color(0xFFFEE2E2),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -1019,7 +1019,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF16A34A),
+                              color: Color(0xFFDC2626),
                             ),
                           ),
                         ),
