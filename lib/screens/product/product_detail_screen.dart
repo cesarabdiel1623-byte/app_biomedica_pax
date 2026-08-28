@@ -990,51 +990,48 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (p.hasDiscount) ...[
-                    Text(
-                      'Antes: ${p.formattedOldPrice}',
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        decoration: TextDecoration.lineThrough,
-                        color: Color(0xFF94A3B8),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                  ],
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        p.formattedPrice,
-                        style: const TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF0F172A),
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      if (p.hasDiscount) ...[
-                        const SizedBox(width: 10),
+                    Row(
+                      children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 4,
+                            horizontal: 7,
+                            vertical: 2.5,
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFEE2E2),
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            '-${p.discountPercent}% OFF',
+                            '-${p.discountPercent}%',
                             style: const TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 12,
                               fontWeight: FontWeight.w800,
                               color: Color(0xFFDC2626),
                             ),
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        Text(
+                          p.formattedOldPrice,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            decoration: TextDecoration.lineThrough,
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ],
-                    ],
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                  Text(
+                    p.formattedPrice,
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.5,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   const Row(
