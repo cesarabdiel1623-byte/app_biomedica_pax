@@ -456,13 +456,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       backgroundColor: Colors.white,
       builder: (context) {
-        return FractionallySizedBox(
-          heightFactor: 0.72,
-          child: SafeArea(
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Tirador superior de arrastre
-                const SizedBox(height: 10),
+                // Tirador superior de arrastre centrado
                 Center(
                   child: Container(
                     width: 36,
@@ -473,182 +474,165 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                   ),
                 ),
-                // Encabezado
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 12, 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Medios de pago',
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Cerrar',
-                        icon: const Icon(
-                          Icons.close_rounded,
-                          color: Color(0xFF64748B),
-                          size: 24,
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
+                const SizedBox(height: 16),
+
+                // Título limpio sin X
+                const Text(
+                  'Medios de pago',
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
                   ),
                 ),
-                const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ── Mercado Pago Info ──
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            _mercadoPagoBadge(size: 42, padding: 5),
-                            const SizedBox(width: 14),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Paga con Mercado Pago',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Elige tu método preferido al finalizar tu compra.',
-                                    style: TextStyle(
-                                      fontSize: 12.5,
-                                      color: Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
-                              ),
+
+                const SizedBox(height: 12),
+                const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Color(0xFFF1F5F9),
+                ),
+                const SizedBox(height: 16),
+
+                // ── Mercado Pago Info ──
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _mercadoPagoBadge(size: 42, padding: 5),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Paga con Mercado Pago',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0F172A),
                             ),
-                          ],
-                        ),
-
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 18),
-                          child: Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Color(0xFFF1F5F9),
                           ),
-                        ),
-
-                        // ── Tarjetas de Crédito y Débito ──
-                        const Text(
-                          'Tarjetas de crédito y débito',
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Acreditación instantánea con tarjetas participantes.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF64748B),
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            _paymentAsset(
-                              'assets/images/payments/visa_v3.svg',
-                              width: 56,
-                              height: 30,
+                          SizedBox(height: 2),
+                          Text(
+                            'Elige tu método preferido al finalizar tu compra.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF64748B),
                             ),
-                            const SizedBox(width: 16),
-                            _paymentAsset(
-                              'assets/images/payments/mastercard_v3.svg',
-                              width: 48,
-                              height: 30,
-                            ),
-                          ],
-                        ),
-
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 18),
-                          child: Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Color(0xFFF1F5F9),
                           ),
-                        ),
-
-                        // ── Pago en Efectivo ──
-                        const Text(
-                          'Efectivo en puntos de pago',
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Paga en tiendas OXXO con código de barras generado al instante.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF64748B),
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        _paymentAsset(
-                          'assets/images/payments/oxxo_v3.svg',
-                          width: 68,
-                          height: 34,
-                        ),
-
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 20),
-                          child: Divider(
-                            height: 1,
-                            thickness: 1,
-                            color: Color(0xFFF1F5F9),
-                          ),
-                        ),
-
-                        // ── Pie de Seguridad ──
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons.lock_outline_rounded,
-                              size: 16,
-                              color: Color(0xFF16A34A),
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Tus transacciones están encriptadas y protegidas por Mercado Pago.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF64748B),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                  ],
+                ),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFF1F5F9),
                   ),
+                ),
+
+                // ── Tarjetas de Crédito y Débito ──
+                const Text(
+                  'Tarjetas de crédito y débito',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Acreditación instantánea con tarjetas participantes.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF64748B),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    _paymentAsset(
+                      'assets/images/payments/visa_v3.svg',
+                      width: 56,
+                      height: 30,
+                    ),
+                    const SizedBox(width: 16),
+                    _paymentAsset(
+                      'assets/images/payments/mastercard_v3.svg',
+                      width: 48,
+                      height: 30,
+                    ),
+                  ],
+                ),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFF1F5F9),
+                  ),
+                ),
+
+                // ── Pago en Efectivo ──
+                const Text(
+                  'Efectivo en puntos de pago',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Paga en tiendas OXXO con código de barras generado al instante.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF64748B),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _paymentAsset(
+                  'assets/images/payments/oxxo_v3.svg',
+                  width: 68,
+                  height: 34,
+                ),
+
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 18),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: Color(0xFFF1F5F9),
+                  ),
+                ),
+
+                // ── Pie de Seguridad ──
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 16,
+                      color: Color(0xFF16A34A),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Tus transacciones están encriptadas y protegidas por Mercado Pago.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
