@@ -36,10 +36,10 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
       UiHelpers.showWarningToast(context, 'La pregunta no puede estar vacía.');
       return;
     }
-    if (text.length > 500) {
+    if (text.length > 100) {
       UiHelpers.showWarningToast(
         context,
-        'La pregunta no puede exceder los 500 caracteres.',
+        'La pregunta no puede exceder los 100 caracteres.',
       );
       return;
     }
@@ -121,8 +121,8 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
 
               TextField(
                 controller: _questionController,
-                maxLines: 6,
-                maxLength: 500,
+                maxLines: 4,
+                maxLength: 100,
                 autofocus: true,
                 textCapitalization: TextCapitalization.sentences,
                 style: const TextStyle(
