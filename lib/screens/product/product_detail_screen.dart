@@ -1238,7 +1238,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   // 1. Agregar al carrito / Ver carrito (Verde Teal Circular)
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 54,
                     child: _addedToCartSuccess
                         ? ElevatedButton.icon(
                             onPressed: () {
@@ -1249,13 +1249,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             },
                             icon: const Icon(
                               Icons.shopping_cart_outlined,
-                              size: 20,
+                              size: 22,
                               color: Colors.white,
                             ),
                             label: const Text(
                               'Ver carrito',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 16.5,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
@@ -1264,7 +1264,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               backgroundColor: _kPrimary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
+                                borderRadius: BorderRadius.circular(30),
                               ),
                             ),
                           )
@@ -1279,16 +1279,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ? const SizedBox.shrink()
                                 : const Icon(
                                     Icons.add_shopping_cart_rounded,
-                                    size: 20,
+                                    size: 22,
                                     color: Colors.white,
                                   ),
                             label: _loadingAddToCart
                                 ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
+                                    width: 22,
+                                    height: 22,
                                     child: CircularProgressIndicator(
                                       color: Colors.white,
-                                      strokeWidth: 2,
+                                      strokeWidth: 2.2,
                                     ),
                                   )
                                 : Text(
@@ -1296,7 +1296,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                         ? 'Agregar al carrito'
                                         : 'Agotado',
                                     style: const TextStyle(
-                                      fontSize: 16,
+                                      fontSize: 16.5,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
                                     ),
@@ -1305,7 +1305,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               backgroundColor: _kPrimary,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
+                                borderRadius: BorderRadius.circular(30),
                               ),
                             ),
                           ),
@@ -1315,7 +1315,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   // 2. Cotizar / Solicitar Cotización (Azul Sólido Circular)
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 54,
                     child: _addedToQuoteSuccess
                         ? ElevatedButton.icon(
                             onPressed: () {
@@ -1327,13 +1327,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             },
                             icon: const Icon(
                               Icons.description_outlined,
-                              size: 20,
+                              size: 22,
                               color: Colors.white,
                             ),
                             label: const Text(
                               'Ver cotización',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 16.5,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
@@ -1342,7 +1342,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               backgroundColor: const Color(0xFF3483FA),
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
+                                borderRadius: BorderRadius.circular(30),
                               ),
                             ),
                           )
@@ -1355,22 +1355,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ? const SizedBox.shrink()
                                 : const Icon(
                                     Icons.request_quote_outlined,
-                                    size: 20,
+                                    size: 22,
                                     color: Colors.white,
                                   ),
                             label: _loadingAddToQuote
                                 ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
+                                    width: 22,
+                                    height: 22,
                                     child: CircularProgressIndicator(
                                       color: Colors.white,
-                                      strokeWidth: 2,
+                                      strokeWidth: 2.2,
                                     ),
                                   )
                                 : const Text(
                                     'Solicitar Cotización',
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: 16.5,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
                                     ),
@@ -1379,7 +1379,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               backgroundColor: const Color(0xFF3483FA),
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
+                                borderRadius: BorderRadius.circular(30),
                               ),
                             ),
                           ),
