@@ -1,9 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-double _doubleFromJson(
-  Object? value, {
-  required double fallback,
-}) {
+double _doubleFromJson(Object? value, {required double fallback}) {
   if (value == null) return fallback;
   if (value is num) return value.toDouble();
   if (value is String) {
@@ -62,10 +59,7 @@ class ServiceQuoteLineItem {
       quantity: _doubleFromJson(json['quantity'], fallback: 1.0),
       unitPrice: _doubleFromJson(json['unit_price'], fallback: 0.0),
       discount: _doubleFromJson(json['discount'], fallback: 0.0),
-      totalLinePrice: _doubleFromJson(
-        json['total_line_price'],
-        fallback: 0.0,
-      ),
+      totalLinePrice: _doubleFromJson(json['total_line_price'], fallback: 0.0),
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
     );
   }

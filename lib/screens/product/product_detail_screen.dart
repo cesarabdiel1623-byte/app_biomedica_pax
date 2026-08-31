@@ -24,13 +24,13 @@ import 'all_questions_screen.dart';
 import 'all_reviews_screen.dart';
 import 'quote_cart_screen.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
 const _kAmber = Color(0xFFF59E0B);
 const _kGreen = Color(0xFF16A34A);
 const _kRed = Color(0xFFEF4444);
-const _kBlue = Color(0xFF0D9488);
-const _kLightBlue = Color(0xFFE0F2F1);
+const _kBlue = Color(0xFF024C8B);
+const _kLightBlue = Color(0xFFEBF3FA);
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -711,7 +711,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   widget.searchQuery ?? 'Buscar equipo médico',
                   style: TextStyle(
                     color: widget.searchQuery != null
-                        ? const Color(0xFF1E3A5F)
+                        ? const Color(0xFF1F2937)
                         : Colors.grey.shade500,
                     fontSize: 14,
                     fontWeight: widget.searchQuery != null
@@ -1019,7 +1019,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Icon(
                         Icons.check_circle_outline_rounded,
                         size: 14,
-                        color: Color(0xFF0D9488),
+                        color: Color(0xFF024C8B),
                       ),
                       SizedBox(width: 5),
                       Text(
@@ -2231,9 +2231,9 @@ class _ProductDetailsSheetContentState extends State<ProductDetailsSheetContent>
           // Pestañas
           TabBar(
             controller: _tabController,
-            labelColor: const Color(0xFF0D9488), // _kPrimary
+            labelColor: _kPrimary,
             unselectedLabelColor: Colors.grey,
-            indicatorColor: const Color(0xFF0D9488), // _kPrimary
+            indicatorColor: _kPrimary,
             indicatorWeight: 2.5,
             dividerColor: Colors.transparent,
             labelStyle: const TextStyle(

@@ -18,7 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  static const _primaryColor = Color(0xFF0D9488);
+  static const _primaryColor = Color(0xFF024C8B);
 
   Future<void> _signUp() async {
     final email = _emailController.text.trim();
@@ -88,7 +88,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       String message = e.message;
       if (e.code == 'user_already_exists' ||
           message.toLowerCase().contains('user already exists')) {
-        message = 'Este correo ya está registrado. Inicia sesión o recupera tu contraseña.';
+        message =
+            'Este correo ya está registrado. Inicia sesión o recupera tu contraseña.';
       } else if (message.contains('El número de teléfono ya está registrado')) {
         message =
             'Este número ya está registrado en una cuenta de la app. Inicia sesión o recupera tu cuenta.';

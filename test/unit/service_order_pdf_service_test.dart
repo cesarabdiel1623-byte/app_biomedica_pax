@@ -155,10 +155,7 @@ void main() {
             capturedBody = body;
             return ServiceOrderPdfRawResponse(
               status: 200,
-              data: {
-                ...validPayload,
-                'document_type': 'final',
-              },
+              data: {...validPayload, 'document_type': 'final'},
             );
           },
         );
@@ -176,15 +173,18 @@ void main() {
       },
     );
 
-    test('TicketDetailScreen integra ServiceCompletionCard de forma reactiva', () {
-      final source = File(
-        'lib/screens/tickets/ticket_detail_screen.dart',
-      ).readAsStringSync();
+    test(
+      'TicketDetailScreen integra ServiceCompletionCard de forma reactiva',
+      () {
+        final source = File(
+          'lib/screens/tickets/ticket_detail_screen.dart',
+        ).readAsStringSync();
 
-      expect(source, contains('ServiceCompletionCard'));
-      expect(source, contains('_openFinalServiceOrderPdf'));
-      expect(source, contains('_loadServiceCompletion'));
-      expect(source, contains('documentType: \'final\''));
-    });
+        expect(source, contains('ServiceCompletionCard'));
+        expect(source, contains('_openFinalServiceOrderPdf'));
+        expect(source, contains('_loadServiceCompletion'));
+        expect(source, contains('documentType: \'final\''));
+      },
+    );
   });
 }

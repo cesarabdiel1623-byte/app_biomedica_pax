@@ -16,8 +16,8 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
   bool _obscure1 = true;
   bool _obscure2 = true;
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = Color(0xFF024C8B);
+  static const _greyBg = Color(0xFFF7F9FC);
 
   // Validation rules
   bool get _hasMinLength => _passwordController.text.length >= 8;
@@ -265,7 +265,7 @@ class _Step4PasswordScreenState extends State<Step4PasswordScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
+            color: const Color(0xFFF7F9FC),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(

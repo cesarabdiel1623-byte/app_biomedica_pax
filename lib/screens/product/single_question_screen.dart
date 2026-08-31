@@ -14,9 +14,9 @@ class SingleQuestionScreen extends StatefulWidget {
 }
 
 class _SingleQuestionScreenState extends State<SingleQuestionScreen> {
-  static const _kPrimary = Color(0xFF0D9488);
-  static const _kNavy = Color(0xFF1E3A5F);
-  static const _kGreyBg = Color(0xFFF8FAFC);
+  static const _kPrimary = Color(0xFF024C8B);
+  static const _kNavy = Color(0xFF024C8B);
+  static const _kGreyBg = Color(0xFFF7F9FC);
   static const _kTextDark = Color(0xFF1A1A1A);
   static const _kTextGrey = Color(0xFF757575);
 

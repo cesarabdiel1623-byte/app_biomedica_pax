@@ -15,10 +15,10 @@ class ReviewsScreen extends StatefulWidget {
 }
 
 class _ReviewsScreenState extends State<ReviewsScreen> {
-  static const _primary = Color(0xFF0D9488);
-  static const _navy = Color(0xFF172B4D);
-  static const _background = Color(0xFFF5F7FA);
-  static const _border = Color(0xFFE5E7EB);
+  static const _primary = Color(0xFF024C8B);
+  static const _navy = Color(0xFF024C8B);
+  static const _background = Color(0xFFF7F9FC);
+  static const _border = Color(0xFFE4E7EC);
   static const _star = Color(0xFFF6B800);
 
   List<Map<String, dynamic>> _pendingReviews = [];

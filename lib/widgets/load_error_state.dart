@@ -29,7 +29,7 @@ class LoadErrorState extends StatelessWidget {
         ? Icons.wifi_off_rounded
         : Icons.error_outline_rounded;
     final accent = isOffline
-        ? const Color(0xFF0D9488)
+        ? const Color(0xFF024C8B)
         : const Color(0xFFEF4444);
 
     return Center(
@@ -46,7 +46,7 @@ class LoadErrorState extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E3A5F),
+                color: Color(0xFF1F2937),
               ),
             ),
             const SizedBox(height: 4),
@@ -59,7 +59,7 @@ class LoadErrorState extends StatelessWidget {
             TextButton(
               onPressed: onRetry,
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF0D9488),
+                foregroundColor: const Color(0xFF024C8B),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
                   vertical: 10,

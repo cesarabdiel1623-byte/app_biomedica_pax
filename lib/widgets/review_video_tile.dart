@@ -120,7 +120,7 @@ class _ReviewVideoDialogState extends State<_ReviewVideoDialog> {
             const SizedBox(
               height: 240,
               child: Center(
-                child: CircularProgressIndicator(color: Color(0xFF0D9488)),
+                child: CircularProgressIndicator(color: Color(0xFF024C8B)),
               ),
             )
           else
@@ -148,7 +148,7 @@ class _ReviewVideoDialogState extends State<_ReviewVideoDialog> {
                         _controller,
                         allowScrubbing: true,
                         colors: const VideoProgressColors(
-                          playedColor: Color(0xFF0D9488),
+                          playedColor: Color(0xFF21AF97),
                           bufferedColor: Colors.white38,
                           backgroundColor: Colors.white24,
                         ),

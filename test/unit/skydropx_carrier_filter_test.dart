@@ -13,8 +13,10 @@ final _allowedCarrierPatterns = [
 ];
 
 String _removeDiacritics(String str) {
-  const withDia = 'ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐIÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽž';
-  const withoutDia = 'AAAAAAaaaaaaOOOOOOOoooooooEEEEeeeedCcDIIIIiiiiUUUUuuuuNnSsYyyZz';
+  const withDia =
+      'ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐIÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽž';
+  const withoutDia =
+      'AAAAAAaaaaaaOOOOOOOoooooooEEEEeeeedCcDIIIIiiiiUUUUuuuuNnSsYyyZz';
   var result = str;
   for (int i = 0; i < withDia.length; i++) {
     result = result.replaceAll(withDia[i], withoutDia[i]);
@@ -24,9 +26,7 @@ String _removeDiacritics(String str) {
 
 bool isAllowedCarrier(String? carrierName) {
   if (carrierName == null || carrierName.trim().isEmpty) return false;
-  final clean = _removeDiacritics(carrierName)
-      .trim()
-      .toLowerCase();
+  final clean = _removeDiacritics(carrierName).trim().toLowerCase();
 
   return _allowedCarrierPatterns.any((regex) => regex.hasMatch(clean));
 }

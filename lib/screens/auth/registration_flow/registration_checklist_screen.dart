@@ -39,8 +39,8 @@ class _RegistrationChecklistScreenState
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = Color(0xFF024C8B);
+  static const _greyBg = Color(0xFFF7F9FC);
 
   @override
   void initState() {
@@ -64,7 +64,9 @@ class _RegistrationChecklistScreenState
       return;
     }
 
-    final progress = await RegistrationGateService.loadOnboardingProgress(user: user);
+    final progress = await RegistrationGateService.loadOnboardingProgress(
+      user: user,
+    );
     if (!mounted) return;
 
     setState(() {
@@ -131,7 +133,7 @@ class _RegistrationChecklistScreenState
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: isCompleted
-            ? const Color(0xFFF0FDF9)
+            ? const Color(0xFFEBF3FA)
             : isActive
             ? Colors.white
             : const Color(0xFFFAFAFA),
@@ -255,9 +257,7 @@ class _RegistrationChecklistScreenState
         final authRes = await Supabase.instance.client.auth.signUp(
           email: _userEmail.trim(),
           password: _userPassword,
-          data: {
-            'full_name': _userName.trim(),
-          },
+          data: {'full_name': _userName.trim()},
         );
 
         if (!mounted) return;
@@ -313,7 +313,9 @@ class _RegistrationChecklistScreenState
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Error al finalizar registro. Por favor intenta de nuevo.'),
+              content: Text(
+                'Error al finalizar registro. Por favor intenta de nuevo.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -469,7 +471,8 @@ class _RegistrationChecklistScreenState
                                 icon: Icons.email_outlined,
                                 title: 'Ingresar e-mail',
                                 completedTitle: 'E-mail ingresado',
-                                subtitle: 'Lo usarás como tu usuario de acceso.',
+                                subtitle:
+                                    'Lo usarás como tu usuario de acceso.',
                                 completedSubtitle: 'Guardado',
                                 isCompleted: _emailValidated,
                                 buttonText: 'Ingresar',
@@ -527,7 +530,8 @@ class _RegistrationChecklistScreenState
                                 icon: Icons.phone_android_outlined,
                                 title: 'Teléfono de contacto',
                                 completedTitle: 'Teléfono ingresado',
-                                subtitle: 'Para coordinar envíos y notificaciones.',
+                                subtitle:
+                                    'Para coordinar envíos y notificaciones.',
                                 completedSubtitle:
                                     _userPhone.startsWith('Omitido')
                                     ? 'Omitido por ahora'
@@ -582,7 +586,8 @@ class _RegistrationChecklistScreenState
                                   icon: Icons.lock_outline,
                                   title: 'Crear contraseña',
                                   completedTitle: 'Contraseña creada',
-                                  subtitle: 'Servirá para ingresar a tu cuenta.',
+                                  subtitle:
+                                      'Servirá para ingresar a tu cuenta.',
                                   completedSubtitle: 'Guardada',
                                   isCompleted: _passwordCreated,
                                   buttonText: 'Crear',
@@ -600,7 +605,8 @@ class _RegistrationChecklistScreenState
                                         result['success'] == true) {
                                       setState(() {
                                         _passwordCreated = true;
-                                        _userPassword = result['password'] ?? '';
+                                        _userPassword =
+                                            result['password'] ?? '';
                                         _draft.password = _userPassword;
                                       });
                                       if (mounted) {
@@ -622,7 +628,7 @@ class _RegistrationChecklistScreenState
                                     vertical: 10,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
+                                    color: const Color(0xFFF7F9FC),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: Colors.grey.withValues(
@@ -648,7 +654,8 @@ class _RegistrationChecklistScreenState
                                           onChanged: (value) {
                                             setState(() {
                                               _termsAccepted = value ?? false;
-                                              _draft.termsAccepted = _termsAccepted;
+                                              _draft.termsAccepted =
+                                                  _termsAccepted;
                                             });
                                           },
                                         ),
@@ -658,7 +665,8 @@ class _RegistrationChecklistScreenState
                                         child: GestureDetector(
                                           onTap: () => setState(() {
                                             _termsAccepted = !_termsAccepted;
-                                            _draft.termsAccepted = _termsAccepted;
+                                            _draft.termsAccepted =
+                                                _termsAccepted;
                                           }),
                                           child: RichText(
                                             text: TextSpan(
@@ -729,7 +737,9 @@ class _RegistrationChecklistScreenState
                                             ),
                                           )
                                         : Text(
-                                            _isGoogle ? 'Continuar' : 'Crear cuenta',
+                                            _isGoogle
+                                                ? 'Continuar'
+                                                : 'Crear cuenta',
                                             style: const TextStyle(
                                               fontSize: 15,
                                               fontWeight: FontWeight.bold,

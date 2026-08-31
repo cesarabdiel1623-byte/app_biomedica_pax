@@ -83,7 +83,7 @@ export const SERVICE_ORDER_COORDS = {
     state: { x: 368.0, y: 509.5, maxWidth: 185.0, preferredFontSize: 8.0, minFontSize: 6.5 },
     phone: { x: 80.0, y: 499.5, maxWidth: 88.0, preferredFontSize: 7.5, minFontSize: 6.0 },
     email: { x: 232.0, y: 499.5, maxWidth: 120.0, preferredFontSize: 7.0, minFontSize: 5.5 },
-    institution: { x: 447.0, y: 499.5, maxWidth: 108.0, preferredFontSize: 7.5, minFontSize: 6.0 },
+    institution: { x: 450.0, y: 499.5, maxWidth: 105.0, preferredFontSize: 7.5, minFontSize: 6.0 },
   },
   failureDescription: {
     lines: [
@@ -197,7 +197,7 @@ export function drawCheckboxMark(
 }
 
 /**
- * Word-wraps text across multiple distinct line definitions.
+ * Word-wraps text across multiple distinct line definitions, respecting explicit newlines (\n).
  */
 export function drawMultilineBlock(
   page: PDFPage,
@@ -207,47 +207,99 @@ export function drawMultilineBlock(
   color: ReturnType<typeof rgb>
 ): void {
   if (!text || text.trim() === '' || lines.length === 0) return;
-  const words = text.replace(/\s+/g, ' ').trim().split(' ');
-  if (words.length === 0 || words[0] === '') return;
 
-  let currentWordIndex = 0;
+  // Normalizar saltos de línea (CRLF -> LF)
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  const rawParagraphs = normalized.split('\n');
 
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    if (currentWordIndex >= words.length) break;
-
-    const lineDef = lines[lineIdx];
-    const fontSize = lineDef.preferredFontSize ?? 8.0;
-    const maxWidth = lineDef.maxWidth;
-
-    let lineText = words[currentWordIndex];
-    currentWordIndex++;
-
-    while (currentWordIndex < words.length) {
-      const nextWord = words[currentWordIndex];
-      const candidate = `${lineText} ${nextWord}`;
-      if (font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
-        lineText = candidate;
-        currentWordIndex++;
-      } else {
-        break;
-      }
+  const paragraphs: string[] = [];
+  for (const p of rawParagraphs) {
+    const trimmed = p.trim();
+    if (trimmed.length > 0) {
+      paragraphs.push(trimmed);
     }
+  }
 
-    // If this is the last available line and more words remain, truncate with ellipsis
-    if (lineIdx === lines.length - 1 && currentWordIndex < words.length) {
-      while (lineText.length > 2 && font.widthOfTextAtSize(`${lineText}...`, fontSize) > maxWidth) {
-        lineText = lineText.slice(0, -1).trim();
+  if (paragraphs.length === 0) return;
+
+  let lineIdx = 0;
+
+  for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
+    if (lineIdx >= lines.length) break;
+
+    const paragraph = paragraphs[pIdx];
+    const words = paragraph.split(/\s+/).filter(w => w.length > 0);
+    if (words.length === 0) continue;
+
+    let currentWordIndex = 0;
+
+    while (currentWordIndex < words.length && lineIdx < lines.length) {
+      const lineDef = lines[lineIdx];
+      const fontSize = lineDef.preferredFontSize ?? 8.0;
+      const maxWidth = lineDef.maxWidth;
+
+      let lineText = words[currentWordIndex];
+      currentWordIndex++;
+
+      // Si una sola palabra excede el maxWidth disponible, dividirla o truncarla de forma determinista
+      if (font.widthOfTextAtSize(lineText, fontSize) > maxWidth) {
+        let chunk = '';
+        let remainder = '';
+        for (let cIdx = 0; cIdx < lineText.length; cIdx++) {
+          const testChunk = chunk + lineText[cIdx];
+          if (font.widthOfTextAtSize(testChunk, fontSize) <= maxWidth) {
+            chunk = testChunk;
+          } else {
+            remainder = lineText.slice(cIdx);
+            break;
+          }
+        }
+        if (chunk.length > 0) {
+          lineText = chunk;
+          if (remainder.length > 0) {
+            words.splice(currentWordIndex, 0, remainder);
+          }
+        } else {
+          while (lineText.length > 1 && font.widthOfTextAtSize(`${lineText}...`, fontSize) > maxWidth) {
+            lineText = lineText.slice(0, -1);
+          }
+          lineText = `${lineText}...`;
+        }
       }
-      lineText = `${lineText}...`;
-    }
 
-    page.drawText(lineText, {
-      x: lineDef.x,
-      y: lineDef.y,
-      size: fontSize,
-      font,
-      color,
-    });
+      while (currentWordIndex < words.length) {
+        const nextWord = words[currentWordIndex];
+        const candidate = `${lineText} ${nextWord}`;
+        if (font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
+          lineText = candidate;
+          currentWordIndex++;
+        } else {
+          break;
+        }
+      }
+
+      const isLastAvailableLine = (lineIdx === lines.length - 1);
+      const hasMoreInParagraph = (currentWordIndex < words.length);
+      const hasMoreParagraphs = (pIdx < paragraphs.length - 1);
+
+      // Truncado determinista y seguro con ellipsis si excede físicamente el área asignada
+      if (isLastAvailableLine && (hasMoreInParagraph || hasMoreParagraphs)) {
+        while (lineText.length > 2 && font.widthOfTextAtSize(`${lineText}...`, fontSize) > maxWidth) {
+          lineText = lineText.slice(0, -1).trim();
+        }
+        lineText = `${lineText}...`;
+      }
+
+      page.drawText(lineText, {
+        x: lineDef.x,
+        y: lineDef.y,
+        size: fontSize,
+        font,
+        color,
+      });
+
+      lineIdx++;
+    }
   }
 }
 

@@ -6,8 +6,8 @@ import '../../../services/product_service.dart';
 import '../../../services/promotion_banner_service.dart';
 import 'promotion_navigation.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
 
 class PromotionCardsSection extends StatefulWidget {
   const PromotionCardsSection({

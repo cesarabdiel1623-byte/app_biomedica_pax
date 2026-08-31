@@ -26,11 +26,14 @@ class ServicePartUsedItem {
       id: json['id']?.toString() ?? '',
       serviceOrderId: json['service_order_id']?.toString() ?? '',
       productId: json['product_id']?.toString() ?? '',
-      productName: productMap?['name']?.toString() ?? json['product_name']?.toString(),
+      productName:
+          productMap?['name']?.toString() ?? json['product_name']?.toString(),
       warehouseId: json['warehouse_id']?.toString(),
       quantity: double.tryParse(json['quantity']?.toString() ?? '1') ?? 1.0,
       unitCost: double.tryParse(json['unit_cost']?.toString() ?? '0') ?? 0.0,
-      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())
+          : null,
     );
   }
 }
@@ -49,6 +52,7 @@ class ServiceCompletion {
   final DateTime? startedAt;
   final DateTime? completedAt;
   final String? reportPdfPath;
+  final String? partsUsedNotes;
   final List<ServicePartUsedItem> partsUsed;
 
   const ServiceCompletion({
@@ -64,6 +68,7 @@ class ServiceCompletion {
     this.startedAt,
     this.completedAt,
     this.reportPdfPath,
+    this.partsUsedNotes,
     this.partsUsed = const [],
   });
 
@@ -72,8 +77,11 @@ class ServiceCompletion {
 
   factory ServiceCompletion.fromJson(Map<String, dynamic> json) {
     final profile = json['assigned_technician'] as Map<String, dynamic>?;
-    final parts = (json['service_parts_used'] as List<dynamic>?)
-            ?.map((e) => ServicePartUsedItem.fromJson(e as Map<String, dynamic>))
+    final parts =
+        (json['service_parts_used'] as List<dynamic>?)
+            ?.map(
+              (e) => ServicePartUsedItem.fromJson(e as Map<String, dynamic>),
+            )
             .toList() ??
         const [];
 
@@ -86,10 +94,17 @@ class ServiceCompletion {
       solution: json['solution']?.toString(),
       recommendations: json['recommendations']?.toString(),
       status: json['status']?.toString() ?? 'assigned',
-      scheduledAt: json['scheduled_at'] != null ? DateTime.tryParse(json['scheduled_at'].toString()) : null,
-      startedAt: json['started_at'] != null ? DateTime.tryParse(json['started_at'].toString()) : null,
-      completedAt: json['completed_at'] != null ? DateTime.tryParse(json['completed_at'].toString()) : null,
+      scheduledAt: json['scheduled_at'] != null
+          ? DateTime.tryParse(json['scheduled_at'].toString())
+          : null,
+      startedAt: json['started_at'] != null
+          ? DateTime.tryParse(json['started_at'].toString())
+          : null,
+      completedAt: json['completed_at'] != null
+          ? DateTime.tryParse(json['completed_at'].toString())
+          : null,
       reportPdfPath: json['report_pdf_path']?.toString(),
+      partsUsedNotes: json['parts_used_notes']?.toString(),
       partsUsed: parts,
     );
   }

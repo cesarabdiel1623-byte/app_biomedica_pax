@@ -8,8 +8,8 @@ import '../../../services/product_service.dart';
 import '../../../services/promotion_banner_service.dart';
 import 'promotion_navigation.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
 const _kBannerAspectRatio = 8 / 3; // 1600 x 600 px (2.6667:1)
 const _kBannerInterval = Duration(seconds: 3);
 const _kInitialBannerPage = 100000;

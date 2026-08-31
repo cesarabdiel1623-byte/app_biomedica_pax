@@ -32,8 +32,8 @@ class _LoginScreenState extends State<LoginScreen>
   late final Animation<Offset> _slideUpAnim;
   late final Animation<Offset> _slideDownAnim;
 
-  static const _primaryColor = Color(0xFF0D9488); // Teal de Go Medical
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = Color(0xFF024C8B); // Azul Corporativo de Go Medical
+  static const _greyBg = Color(0xFFF7F9FC);
 
   @override
   void initState() {
@@ -690,11 +690,11 @@ class LoginBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint1 = Paint()
-      ..color = const Color(0xFF0D9488).withValues(alpha: 0.05)
+      ..color = const Color(0xFF024C8B).withValues(alpha: 0.05)
       ..style = PaintingStyle.fill;
 
     final paint2 = Paint()
-      ..color = const Color(0xFF0D9488).withValues(alpha: 0.03)
+      ..color = const Color(0xFF21AF97).withValues(alpha: 0.04)
       ..style = PaintingStyle.fill;
 
     // Top Right Wave

@@ -10,8 +10,8 @@ class Step1EmailScreen extends StatefulWidget {
 class _Step1EmailScreenState extends State<Step1EmailScreen> {
   final _emailController = TextEditingController();
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = Color(0xFF024C8B);
+  static const _greyBg = Color(0xFFF7F9FC);
 
   void _continueWithEmail() {
     final email = _emailController.text.trim();

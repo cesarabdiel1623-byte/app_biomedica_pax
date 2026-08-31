@@ -53,29 +53,33 @@ void main() {
       expect(closedNoDate.isCompleted, isFalse);
     });
 
-    test('H: multiple historical orders selection logic prioritizes latest completed', () {
-      final historical1 = ServiceCompletion(
-        id: 'order-old',
-        serviceTicketId: 'ticket-1',
-        status: 'resolved',
-        completedAt: DateTime.parse('2026-08-10T10:00:00Z'),
-      );
-      final historical2 = ServiceCompletion(
-        id: 'order-new',
-        serviceTicketId: 'ticket-1',
-        status: 'closed',
-        completedAt: DateTime.parse('2026-08-19T15:00:00Z'),
-      );
-      final list = [historical1, historical2];
-      list.sort((a, b) => b.completedAt!.compareTo(a.completedAt!));
+    test(
+      'H: multiple historical orders selection logic prioritizes latest completed',
+      () {
+        final historical1 = ServiceCompletion(
+          id: 'order-old',
+          serviceTicketId: 'ticket-1',
+          status: 'resolved',
+          completedAt: DateTime.parse('2026-08-10T10:00:00Z'),
+        );
+        final historical2 = ServiceCompletion(
+          id: 'order-new',
+          serviceTicketId: 'ticket-1',
+          status: 'closed',
+          completedAt: DateTime.parse('2026-08-19T15:00:00Z'),
+        );
+        final list = [historical1, historical2];
+        list.sort((a, b) => b.completedAt!.compareTo(a.completedAt!));
 
-      expect(list.first.id, 'order-new');
-    });
+        expect(list.first.id, 'order-new');
+      },
+    );
   });
 
   group('ServiceCompletionCard Widget Tests', () {
-    testWidgets('E: renders technical details and parts without unit cost',
-        (WidgetTester tester) async {
+    testWidgets('E: renders technical details and parts without unit cost', (
+      WidgetTester tester,
+    ) async {
       final completion = ServiceCompletion(
         id: 'order-123',
         serviceTicketId: 'ticket-456',
@@ -114,19 +118,32 @@ void main() {
       expect(find.text('Diagnóstico Técnico Final:'), findsOneWidget);
       expect(find.text('Sensor de oxígeno descalibrado'), findsOneWidget);
       expect(find.text('Trabajo Realizado y Solución:'), findsOneWidget);
-      expect(find.text('Reemplazo de sensor y calibración con gas patrón'), findsOneWidget);
+      expect(
+        find.text('Reemplazo de sensor y calibración con gas patrón'),
+        findsOneWidget,
+      );
       expect(find.text('Recomendaciones del Especialista:'), findsOneWidget);
-      expect(find.text('Uso en ambiente libre de humedad excesiva'), findsOneWidget);
-      expect(find.text('Técnico Responsable: Ing. Carlos Mendoza'), findsOneWidget);
-      expect(find.text('Sensor de Oxígeno Médico O2'), findsOneWidget);
-      expect(find.text('Cant: 1.0'), findsOneWidget);
+      expect(
+        find.text('Uso en ambiente libre de humedad excesiva'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Técnico Responsable: Ing. Carlos Mendoza'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Sensor de Oxígeno Médico O2 — 1 pieza'),
+        findsOneWidget,
+      );
 
       // Verify unit cost (1500) is NOT rendered anywhere
       expect(find.textContaining('1500'), findsNothing);
       expect(find.textContaining('\$1,500'), findsNothing);
 
       // Verify Download Button
-      final downloadButton = find.text('Descargar Orden de Servicio Oficial (PDF)');
+      final downloadButton = find.text(
+        'Descargar Orden de Servicio Oficial (PDF)',
+      );
       expect(downloadButton, findsOneWidget);
 
       await tester.tap(downloadButton);
@@ -135,8 +152,9 @@ void main() {
       expect(downloadClicked, isTrue);
     });
 
-    testWidgets('Shows loading indicator when isDownloadingPdf is true',
-        (WidgetTester tester) async {
+    testWidgets('Shows loading indicator when isDownloadingPdf is true', (
+      WidgetTester tester,
+    ) async {
       final completion = ServiceCompletion(
         id: 'order-123',
         serviceTicketId: 'ticket-456',
@@ -160,6 +178,99 @@ void main() {
 
       expect(find.text('Generando documento...'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets(
+      'Renders free-text partsUsedNotes with bullet points and without unit cost',
+      (WidgetTester tester) async {
+        final completion = ServiceCompletion(
+          id: 'order-free-parts',
+          serviceTicketId: 'ticket-789',
+          diagnosis: 'Fusible dañado y cable cortado',
+          solution: 'Reemplazo de componentes de alimentación',
+          partsUsedNotes:
+              '• Fusible 5A (Cant: 2)\n• Cable de alimentación grado médico',
+          status: 'resolved',
+          completedAt: DateTime.parse('2026-08-28T12:00:00Z'),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ServiceCompletionCard(serviceCompletion: completion),
+            ),
+          ),
+        );
+
+        expect(
+          find.text('Refacciones / Materiales Utilizados:'),
+          findsOneWidget,
+        );
+        expect(find.text('Fusible 5A (Cant: 2)'), findsOneWidget);
+        expect(find.text('Cable de alimentación grado médico'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Combines BOTH partsUsedNotes AND partsUsed without losing either source',
+      (WidgetTester tester) async {
+        final completion = ServiceCompletion(
+          id: 'order-combined-parts',
+          serviceTicketId: 'ticket-888',
+          diagnosis: 'Mantenimiento integral correctivo',
+          solution: 'Reemplazo de partes electrónicas y consumibles',
+          partsUsedNotes: 'Fusible 5A\nCable de alimentación',
+          status: 'resolved',
+          completedAt: DateTime.parse('2026-08-28T14:00:00Z'),
+          partsUsed: const [
+            ServicePartUsedItem(
+              id: 'part-structured-1',
+              serviceOrderId: 'order-combined-parts',
+              productId: 'prod-transductor',
+              productName: 'Transductor X',
+              quantity: 1,
+              unitCost: 3500.0,
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ServiceCompletionCard(serviceCompletion: completion),
+            ),
+          ),
+        );
+
+        expect(find.text('Fusible 5A'), findsOneWidget);
+        expect(find.text('Cable de alimentación'), findsOneWidget);
+        expect(find.text('Transductor X — 1 pieza'), findsOneWidget);
+        expect(find.textContaining('3500'), findsNothing);
+      },
+    );
+
+    testWidgets('Renders "Ninguna" when no parts were used', (
+      WidgetTester tester,
+    ) async {
+      final completion = ServiceCompletion(
+        id: 'order-no-parts',
+        serviceTicketId: 'ticket-999',
+        diagnosis: 'Ajuste de calibración',
+        solution: 'Calibración por software completada',
+        status: 'resolved',
+        completedAt: DateTime.parse('2026-08-28T12:00:00Z'),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ServiceCompletionCard(serviceCompletion: completion),
+          ),
+        ),
+      );
+
+      expect(find.text('Refacciones / Materiales Utilizados:'), findsOneWidget);
+      expect(find.text('Ninguna'), findsOneWidget);
     });
   });
 }

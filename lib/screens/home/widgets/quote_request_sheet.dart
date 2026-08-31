@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../services/cart_service.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
-const _kBg = Color(0xFFF8FAFC);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
+const _kBg = Color(0xFFF7F9FC);
 
 class QuoteRequestSheet extends StatefulWidget {
   final double total;

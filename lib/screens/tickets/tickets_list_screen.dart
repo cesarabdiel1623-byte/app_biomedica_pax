@@ -11,7 +11,7 @@ import '../home/home_screen.dart';
 import '../../widgets/load_error_state.dart';
 import '../../widgets/standard_section_header.dart';
 
-const _kPrimary = Color(0xFF0D9488);
+const _kPrimary = Color(0xFF024C8B);
 
 class TicketsListScreen extends StatefulWidget {
   const TicketsListScreen({super.key});
@@ -30,8 +30,9 @@ class _TicketsListScreenState extends State<TicketsListScreen>
   final _statusFilters = const [
     ('all', 'Todos'),
     ('open', 'Abiertos'),
-    ('in_progress', 'En Progreso'),
-    ('resolved', 'Resueltos'),
+    ('assigned', 'Asignados'),
+    ('in_progress', 'En progreso'),
+    ('resolved', 'Servicio realizado'),
     ('closed', 'Cerrados'),
   ];
 
@@ -101,36 +102,40 @@ class _TicketsListScreenState extends State<TicketsListScreen>
         _load(showSpinner: false);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al abrir solicitud: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al abrir solicitud: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   List<ServiceTicket> get _filtered {
     if (_filterStatus == 'all') return _tickets;
-    return _tickets.where((t) => t.status == _filterStatus).toList();
+    return _tickets
+        .where((t) => t.status.toLowerCase() == _filterStatus)
+        .toList();
   }
 
   Color _statusColor(String status) {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'open':
         return const Color(0xFF3B82F6);
+      case 'assigned':
+        return const Color(0xFF0284C7);
       case 'in_progress':
         return const Color(0xFFF59E0B);
       case 'resolved':
         return const Color(0xFF16A34A);
       case 'closed':
-        return Colors.grey;
+        return const Color(0xFF64748B);
       case 'cancelled':
+      case 'canceled':
         return const Color(0xFFEF4444);
       default:
-        return Colors.grey;
+        return const Color(0xFF64748B);
     }
   }
 
@@ -152,7 +157,7 @@ class _TicketsListScreenState extends State<TicketsListScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF7F9FC),
       floatingActionButton: FloatingActionButton(
         onPressed: _openCreateService,
         backgroundColor: _kPrimary,
@@ -379,7 +384,7 @@ class _TicketCard extends StatelessWidget {
                       ticket.ticketNumber,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E3A5F),
+                        color: Color(0xFF024C8B),
                         fontSize: 13.5,
                       ),
                     ),

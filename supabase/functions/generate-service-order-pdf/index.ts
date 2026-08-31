@@ -191,7 +191,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
     if (documentType === "final") {
       const { data: serviceOrder, error: orderError } = await supabaseAdmin
         .from("service_orders")
-        .select("id, diagnosis, solution, recommendations, completed_at, status")
+        .select("id, diagnosis, solution, recommendations, parts_used_notes, completed_at, status")
         .eq("service_ticket_id", ticketId)
         .order("completed_at", { ascending: false })
         .limit(1)
@@ -209,7 +209,51 @@ Deno.serve(async (request: Request): Promise<Response> => {
       const diag = serviceOrder.diagnosis?.trim() ?? "";
       const sol = serviceOrder.solution?.trim() ?? "";
       workPerformedFormatted = `DIAGNÓSTICO:\n${diag}\n\nTRABAJO REALIZADO:\n${sol}`.trim();
-      observationsFormatted = serviceOrder.recommendations?.trim() || null;
+
+      // Cargar posibles refacciones estructuradas para complementar el reporte oficial
+      const { data: structuredParts } = await supabaseAdmin
+        .from("service_parts_used")
+        .select("quantity, products(name)")
+        .eq("service_order_id", serviceOrder.id);
+
+      const partsList: string[] = [];
+      const seenParts = new Set<string>();
+
+      if (serviceOrder.parts_used_notes?.trim()) {
+        for (const line of serviceOrder.parts_used_notes.trim().split("\n")) {
+          const clean = line.replace(/^[•\-\*]\s*/, "").trim();
+          if (clean && !seenParts.has(clean.toLowerCase())) {
+            seenParts.add(clean.toLowerCase());
+            partsList.push(`• ${clean}`);
+          }
+        }
+      }
+
+      if (Array.isArray(structuredParts)) {
+        for (const sp of structuredParts) {
+          const prod = Array.isArray(sp.products) ? sp.products[0] : sp.products;
+          const name = prod?.name || "Refacción biomédica";
+          const qty = sp.quantity ?? 1;
+          const itemText = `• ${name} — ${qty} ${qty === 1 ? "pieza" : "piezas"}`;
+          if (!seenParts.has(name.toLowerCase())) {
+            seenParts.add(name.toLowerCase());
+            partsList.push(itemText);
+          }
+        }
+      }
+
+      const rec = serviceOrder.recommendations?.trim() || "";
+      const partsFormatted = partsList.length > 0 ? partsList.join("\n") : "";
+
+      if (rec && partsFormatted) {
+        observationsFormatted = `${rec}\n\nREFACCIONES UTILIZADAS:\n${partsFormatted}`;
+      } else if (rec) {
+        observationsFormatted = rec;
+      } else if (partsFormatted) {
+        observationsFormatted = `REFACCIONES UTILIZADAS:\n${partsFormatted}`;
+      } else {
+        observationsFormatted = null;
+      }
     }
 
     // 8. Extract & Normalize PDF Data

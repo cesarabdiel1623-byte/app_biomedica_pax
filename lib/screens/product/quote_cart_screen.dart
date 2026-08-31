@@ -5,11 +5,11 @@ import '../../services/quote_service.dart';
 import 'product_detail_screen.dart';
 import '../../utils/ui_helpers.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
 const _kGreen = Color(0xFF16A34A);
 const _kRed = Color(0xFFEF4444);
-const _kBg = Color(0xFFF8FAFC);
+const _kBg = Color(0xFFF7F9FC);
 
 class QuoteCartScreen extends StatefulWidget {
   const QuoteCartScreen({super.key});
@@ -477,7 +477,7 @@ class _QuoteCartScreenState extends State<QuoteCartScreen> {
           child: ElevatedButton(
             onPressed: _showFormBottomSheet,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3483FA),
+              backgroundColor: _kPrimary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),

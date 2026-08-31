@@ -17,8 +17,8 @@ class _Step1OtpScreenState extends State<Step1OtpScreen> {
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = Color(0xFF024C8B);
+  static const _greyBg = Color(0xFFF7F9FC);
 
   @override
   void dispose() {
@@ -233,13 +233,17 @@ class _Step1OtpScreenState extends State<Step1OtpScreen> {
                                         filled: true,
                                         fillColor: const Color(0xFFFAFAFA),
                                         border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                           borderSide: BorderSide(
                                             color: Colors.grey.shade300,
                                           ),
                                         ),
                                         focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                           borderSide: const BorderSide(
                                             color: _primaryColor,
                                             width: 2,

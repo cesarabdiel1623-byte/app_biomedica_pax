@@ -1,11 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-enum RegistrationGateState {
-  unauthenticated,
-  incomplete,
-  complete,
-}
+enum RegistrationGateState { unauthenticated, incomplete, complete }
 
 class OnboardingProgress {
   final bool emailVerified;
@@ -87,7 +83,9 @@ class RegistrationGateService {
       }
       return RegistrationGateState.incomplete;
     } catch (e) {
-      debugPrint('RegistrationGateService.evaluateGateState error (failing closed): $e');
+      debugPrint(
+        'RegistrationGateService.evaluateGateState error (failing closed): $e',
+      );
       return RegistrationGateState.incomplete;
     }
   }
@@ -110,7 +108,8 @@ class RegistrationGateService {
         final profileCompleted = rpcRes['profile_completed'] == true;
         final hasValidName = rpcRes['has_valid_name'] == true;
         final hasValidPhone = rpcRes['has_valid_phone'] == true;
-        final phoneSkipped = rpcRes['phone_skipped'] == true ||
+        final phoneSkipped =
+            rpcRes['phone_skipped'] == true ||
             metadata['phone_skipped'] == true;
         final termsAccepted = rpcRes['terms_accepted'] == true;
 
@@ -122,7 +121,8 @@ class RegistrationGateService {
           emailVerified: userEmail.isNotEmpty,
           nameCompleted: hasValidName,
           phoneCompleted: hasValidPhone || phoneSkipped,
-          passwordCreated: isGoogle || metadata['password_set'] == true || profileCompleted,
+          passwordCreated:
+              isGoogle || metadata['password_set'] == true || profileCompleted,
           termsAccepted: termsAccepted,
           profileCompleted: profileCompleted,
           isGoogleUser: isGoogle,
@@ -179,8 +179,11 @@ class RegistrationGateService {
       debugPrint('RegistrationGateService: error consultando DB: $e');
     }
 
-    final hasValidName = dbFullName.isNotEmpty && dbFullName != 'Sin especificar';
-    final hasValidPhone = dbPhone.isNotEmpty || (currentUser.phone != null && currentUser.phone!.isNotEmpty);
+    final hasValidName =
+        dbFullName.isNotEmpty && dbFullName != 'Sin especificar';
+    final hasValidPhone =
+        dbPhone.isNotEmpty ||
+        (currentUser.phone != null && currentUser.phone!.isNotEmpty);
     final isPhoneDone = hasValidPhone || phoneSkipped;
 
     return OnboardingProgress(
@@ -205,18 +208,19 @@ class RegistrationGateService {
 
     // 1. Intentar RPC save_onboarding_contact
     try {
-      await _client.rpc('save_onboarding_contact', params: {
-        'p_full_name': cleanName,
-      });
+      await _client.rpc(
+        'save_onboarding_contact',
+        params: {'p_full_name': cleanName},
+      );
       return true;
     } catch (_) {}
 
     // 2. Fallback a update_my_profile_contact o updateUser
     try {
-      await _client.rpc('update_my_profile_contact', params: {
-        'p_full_name': cleanName,
-        'p_phone': null,
-      });
+      await _client.rpc(
+        'update_my_profile_contact',
+        params: {'p_full_name': cleanName, 'p_phone': null},
+      );
     } catch (_) {}
 
     try {
@@ -231,12 +235,15 @@ class RegistrationGateService {
   }
 
   /// Guarda el teléfono del usuario o marca el estado de omitido
-  static Future<bool> saveContactPhone(String? phone, {bool skipped = false}) async {
+  static Future<bool> saveContactPhone(
+    String? phone, {
+    bool skipped = false,
+  }) async {
     try {
-      await _client.rpc('save_onboarding_contact', params: {
-        'p_phone': phone,
-        'p_phone_skipped': skipped,
-      });
+      await _client.rpc(
+        'save_onboarding_contact',
+        params: {'p_phone': phone, 'p_phone_skipped': skipped},
+      );
       return true;
     } catch (_) {}
 
@@ -278,13 +285,17 @@ class RegistrationGateService {
       if (res is Map && res['success'] == true) {
         // Sincronizar metadata local
         await _client.auth.updateUser(
-          UserAttributes(data: {'terms_accepted': true, 'full_name': cleanName}),
+          UserAttributes(
+            data: {'terms_accepted': true, 'full_name': cleanName},
+          ),
         );
         await _client.auth.refreshSession();
         return true;
       }
     } catch (e) {
-      debugPrint('RegistrationGateService: error en RPC complete_user_onboarding: $e');
+      debugPrint(
+        'RegistrationGateService: error en RPC complete_user_onboarding: $e',
+      );
       return false;
     }
 

@@ -20,9 +20,9 @@ import '../../widgets/service_completion_card.dart';
 import '../profile/orders_screen.dart';
 import 'admin_create_quote_sheet.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
-const _kBg = Color(0xFFF8FAFC);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
+const _kBg = Color(0xFFF7F9FC);
 const _kRed = Color(0xFFEF4444);
 
 class TicketDetailScreen extends StatefulWidget {
@@ -558,19 +558,22 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
   }
 
   Color _statusColor(String status) {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'open':
         return const Color(0xFF3B82F6);
+      case 'assigned':
+        return const Color(0xFF0284C7);
       case 'in_progress':
         return const Color(0xFFF59E0B);
       case 'resolved':
         return const Color(0xFF16A34A);
       case 'closed':
-        return Colors.grey;
+        return const Color(0xFF64748B);
       case 'cancelled':
+      case 'canceled':
         return const Color(0xFFEF4444);
       default:
-        return Colors.grey;
+        return const Color(0xFF64748B);
     }
   }
 
@@ -612,10 +615,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
 
   bool get _canChat {
     final status = _ticket?.status.toLowerCase();
-    return status != 'resolved' &&
-        status != 'closed' &&
-        status != 'cancelled' &&
-        status != 'canceled';
+    return status != 'closed' && status != 'cancelled' && status != 'canceled';
   }
 
   Widget _buildChatCard(ServiceTicket ticket) {
@@ -832,7 +832,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'Ticket resuelto/cerrado. Chat archivado.',
+                    'Servicio cerrado. Chat archivado.',
                     style: TextStyle(
                       color: Colors.grey.shade600,
                       fontSize: 12,
@@ -1581,7 +1581,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF1E3A5F), Color(0xFF0D9488)],
+              colors: [Color(0xFF024C8B), Color(0xFF013663)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -1788,6 +1788,145 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               ),
             ],
           ),
+          if (ticket.status.toLowerCase() == 'in_progress') ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.engineering_outlined,
+                    color: Color(0xFFD97706),
+                    size: 20,
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Servicio técnico en proceso',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xFF92400E),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'El equipo técnico se encuentra atendiendo la solicitud. Mantente atento a las actualizaciones y al chat.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFFB45309),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (ticket.status.toLowerCase() == 'resolved') ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: Color(0xFF16A34A),
+                    size: 20,
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Servicio realizado',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xFF166534),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'El técnico terminó la atención y registró la información final del servicio. El caso está pendiente de cierre administrativo.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF15803D),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (ticket.status.toLowerCase() == 'closed') ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.task_alt_outlined,
+                    color: Color(0xFF64748B),
+                    size: 20,
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Servicio cerrado',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'El servicio ha sido cerrado.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF64748B),
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2808,13 +2947,13 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF0FDFA),
+                color: const Color(0xFFF0FDF4),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF99F6E4)),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.verified, color: Color(0xFF0D9488), size: 20),
+                  Icon(Icons.verified, color: Color(0xFF16A34A), size: 20),
                   SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -2823,7 +2962,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         Text(
                           'Cotización pagada / convertida en compra',
                           style: TextStyle(
-                            color: Color(0xFF115E59),
+                            color: Color(0xFF15803D),
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                           ),
@@ -2832,7 +2971,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                         Text(
                           'El pago fue acreditado y la orden está registrada.',
                           style: TextStyle(
-                            color: Color(0xFF0F766E),
+                            color: Color(0xFF166534),
                             fontSize: 11.5,
                           ),
                         ),
@@ -2849,8 +2988,8 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => _viewConvertedOrder(quote),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF0D9488),
-                    side: const BorderSide(color: Color(0xFF0D9488)),
+                    foregroundColor: _kPrimary,
+                    side: const BorderSide(color: _kPrimary),
                     padding: const EdgeInsets.symmetric(vertical: 11),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -2878,7 +3017,7 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
       title: 'ORDEN DE SERVICIO',
       icon: Icons.assignment_outlined,
       children: [
-        _buildServiceOrderPdfAction(),
+        _buildServiceOrderPdfAction(ticket),
         const SizedBox(height: 16),
         _buildOrderSection('DATOS DEL EQUIPO', [
           _orderField('Equipo', order.equipmentName, Icons.settings_outlined),
@@ -2950,14 +3089,24 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
     );
   }
 
-  Widget _buildServiceOrderPdfAction() {
+  Widget _buildServiceOrderPdfAction(ServiceTicket ticket) {
+    final isFinal =
+        ticket.status.toLowerCase() == 'resolved' ||
+        ticket.status.toLowerCase() == 'closed';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _kPrimary.withValues(alpha: 0.06),
+        color: isFinal
+            ? const Color(0xFF16A34A).withValues(alpha: 0.06)
+            : _kPrimary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kPrimary.withValues(alpha: 0.14)),
+        border: Border.all(
+          color: isFinal
+              ? const Color(0xFF16A34A).withValues(alpha: 0.18)
+              : _kPrimary.withValues(alpha: 0.14),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2971,30 +3120,39 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _kPrimary.withValues(alpha: 0.18)),
+                  border: Border.all(
+                    color: isFinal
+                        ? const Color(0xFF16A34A).withValues(alpha: 0.22)
+                        : _kPrimary.withValues(alpha: 0.18),
+                  ),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.picture_as_pdf_outlined,
-                  color: _kPrimary,
+                  color: isFinal ? const Color(0xFF16A34A) : _kPrimary,
                   size: 20,
                 ),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Documento generado con la información registrada para este servicio.',
-                      style: TextStyle(
+                      isFinal
+                          ? 'Documento final generado con la información y reporte técnico registrado.'
+                          : 'Documento generado con la información registrada para este servicio.',
+                      style: const TextStyle(
                         fontSize: 12.5,
                         height: 1.35,
                         color: _kNavy,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    SizedBox(height: 8),
-                    _PreliminaryChip(),
+                    const SizedBox(height: 8),
+                    if (isFinal)
+                      const _FinalChip()
+                    else
+                      const _PreliminaryChip(),
                   ],
                 ),
               ),
@@ -3003,38 +3161,71 @@ class _TicketDetailScreenState extends State<TicketDetailScreen> {
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _generatingServiceOrderPdf
-                  ? null
-                  : _openServiceOrderPdf,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _kPrimary,
-                side: const BorderSide(color: _kPrimary),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: _generatingServiceOrderPdf
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: _kPrimary,
+            child: isFinal
+                ? OutlinedButton.icon(
+                    onPressed: _generatingFinalServiceOrderPdf
+                        ? null
+                        : _openFinalServiceOrderPdf,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF16A34A),
+                      side: const BorderSide(color: Color(0xFF16A34A)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    )
-                  : const Icon(Icons.open_in_new_rounded, size: 18),
-              label: Text(
-                _generatingServiceOrderPdf
-                    ? 'Generando orden...'
-                    : 'Ver orden de servicio',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-            ),
+                    ),
+                    icon: _generatingFinalServiceOrderPdf
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF16A34A),
+                            ),
+                          )
+                        : const Icon(Icons.open_in_new_rounded, size: 18),
+                    label: Text(
+                      _generatingFinalServiceOrderPdf
+                          ? 'Generando orden final...'
+                          : 'Ver orden de servicio final',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  )
+                : OutlinedButton.icon(
+                    onPressed: _generatingServiceOrderPdf
+                        ? null
+                        : _openServiceOrderPdf,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _kPrimary,
+                      side: const BorderSide(color: _kPrimary),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: _generatingServiceOrderPdf
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _kPrimary,
+                            ),
+                          )
+                        : const Icon(Icons.open_in_new_rounded, size: 18),
+                    label: Text(
+                      _generatingServiceOrderPdf
+                          ? 'Generando orden...'
+                          : 'Ver orden de servicio',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -3294,6 +3485,30 @@ class _PreliminaryChip extends StatelessWidget {
         'Preliminar',
         style: TextStyle(
           color: Color(0xFF0369A1),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _FinalChip extends StatelessWidget {
+  const _FinalChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFDCFCE7),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF86EFAC)),
+      ),
+      child: const Text(
+        'Final',
+        style: TextStyle(
+          color: Color(0xFF166534),
           fontSize: 11,
           fontWeight: FontWeight.w800,
         ),

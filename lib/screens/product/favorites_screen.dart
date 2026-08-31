@@ -13,12 +13,13 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  static const _kPrimary = Color(0xFF0D9488);
-  static const _kNavy = Color(0xFF1E3A5F);
-  static const _kGreyBg = Color(0xFFF8FAFC);
+  static const _kPrimary = Color(0xFF024C8B);
+  static const _kNavy = Color(0xFF024C8B);
+  static const _kGreyBg = Color(0xFFF7F9FC);
 
   List<Product> _favorites = [];
   bool _loading = true;
+  bool _loadFailed = false;
   String? _addingCartProductId;
 
   @override
@@ -29,41 +30,29 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Future<void> _loadFavorites({bool showSpinner = true}) async {
     if (showSpinner) {
-      setState(() => _loading = true);
+      setState(() {
+        _loading = true;
+        _loadFailed = false;
+      });
     }
     try {
-      final results = await Future.wait([
-        FavoriteService.getFavorites().timeout(const Duration(seconds: 30)),
-        Future.delayed(const Duration(seconds: 2)),
-      ]);
+      final favorites = await FavoriteService.getFavorites().timeout(
+        const Duration(seconds: 15),
+      );
       if (mounted) {
         setState(() {
-          _favorites = results[0] as List<Product>;
+          _favorites = favorites;
+          _loading = false;
+          _loadFailed = false;
         });
       }
     } catch (e) {
-      debugPrint('Error al obtener favoritos: $e');
-    } finally {
+      debugPrint('Error en FavoritesScreen._loadFavorites: $e');
       if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
-  }
-
-  Future<void> _removeFavorite(Product product) async {
-    try {
-      final removed = await FavoriteService.toggleFavorite(product.id);
-      if (!removed) {
         setState(() {
-          _favorites.removeWhere((p) => p.id == product.id);
+          _loading = false;
+          _loadFailed = true;
         });
-        if (mounted) {
-          UiHelpers.showRemoveFavoriteToast(context, product.name);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        UiHelpers.showErrorToast(context, 'Error al modificar favoritos.');
       }
     }
   }
@@ -112,6 +101,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     return status.contains('sin stock') || status.contains('agotado');
   }
 
+  Future<void> _removeFavorite(Product product) async {
+    try {
+      await FavoriteService.toggleFavorite(product.id);
+      if (mounted) {
+        setState(() {
+          _favorites.removeWhere((p) => p.id == product.id);
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -131,7 +131,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+              colors: [Color(0xFF024C8B), Color(0xFF013663)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -140,6 +140,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: _kPrimary))
+          : _loadFailed
+          ? _buildLoadErrorState()
           : _favorites.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
@@ -155,6 +157,47 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 },
               ),
             ),
+    );
+  }
+
+  Widget _buildLoadErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.favorite_border,
+              size: 48,
+              color: Color(0xFF94A3B8),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No pudimos cargar tus favoritos',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: _kNavy,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Revisa tu conexi\u00f3n e intenta nuevamente.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _loadFavorites,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+              style: FilledButton.styleFrom(backgroundColor: _kPrimary),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -188,277 +231,304 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Product image
-                SizedBox(
-                  width: 140,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            color: const Color(0xFFF8FAFC),
-                            padding: const EdgeInsets.all(2),
-                            child: product.mainImageUrl != null
-                                ? Image.network(
-                                    product.mainImageUrl!,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, _, _) =>
-                                        _buildPlaceholderImage(),
-                                  )
-                                : _buildPlaceholderImage(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final imageWidth = constraints.maxWidth < 360 ? 108.0 : 132.0;
+
+            return Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Product image
+                  SizedBox(
+                    width: imageWidth,
+                    height: imageWidth,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Container(
+                              color: const Color(0xFFF8FAFC),
+                              padding: const EdgeInsets.all(2),
+                              child: product.mainImageUrl != null
+                                  ? Image.network(
+                                      product.mainImageUrl!,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, _, _) =>
+                                          _buildPlaceholderImage(),
+                                    )
+                                  : _buildPlaceholderImage(),
+                            ),
                           ),
                         ),
-                      ),
-                      if (hasDiscount && product.discountPercent > 0)
-                        Positioned(
-                          left: 4,
-                          top: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: Text(
-                              '${product.discountPercent}% OFF',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.bold,
+                        if (hasDiscount && product.discountPercent > 0)
+                          Positioned(
+                            left: 4,
+                            top: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 2,
                               ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Product details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Name
-                      Text(
-                        product.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          color: Color(0xFF1F2937),
-                          height: 1.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Old price
-                      if (hasDiscount && oldPrice != null) ...[
-                        Text(
-                          product.formattedOldPrice,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF9CA3AF),
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                      ],
-                      // Current price and discount stay on separate lines on narrow cards.
-                      Text(
-                        product.formattedPrice,
-                        style: const TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF111827),
-                          letterSpacing: -0.2,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (hasDiscount) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          '${product.discountPercent}% OFF',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF16A34A),
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      const SizedBox(height: 6),
-                      // Shipping Info
-                      if (product.hasFreeShipping)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.local_shipping_outlined,
-                                size: 10,
-                                color: Color(0xFF16A34A),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444),
+                                borderRadius: BorderRadius.circular(3),
                               ),
-                              const SizedBox(width: 3),
-                              const Expanded(
-                                child: Text(
-                                  'Envío gratis',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Color(0xFF16A34A),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                              child: Text(
+                                '${product.discountPercent}% OFF',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Product details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Name
+                        Text(
+                          product.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF1F2937),
+                            height: 1.3,
                           ),
                         ),
-                      // Stock info
-                      Row(
-                        children: [
-                          Icon(
-                            isUnavailable
-                                ? Icons.highlight_off_rounded
-                                : Icons.check_circle_outline_rounded,
-                            size: 10,
-                            color: product.stockStatusColor,
-                          ),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              isUnavailable
-                                  ? 'Agotado'
-                                  : product.stockStatusLabel,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: product.stockStatusColor,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                        const SizedBox(height: 4),
+                        // Old price
+                        if (hasDiscount && oldPrice != null) ...[
+                          Text(
+                            product.formattedOldPrice,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF9CA3AF),
+                              decoration: TextDecoration.lineThrough,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                        ],
+                        // Current price and discount stay on separate lines on narrow cards.
+                        Text(
+                          product.formattedPrice,
+                          style: const TextStyle(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF111827),
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (hasDiscount) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '${product.discountPercent}% OFF',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF16A34A),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: _addingCartProductId != null
-                                  ? null
-                                  : () => _addToCart(product),
-                              child: Container(
-                                alignment: Alignment.center,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
+                        const SizedBox(height: 6),
+                        // Shipping Info
+                        if (product.hasFreeShipping)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.local_shipping_outlined,
+                                  size: 10,
+                                  color: Color(0xFF16A34A),
                                 ),
-                                decoration: BoxDecoration(
-                                  color: _kPrimary,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _kPrimary.withValues(alpha: 0.15),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
+                                const SizedBox(width: 3),
+                                const Expanded(
+                                  child: Text(
+                                    'Envío gratis',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Color(0xFF16A34A),
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                  ],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    _addingCartProductId == product.id
-                                        ? const SizedBox(
-                                            width: 12,
-                                            height: 12,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.white,
-                                              strokeWidth: 1.5,
+                              ],
+                            ),
+                          ),
+                        // Stock info
+                        Row(
+                          children: [
+                            Icon(
+                              isUnavailable
+                                  ? Icons.highlight_off_rounded
+                                  : Icons.check_circle_outline_rounded,
+                              size: 10,
+                              color: product.stockStatusColor,
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                isUnavailable
+                                    ? 'Agotado'
+                                    : product.stockStatusLabel,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: product.stockStatusColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final useCompactLabel = constraints.maxWidth < 180;
+
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: _addingCartProductId != null
+                                        ? null
+                                        : () => _addToCart(product),
+                                    child: Container(
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _kPrimary,
+                                        borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: _kPrimary.withValues(
+                                              alpha: 0.15,
                                             ),
-                                          )
-                                        : Icon(
-                                            isUnavailable
-                                                ? Icons.visibility_outlined
-                                                : Icons.add_shopping_cart,
-                                            color: Colors.white,
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          _addingCartProductId == product.id
+                                              ? const SizedBox(
+                                                  width: 12,
+                                                  height: 12,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        color: Colors.white,
+                                                        strokeWidth: 1.5,
+                                                      ),
+                                                )
+                                              : Icon(
+                                                  isUnavailable
+                                                      ? Icons
+                                                            .visibility_outlined
+                                                      : Icons.add_shopping_cart,
+                                                  color: Colors.white,
+                                                  size: 12,
+                                                ),
+                                          const SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              isUnavailable
+                                                  ? (useCompactLabel
+                                                        ? 'Ver'
+                                                        : 'Ver producto')
+                                                  : 'Agregar',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 11.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => _removeFavorite(product),
+                                    child: Container(
+                                      alignment: Alignment.center,
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF2F2),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: const Color(0xFFFEE2E2),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.delete_outline,
+                                            color: Color(0xFFEF4444),
                                             size: 12,
                                           ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      isUnavailable
-                                          ? 'Ver producto'
-                                          : 'Agregar',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11.5,
+                                          SizedBox(width: 4),
+                                          Flexible(
+                                            child: Text(
+                                              'Eliminar',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: Color(0xFFEF4444),
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 11.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => _removeFavorite(product),
-                              child: Container(
-                                alignment: Alignment.center,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF2F2),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: const Color(0xFFFEE2E2),
                                   ),
                                 ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.delete_outline,
-                                      color: Color(0xFFEF4444),
-                                      size: 12,
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Eliminar',
-                                      style: TextStyle(
-                                        color: Color(0xFFEF4444),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
@@ -489,20 +559,40 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               color: Colors.grey.shade400,
               size: 64,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             const Text(
               'Aún no tienes favoritos',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 17,
                 fontWeight: FontWeight.bold,
                 color: _kNavy,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               'Agrega equipos médicos a tus favoritos pulsando el icono de corazón en su ficha de detalle.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.storefront_outlined, size: 18),
+              label: const Text('Explorar catálogo'),
+              style: FilledButton.styleFrom(
+                backgroundColor: _kPrimary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ],
         ),

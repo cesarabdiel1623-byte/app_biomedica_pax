@@ -306,4 +306,55 @@ class ProductService {
       return [];
     }
   }
+
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  /// Validates whether a given string is a valid canonical UUID
+  static bool isValidUuid(String id) {
+    return _uuidRegex.hasMatch(id.trim());
+  }
+
+  /// Get a list of active products matching a list of IDs, preserving input order
+  static Future<List<Product>> getProductsByIds(
+    List<String> ids, {
+    SupabaseClient? client,
+  }) async {
+    if (ids.isEmpty) return const [];
+
+    final cleanIds = <String>[];
+    final seen = <String>{};
+
+    for (final rawId in ids) {
+      final trimmed = rawId.trim();
+      if (trimmed.isNotEmpty && isValidUuid(trimmed)) {
+        final canonicalId = trimmed.toLowerCase();
+        if (seen.add(canonicalId)) {
+          cleanIds.add(canonicalId);
+        }
+      }
+    }
+
+    if (cleanIds.isEmpty) return const [];
+
+    final effectiveClient = client ?? _client;
+    final response = await effectiveClient
+        .from('products')
+        .select(publicProductSelect)
+        .eq('is_active', true)
+        .inFilter('id', cleanIds);
+
+    final products = (response as List)
+        .map((json) => Product.fromJson(json as Map<String, dynamic>))
+        .toList();
+
+    final orderMap = {for (int i = 0; i < cleanIds.length; i++) cleanIds[i]: i};
+    products.sort(
+      (a, b) => (orderMap[a.id.toLowerCase()] ?? 99999).compareTo(
+        orderMap[b.id.toLowerCase()] ?? 99999,
+      ),
+    );
+    return products;
+  }
 }

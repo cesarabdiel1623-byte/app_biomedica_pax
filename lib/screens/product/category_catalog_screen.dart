@@ -7,8 +7,8 @@ import '../../utils/ui_helpers.dart';
 import '../../widgets/load_error_state.dart';
 import '../home/widgets/product_card.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
 
 class CategoryCatalogScreen extends StatefulWidget {
   const CategoryCatalogScreen({super.key, required this.category});

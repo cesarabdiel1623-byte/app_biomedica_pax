@@ -15,6 +15,7 @@ import '../../services/auth_identity_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/product_service.dart';
 import '../../services/question_service.dart';
+import '../../utils/notification_presentation.dart';
 import '../../utils/ui_helpers.dart';
 import '../../widgets/load_error_state.dart';
 
@@ -359,23 +360,27 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
 
   ({IconData icon, Color color, Color bg}) _notifStyle(
     String title,
-    String body,
-  ) {
+    String body, {
+    bool isServiceNotification = false,
+  }) {
     final t = title.toLowerCase();
     final b = body.toLowerCase();
-    if (t.contains('ticket') || b.contains('tck-') || t.contains('soporte')) {
+    if (isServiceNotification ||
+        t.contains('ticket') ||
+        b.contains('tck-') ||
+        t.contains('soporte')) {
       return (
         icon: Icons.build_circle_rounded,
-        color: const Color(0xFF0D9488),
-        bg: const Color(0xFFE6F7F6),
+        color: const Color(0xFF024C8B),
+        bg: const Color(0xFFEBF3FA),
       );
     } else if (t.contains('cotiza') ||
         b.contains('cot-') ||
         b.contains('rq-')) {
       return (
         icon: Icons.request_quote_rounded,
-        color: const Color(0xFF1E3A5F),
-        bg: const Color(0xFFE8EEF7),
+        color: const Color(0xFF024C8B),
+        bg: const Color(0xFFEBF3FA),
       );
     } else if (t.contains('pedido') ||
         t.contains('orden') ||
@@ -400,8 +405,8 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
     } else if (t.contains('pregunta') || b.contains('pregunta')) {
       return (
         icon: Icons.question_answer_rounded,
-        color: const Color(0xFF0D9488),
-        bg: const Color(0xFFE0F2F1),
+        color: const Color(0xFF21AF97),
+        bg: const Color(0xFFE6F7F5),
       );
     } else {
       return (
@@ -415,8 +420,9 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
   Future<void> _handleNotificationTap(Map<String, dynamic> notification) async {
     final String id = notification['id']?.toString() ?? '';
     final bool isRead = notification['is_read'] as bool? ?? false;
-    final String body = notification['body']?.toString() ?? '';
-    final String title = notification['title']?.toString() ?? '';
+    final presentation = notificationPresentation(notification);
+    final String body = presentation.body;
+    final String title = presentation.title;
 
     if (!isRead && id.isNotEmpty) {
       if (mounted) {
@@ -455,7 +461,15 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
           'target_type',
         ])?.toLowerCase() ??
         '';
+    final resourceType =
+        _notificationValue(notification, const [
+          'resource_type',
+          'resourceType',
+        ])?.toLowerCase() ??
+        '';
     final isTicketNotification =
+        presentation.isServiceNotification ||
+        resourceType == 'service_ticket' ||
         title.toLowerCase().contains('ticket') ||
         body.toLowerCase().contains('ticket') ||
         combinedText.toLowerCase().contains('tck-') ||
@@ -479,12 +493,19 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
       }
     }
 
-    final ticketReference = _notificationValue(notification, const [
-      'ticket_id',
-      'ticketId',
-      'service_ticket_id',
-      'serviceTicketId',
-    ]);
+    final ticketReference =
+        _notificationValue(notification, const [
+          'ticket_id',
+          'ticketId',
+          'service_ticket_id',
+          'serviceTicketId',
+        ]) ??
+        (resourceType == 'service_ticket'
+            ? _notificationValue(notification, const [
+                'resource_id',
+                'resourceId',
+              ])
+            : null);
     final targetReference = isTicketNotification
         ? _notificationValue(notification, const [
             'target_id',
@@ -1037,11 +1058,16 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
 
   Widget _buildNotifCard(Map<String, dynamic> n) {
     final bool isRead = n['is_read'] as bool? ?? false;
-    final String title = n['title'] ?? 'Notificación';
-    final String body = n['body'] ?? '';
+    final presentation = notificationPresentation(n);
+    final String title = presentation.title;
+    final String body = presentation.body;
     final date = DateTime.tryParse(n['created_at'] ?? '')?.toLocal();
     final dateStr = date != null ? _formatDate(date) : '';
-    final style = _notifStyle(title, body);
+    final style = _notifStyle(
+      title,
+      body,
+      isServiceNotification: presentation.isServiceNotification,
+    );
     final String? imageUrl = UiHelpers.sanitizeTrustedRemoteUrl(
       n['image_url'] as String?,
     );
@@ -1132,7 +1158,7 @@ class _NotificationsListScreenState extends State<NotificationsListScreen> {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF0D9488),
+                        color: Color(0xFF024C8B),
                         shape: BoxShape.circle,
                       ),
                     ),

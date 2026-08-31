@@ -14,8 +14,8 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
   final _apellidoController = TextEditingController();
   bool _isLoading = false;
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = Color(0xFF024C8B);
+  static const _greyBg = Color(0xFFF7F9FC);
 
   Future<void> _saveName() async {
     final nombre = _nombreController.text.trim();
@@ -39,9 +39,7 @@ class _Step2NameScreenState extends State<Step2NameScreen> {
       }
 
       if (mounted) {
-        Navigator.of(
-          context,
-        ).pop({'success': true, 'name': fullName});
+        Navigator.of(context).pop({'success': true, 'name': fullName});
       }
     } catch (e) {
       if (mounted) {

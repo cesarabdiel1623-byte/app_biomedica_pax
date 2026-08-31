@@ -9,7 +9,7 @@ import '../home_screen.dart';
 import '../widgets/checkout_sheet.dart';
 import '../../product/product_detail_screen.dart';
 
-const _kPrimary = Color(0xFF0D9488);
+const _kPrimary = Color(0xFF024C8B);
 
 class CartTab extends StatefulWidget {
   const CartTab({super.key});
@@ -1569,7 +1569,7 @@ class _CartCouponDialogState extends State<_CartCouponDialog> {
                           ? Icons.check_circle_outline
                           : Icons.error_outline,
                       color: _success
-                          ? const Color(0xFF0F766E)
+                          ? const Color(0xFF15803D)
                           : const Color(0xFFB91C1C),
                       size: 18,
                     ),
@@ -1579,7 +1579,7 @@ class _CartCouponDialogState extends State<_CartCouponDialog> {
                         _feedback!,
                         style: TextStyle(
                           color: _success
-                              ? const Color(0xFF0F766E)
+                              ? const Color(0xFF15803D)
                               : const Color(0xFFB91C1C),
                           fontSize: 13,
                           height: 1.35,

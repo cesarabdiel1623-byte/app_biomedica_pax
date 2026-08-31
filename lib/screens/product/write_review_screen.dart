@@ -22,10 +22,10 @@ class WriteReviewScreen extends StatefulWidget {
 }
 
 class _WriteReviewScreenState extends State<WriteReviewScreen> {
-  static const _primary = Color(0xFF0D9488);
-  static const _navy = Color(0xFF172B4D);
+  static const _primary = Color(0xFF024C8B);
+  static const _navy = Color(0xFF024C8B);
   static const _background = Colors.white;
-  static const _border = Color(0xFFD9DEE7);
+  static const _border = Color(0xFFE4E7EC);
   static const _star = Color(0xFFF6B800);
   static const _maxPhotos = 5;
 
@@ -97,8 +97,6 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     }
   }
 
-
-
   Future<void> _showLimitWarning({
     required IconData icon,
     required String title,
@@ -116,7 +114,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
               width: 58,
               height: 58,
               decoration: const BoxDecoration(
-                color: Color(0xFFE6F5F3),
+                color: Color(0xFFEBF3FA),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: _primary, size: 30),
@@ -700,8 +698,6 @@ class _MediaPickerButton extends StatelessWidget {
     );
   }
 }
-
-
 
 class _ReviewPhoto extends StatelessWidget {
   final String url;

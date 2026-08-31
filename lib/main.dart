@@ -57,9 +57,7 @@ const SystemUiOverlayStyle _systemNavigationBarStyle = SystemUiOverlayStyle(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(_systemNavigationBarStyle);
   await Constants.init();
 
@@ -214,19 +212,19 @@ class _GoMedicalAppState extends State<GoMedicalApp> {
       },
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        scaffoldBackgroundColor: const Color(0xFFF7F9FC),
         colorScheme: const ColorScheme(
           brightness: Brightness.light,
-          primary: Color(0xFF0D9488),
+          primary: Color(0xFF024C8B),
           onPrimary: Colors.white,
-          secondary: Color(0xFF0F172A),
+          secondary: Color(0xFF21AF97),
           onSecondary: Colors.white,
           tertiary: Color(0xFF10B981),
           onTertiary: Colors.white,
           error: Color(0xFFF43F5E),
           onError: Colors.white,
-          surface: Color(0xFFF8FAFC),
-          onSurface: Color(0xFF0F172A),
+          surface: Color(0xFFFFFFFF),
+          onSurface: Color(0xFF1F2937),
         ),
         appBarTheme: const AppBarTheme(
           titleSpacing: 4,
@@ -234,6 +232,8 @@ class _GoMedicalAppState extends State<GoMedicalApp> {
           elevation: 0,
           scrolledUnderElevation: 0,
           surfaceTintColor: Colors.transparent,
+          backgroundColor: Color(0xFF024C8B),
+          foregroundColor: Colors.white,
         ),
         cardTheme: CardThemeData(
           color: Colors.white,

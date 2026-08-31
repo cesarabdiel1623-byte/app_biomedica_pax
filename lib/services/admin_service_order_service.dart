@@ -16,7 +16,9 @@ class AdminServiceOrderService {
       throw ArgumentError('El diagnóstico técnico final es obligatorio.');
     }
     if (solution.trim().isEmpty) {
-      throw ArgumentError('La descripción del trabajo y solución aplicada es obligatoria.');
+      throw ArgumentError(
+        'La descripción del trabajo y solución aplicada es obligatoria.',
+      );
     }
   }
 
@@ -62,7 +64,9 @@ class AdminServiceOrderService {
     try {
       final res = await _supabase.rpc('start_service_order', params: params);
       if (res is! Map) {
-        throw Exception('Respuesta inesperada al iniciar la orden de servicio.');
+        throw Exception(
+          'Respuesta inesperada al iniciar la orden de servicio.',
+        );
       }
       return Map<String, dynamic>.from(res);
     } catch (e) {
@@ -109,6 +113,7 @@ class AdminServiceOrderService {
     required String diagnosis,
     required String solution,
     String? recommendations,
+    String? partsUsedNotes,
   }) async {
     if (serviceOrderId.trim().isEmpty) {
       throw ArgumentError('serviceOrderId requerido.');
@@ -122,12 +127,16 @@ class AdminServiceOrderService {
       'p_solution': solution.trim(),
       if (recommendations != null && recommendations.trim().isNotEmpty)
         'p_recommendations': recommendations.trim(),
+      if (partsUsedNotes != null && partsUsedNotes.trim().isNotEmpty)
+        'p_parts_used_notes': partsUsedNotes.trim(),
     };
 
     try {
       final res = await _supabase.rpc('complete_service_order', params: params);
       if (res is! Map) {
-        throw Exception('Respuesta inesperada al completar la orden de servicio.');
+        throw Exception(
+          'Respuesta inesperada al completar la orden de servicio.',
+        );
       }
       return Map<String, dynamic>.from(res);
     } catch (e) {
@@ -175,6 +184,7 @@ class AdminServiceOrderService {
           diagnosis,
           solution,
           recommendations,
+          parts_used_notes,
           status,
           scheduled_at,
           started_at,

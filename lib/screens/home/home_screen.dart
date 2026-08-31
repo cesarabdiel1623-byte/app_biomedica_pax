@@ -7,7 +7,7 @@ import 'tabs/categories_tab.dart';
 import 'tabs/cart_tab.dart';
 import 'tabs/profile_tab.dart';
 
-const _kPrimary = Color(0xFF0D9488);
+const _kPrimary = Color(0xFF024C8B);
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

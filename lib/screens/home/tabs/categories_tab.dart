@@ -9,8 +9,8 @@ import '../../../widgets/standard_section_header.dart';
 import '../../product/category_products_screen.dart';
 import '../home_screen.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kBackground = Color(0xFFF8FAFC);
+const _kPrimary = Color(0xFF024C8B);
+const _kBackground = Color(0xFFF7F9FC);
 
 class CategoriesTab extends StatefulWidget {
   const CategoriesTab({super.key});

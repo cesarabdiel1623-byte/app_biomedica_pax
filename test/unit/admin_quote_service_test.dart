@@ -81,26 +81,29 @@ void main() {
       expect(() => emptyName.validate(), throwsA(isA<ArgumentError>()));
     });
 
-    test('toJson sets item fields strictly and omits authority totals or client_id', () {
-      const item = AdminQuoteItemDraft(
-        productNameSnapshot: 'Mano de Obra',
-        quantity: 3,
-        unitPrice: 800.0,
-        discount: 200.0,
-      );
+    test(
+      'toJson sets item fields strictly and omits authority totals or client_id',
+      () {
+        const item = AdminQuoteItemDraft(
+          productNameSnapshot: 'Mano de Obra',
+          quantity: 3,
+          unitPrice: 800.0,
+          discount: 200.0,
+        );
 
-      final payload = item.toJson();
+        final payload = item.toJson();
 
-      expect(payload['product_name_snapshot'], 'Mano de Obra');
-      expect(payload['quantity'], 3);
-      expect(payload['unit_price'], 800.0);
-      expect(payload['discount'], 200.0);
+        expect(payload['product_name_snapshot'], 'Mano de Obra');
+        expect(payload['quantity'], 3);
+        expect(payload['unit_price'], 800.0);
+        expect(payload['discount'], 200.0);
 
-      // No debe enviar product_id, client_id ni total_line_price como autoridad
-      expect(payload.containsKey('product_id'), isFalse);
-      expect(payload.containsKey('client_id'), isFalse);
-      expect(payload.containsKey('total_line_price'), isFalse);
-    });
+        // No debe enviar product_id, client_id ni total_line_price como autoridad
+        expect(payload.containsKey('product_id'), isFalse);
+        expect(payload.containsKey('client_id'), isFalse);
+        expect(payload.containsKey('total_line_price'), isFalse);
+      },
+    );
   });
 
   group('AdminQuotePreviewTotals Tests', () {
@@ -197,10 +200,7 @@ void main() {
         type: 'otro',
         createdAt: DateTime.now(),
       );
-      expect(
-        ticketFallback.equipmentSummary,
-        'Servicio general de quirófano',
-      );
+      expect(ticketFallback.equipmentSummary, 'Servicio general de quirófano');
     });
   });
 }

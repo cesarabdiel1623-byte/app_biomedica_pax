@@ -7,6 +7,7 @@ class CustomerCoupon {
   final String code;
   final String name;
   final String? publicDescription;
+  final String? publicTerms;
   final String discountType;
   final double discountValue;
   final double minimumSubtotal;
@@ -28,6 +29,7 @@ class CustomerCoupon {
     required this.code,
     required this.name,
     this.publicDescription,
+    this.publicTerms,
     required this.discountType,
     required this.discountValue,
     this.minimumSubtotal = 0.0,
@@ -93,11 +95,17 @@ class CustomerCoupon {
   }
 
   factory CustomerCoupon.fromRpc(Map<String, dynamic> map) {
+    final rawDesc = map['public_description']?.toString().trim();
+    final rawTerms = map['public_terms']?.toString().trim();
+
     return CustomerCoupon(
       couponId: (map['coupon_id'] ?? map['id'] ?? '').toString(),
       code: (map['code'] ?? '').toString().trim(),
       name: (map['name'] ?? '').toString().trim(),
-      publicDescription: map['public_description']?.toString().trim(),
+      publicDescription: (rawDesc != null && rawDesc.isNotEmpty)
+          ? rawDesc
+          : null,
+      publicTerms: (rawTerms != null && rawTerms.isNotEmpty) ? rawTerms : null,
       discountType: (map['discount_type'] ?? 'percentage').toString().trim(),
       discountValue: _parseDouble(map['discount_value']),
       minimumSubtotal: _parseDouble(map['minimum_subtotal']),
@@ -182,24 +190,45 @@ class CustomerCoupon {
     }
   }
 
+  static const _months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+
+  static String _formatDateShort(DateTime dt) {
+    final month = _months[dt.month - 1];
+    return '${dt.day} de $month. ${dt.year}';
+  }
+
   String? get formattedValidUntil {
     if (validUntil == null) return null;
-    const months = [
-      'ene',
-      'feb',
-      'mar',
-      'abr',
-      'may',
-      'jun',
-      'jul',
-      'ago',
-      'sep',
-      'oct',
-      'nov',
-      'dic',
-    ];
-    final month = months[validUntil!.month - 1];
-    return 'Válido hasta el ${validUntil!.day} de $month. ${validUntil!.year}';
+    return 'Válido hasta el ${_formatDateShort(validUntil!)}';
+  }
+
+  String? get formattedValidFrom {
+    if (validFrom == null) return null;
+    return 'Desde el ${_formatDateShort(validFrom!)}';
+  }
+
+  String get formattedValidRange {
+    if (validFrom != null && validUntil != null) {
+      return 'Del ${_formatDateShort(validFrom!)} al ${_formatDateShort(validUntil!)}';
+    } else if (validUntil != null) {
+      return formattedValidUntil!;
+    } else if (validFrom != null) {
+      return 'Disponible desde el ${_formatDateShort(validFrom!)}';
+    }
+    return 'Sin límite de vigencia';
   }
 
   String? get minimumSubtotalText {
@@ -208,5 +237,24 @@ class CustomerCoupon {
         ? minimumSubtotal.toInt().toString()
         : minimumSubtotal.toStringAsFixed(2);
     return 'Compra mínima: \$$formatted MXN';
+  }
+
+  String? get maximumDiscountText {
+    if (maximumDiscount == null || maximumDiscount! <= 0) return null;
+    final formatted = maximumDiscount!.truncateToDouble() == maximumDiscount!
+        ? maximumDiscount!.toInt().toString()
+        : maximumDiscount!.toStringAsFixed(2);
+    return 'Descuento máximo: \$$formatted MXN';
+  }
+
+  String? get remainingUsesText {
+    if (remainingUses != null) {
+      return '$remainingUses ${remainingUses == 1 ? 'uso restante' : 'usos restantes'}';
+    }
+    if (clientUsageLimit != null) {
+      final left = (clientUsageLimit! - clientUses).clamp(0, 999);
+      return '$left ${left == 1 ? 'uso restante' : 'usos restantes'}';
+    }
+    return null;
   }
 }

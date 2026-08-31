@@ -151,16 +151,19 @@ class ServiceTicket {
 
   /// Returns a color-keyed status label
   String get statusLabel {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'open':
         return 'Abierto';
+      case 'assigned':
+        return 'Asignado';
       case 'in_progress':
-        return 'En Progreso';
+        return 'En progreso';
       case 'resolved':
-        return 'Resuelto';
+        return 'Servicio realizado';
       case 'closed':
         return 'Cerrado';
       case 'cancelled':
+      case 'canceled':
         return 'Cancelado';
       default:
         return status;

@@ -24,8 +24,8 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
   String _currentView = 'input';
   String _fullPhone = '';
 
-  static const _primaryColor = Color(0xFF0D9488);
-  static const _greyBg = Color(0xFFF8FAFC);
+  static const _primaryColor = Color(0xFF024C8B);
+  static const _greyBg = Color(0xFFF7F9FC);
 
   Future<void> _sendSmsOtp() async {
     final phone = _phoneController.text.trim().replaceAll(' ', '');
@@ -341,7 +341,10 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
             final navigator = Navigator.of(context);
             if (Supabase.instance.client.auth.currentUser != null) {
               try {
-                await RegistrationGateService.saveContactPhone(null, skipped: true);
+                await RegistrationGateService.saveContactPhone(
+                  null,
+                  skipped: true,
+                );
                 await Supabase.instance.client.auth.updateUser(
                   UserAttributes(data: {'phone_skipped': true}),
                 );
@@ -521,7 +524,7 @@ class _Step3PhoneScreenState extends State<Step3PhoneScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF9),
+            color: const Color(0xFFEBF3FA),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: _primaryColor.withValues(alpha: 0.2)),
           ),

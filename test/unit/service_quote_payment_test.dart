@@ -5,7 +5,9 @@ import 'package:gomedical_app/services/mercado_pago_service.dart';
 void main() {
   group('ServiceQuotePaymentResult Unit Tests', () {
     test('instantiates with valid payment session', () {
-      final uri = Uri.parse('https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=123');
+      final uri = Uri.parse(
+        'https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=123',
+      );
       final result = ServiceQuotePaymentResult(
         ok: true,
         alreadyPaid: false,
@@ -136,74 +138,86 @@ void main() {
   });
 
   group('Service quote Mercado Pago concurrency contract', () {
-    test('only the request that wins created to pending may create preference', () {
-      bool canCreatePreference({
-        required String currentStatus,
-        required bool hasPreferenceId,
-        required bool hasCheckoutUrl,
-      }) {
-        return currentStatus == 'created' && !hasPreferenceId && !hasCheckoutUrl;
-      }
-
-      expect(
-        canCreatePreference(
-          currentStatus: 'created',
-          hasPreferenceId: false,
-          hasCheckoutUrl: false,
-        ),
-        isTrue,
-      );
-
-      expect(
-        canCreatePreference(
-          currentStatus: 'pending',
-          hasPreferenceId: false,
-          hasCheckoutUrl: false,
-        ),
-        isFalse,
-      );
-
-      expect(
-        canCreatePreference(
-          currentStatus: 'created',
-          hasPreferenceId: true,
-          hasCheckoutUrl: true,
-        ),
-        isFalse,
-      );
-    });
-
-    test('orphan external preference is not returned when DB persistence fails', () {
-      String outcomeAfterMercadoPago({
-        required bool mercadoPagoCreatedPreference,
-        required bool persistedInDatabase,
-        required bool hasCanonicalCheckoutUrl,
-      }) {
-        if (persistedInDatabase && hasCanonicalCheckoutUrl) return 'return_checkout_url';
-        if (hasCanonicalCheckoutUrl) return 'reuse_canonical_checkout_url';
-        if (mercadoPagoCreatedPreference && !persistedInDatabase) {
-          return 'fail_closed_without_checkout_url';
+    test(
+      'only the request that wins created to pending may create preference',
+      () {
+        bool canCreatePreference({
+          required String currentStatus,
+          required bool hasPreferenceId,
+          required bool hasCheckoutUrl,
+        }) {
+          return currentStatus == 'created' &&
+              !hasPreferenceId &&
+              !hasCheckoutUrl;
         }
-        return 'retryable_error';
-      }
 
-      expect(
-        outcomeAfterMercadoPago(
-          mercadoPagoCreatedPreference: true,
-          persistedInDatabase: false,
-          hasCanonicalCheckoutUrl: false,
-        ),
-        'fail_closed_without_checkout_url',
-      );
+        expect(
+          canCreatePreference(
+            currentStatus: 'created',
+            hasPreferenceId: false,
+            hasCheckoutUrl: false,
+          ),
+          isTrue,
+        );
 
-      expect(
-        outcomeAfterMercadoPago(
-          mercadoPagoCreatedPreference: true,
-          persistedInDatabase: true,
-          hasCanonicalCheckoutUrl: true,
-        ),
-        'return_checkout_url',
-      );
-    });
+        expect(
+          canCreatePreference(
+            currentStatus: 'pending',
+            hasPreferenceId: false,
+            hasCheckoutUrl: false,
+          ),
+          isFalse,
+        );
+
+        expect(
+          canCreatePreference(
+            currentStatus: 'created',
+            hasPreferenceId: true,
+            hasCheckoutUrl: true,
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'orphan external preference is not returned when DB persistence fails',
+      () {
+        String outcomeAfterMercadoPago({
+          required bool mercadoPagoCreatedPreference,
+          required bool persistedInDatabase,
+          required bool hasCanonicalCheckoutUrl,
+        }) {
+          if (persistedInDatabase && hasCanonicalCheckoutUrl) {
+            return 'return_checkout_url';
+          }
+          if (hasCanonicalCheckoutUrl) {
+            return 'reuse_canonical_checkout_url';
+          }
+          if (mercadoPagoCreatedPreference && !persistedInDatabase) {
+            return 'fail_closed_without_checkout_url';
+          }
+          return 'retryable_error';
+        }
+
+        expect(
+          outcomeAfterMercadoPago(
+            mercadoPagoCreatedPreference: true,
+            persistedInDatabase: false,
+            hasCanonicalCheckoutUrl: false,
+          ),
+          'fail_closed_without_checkout_url',
+        );
+
+        expect(
+          outcomeAfterMercadoPago(
+            mercadoPagoCreatedPreference: true,
+            persistedInDatabase: true,
+            hasCanonicalCheckoutUrl: true,
+          ),
+          'return_checkout_url',
+        );
+      },
+    );
   });
 }

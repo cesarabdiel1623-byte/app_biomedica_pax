@@ -13,11 +13,11 @@ class QuestionsScreen extends StatefulWidget {
 }
 
 class _QuestionsScreenState extends State<QuestionsScreen> {
-  static const _kPrimary = Color(0xFF0D9488);
-  static const _kNavy = Color(0xFF1E3A5F);
-  static const _kGreyBg = Color(0xFFF8FAFC);
-  static const _kTextDark = Color(0xFF1A1A1A);
-  static const _kTextGrey = Color(0xFF757575);
+  static const _kPrimary = Color(0xFF024C8B);
+  static const _kNavy = Color(0xFF024C8B);
+  static const _kGreyBg = Color(0xFFF7F9FC);
+  static const _kTextDark = Color(0xFF1F2937);
+  static const _kTextGrey = Color(0xFF667085);
 
   List<ProductQuestion> _questions = [];
   bool _loading = true;
@@ -426,9 +426,9 @@ class _QuestionsScreenState extends State<QuestionsScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDFA),
+                        color: const Color(0xFFEBF3FA),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFCCFBF1)),
+                        border: Border.all(color: const Color(0xFFD0E1F3)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

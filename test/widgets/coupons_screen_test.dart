@@ -104,14 +104,14 @@ void main() {
 
         await tester.pumpAndSettle();
 
-        expect(find.text('Disponibles'), findsOneWidget);
+        expect(find.text('DISPONIBLES'), findsOneWidget);
         expect(find.text('15% de descuento'), findsOneWidget);
         expect(find.text('BIENVENIDA15'), findsOneWidget);
         expect(find.text('Descuento de Bienvenida'), findsOneWidget);
         expect(find.text('Aplica en tu primera compra médica'), findsOneWidget);
         expect(find.text('Disponible'), findsOneWidget);
         expect(find.text('Compra mínima: \$1500 MXN'), findsOneWidget);
-        expect(find.text('Copiar código'), findsOneWidget);
+        expect(find.text('Copiar'), findsOneWidget);
         // Si no hay carrito activo, no muestra Usar cupón
         expect(find.text('Usar cupón'), findsNothing);
       },
@@ -135,7 +135,7 @@ void main() {
 
         await tester.pumpAndSettle();
 
-        expect(find.text('Otros cupones'), findsOneWidget);
+        expect(find.text('OTROS CUPONES'), findsOneWidget);
         expect(find.text('Utilizado'), findsOneWidget);
         expect(find.text('Vencido'), findsOneWidget);
         expect(find.text('Próximamente'), findsOneWidget);

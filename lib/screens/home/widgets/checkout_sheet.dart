@@ -8,9 +8,9 @@ import '../../../services/shipping_quote_service.dart';
 import '../../../utils/price_formatter.dart';
 import '../../../widgets/standard_section_header.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
-const _kBg = Color(0xFFF8FAFC);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
+const _kBg = Color(0xFFF7F9FC);
 const _shippingProcessingRetryDelay = Duration(seconds: 2);
 const _shippingProcessingMaxRetries = 3;
 
@@ -409,7 +409,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Abriendo Mercado Pago...'),
-          backgroundColor: const Color(0xFF0D9488),
+          backgroundColor: const Color(0xFF024C8B),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -1198,7 +1198,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                                         size: 14,
                                         color: isFree
                                             ? const Color(0xFF16A34A)
-                                            : const Color(0xFF0D9488),
+                                            : _kPrimary,
                                       ),
                                       const SizedBox(width: 3),
                                       Expanded(
@@ -1553,16 +1553,16 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDFA),
+                  color: const Color(0xFFEBF3FA),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF99F6E4)),
+                  border: Border.all(color: const Color(0xFFD0E2F2)),
                 ),
                 child: const Row(
                   children: [
                     Icon(
                       Icons.lock_outline_rounded,
                       size: 16,
-                      color: Color(0xFF0D9488),
+                      color: Color(0xFF024C8B),
                     ),
                     SizedBox(width: 8),
                     Expanded(
@@ -1571,7 +1571,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
                         style: TextStyle(
                           fontSize: 11.5,
                           height: 1.35,
-                          color: Color(0xFF115E59),
+                          color: Color(0xFF013663),
                           fontWeight: FontWeight.w500,
                         ),
                       ),

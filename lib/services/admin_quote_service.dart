@@ -114,7 +114,9 @@ class AdminQuoteService {
       throw ArgumentError('Se requiere serviceTicketId.');
     }
     if (items.isEmpty) {
-      throw ArgumentError('Debes agregar al menos un concepto a la cotización.');
+      throw ArgumentError(
+        'Debes agregar al menos un concepto a la cotización.',
+      );
     }
 
     for (final item in items) {
@@ -143,7 +145,9 @@ class AdminQuoteService {
   }
 
   /// Envía la cotización formalmente al cliente mediante la RPC autoritativa `send_service_quote`.
-  Future<Map<String, dynamic>> sendServiceQuote({required String quoteId}) async {
+  Future<Map<String, dynamic>> sendServiceQuote({
+    required String quoteId,
+  }) async {
     if (quoteId.trim().isEmpty) {
       throw ArgumentError('quoteId requerido.');
     }

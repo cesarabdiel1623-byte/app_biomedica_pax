@@ -16,7 +16,8 @@ class RegistrationDraft {
   });
 
   bool get isStep1Done => email.trim().isNotEmpty && email.contains('@');
-  bool get isStep2Done => fullName.trim().length >= 2 && fullName.trim() != 'Sin especificar';
+  bool get isStep2Done =>
+      fullName.trim().length >= 2 && fullName.trim() != 'Sin especificar';
   bool get isStep3Done => phone.trim().isNotEmpty || phoneSkipped;
   bool get isStep4Done => password.length >= 8;
   bool get isAllReadyForSignUp =>

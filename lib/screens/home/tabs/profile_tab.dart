@@ -12,7 +12,7 @@ import '../../product/recently_viewed_screen.dart';
 import '../../quotes/questions_screen.dart';
 import '../../quotes/reviews_screen.dart';
 
-const _kPrimary = Color(0xFF0D9488);
+const _kPrimary = Color(0xFF024C8B);
 
 class ProfileTab extends StatefulWidget {
   final VoidCallback onSignOut;
@@ -378,7 +378,7 @@ class _ProfileTabState extends State<ProfileTab> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E3A5F),
+                color: Color(0xFF1F2937),
               ),
             ),
             const SizedBox(height: 8),

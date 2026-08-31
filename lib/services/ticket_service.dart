@@ -365,9 +365,7 @@ class TicketService {
 
     if (res.isEmpty) return null;
 
-    final quotes = res
-        .map((m) => ServiceQuote.fromJson(m))
-        .toList();
+    final quotes = res.map((m) => ServiceQuote.fromJson(m)).toList();
 
     if (quotes.isEmpty) return null;
 
@@ -388,10 +386,7 @@ class TicketService {
     }
     await _db.rpc(
       'respond_to_quote',
-      params: {
-        'p_quote_id': quoteId,
-        'p_accept': true,
-      },
+      params: {'p_quote_id': quoteId, 'p_accept': true},
     );
   }
 
@@ -403,10 +398,7 @@ class TicketService {
     }
     await _db.rpc(
       'respond_to_quote',
-      params: {
-        'p_quote_id': quoteId,
-        'p_accept': false,
-      },
+      params: {'p_quote_id': quoteId, 'p_accept': false},
     );
   }
 

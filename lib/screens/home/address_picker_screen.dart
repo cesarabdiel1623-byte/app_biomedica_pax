@@ -9,8 +9,8 @@ import 'package:http/http.dart' as http;
 import '../../services/address_service.dart';
 
 // Colores locales (no conflictan con home_screen.dart)
-const _kPrimaryAddr = Color(0xFF0D9488);
-const _kNavyAddr = Color(0xFF1E3A5F);
+const _kPrimaryAddr = Color(0xFF024C8B);
+const _kNavyAddr = Color(0xFF024C8B);
 
 class AddressPickerScreen extends StatefulWidget {
   const AddressPickerScreen({super.key});

@@ -11,11 +11,11 @@ import 'product_detail_screen.dart';
 import '../../utils/ui_helpers.dart';
 import '../../utils/responsive_grid.dart';
 
-const _kPrimary = Color(0xFF0D9488); // Teal principal
-const _kNavy = Color(0xFF1E3A5F); // Azul navy
-const _kGreen = Color(0xFF16A34A); // Verde envío
-const _kRed = Color(0xFFEF4444); // Rojo descuento
-const _kBg = Color(0xFFF8FAFC); // Gris claro fondo
+const _kPrimary = Color(0xFF024C8B); // Azul corporativo principal
+const _kNavy = Color(0xFF024C8B); // Azul corporativo
+const _kGreen = Color(0xFF16A34A); // Verde envío (semántico)
+const _kRed = Color(0xFFEF4444); // Rojo descuento (semántico)
+const _kBg = Color(0xFFF7F9FC); // Gris claro fondo
 
 class SearchScreen extends StatefulWidget {
   final String? initialQuery;

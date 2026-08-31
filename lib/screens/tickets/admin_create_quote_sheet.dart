@@ -7,8 +7,12 @@ import '../../utils/ui_helpers.dart';
 class _ItemEntry {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController qtyController = TextEditingController(text: '1');
-  final TextEditingController priceController = TextEditingController(text: '0');
-  final TextEditingController discountController = TextEditingController(text: '0');
+  final TextEditingController priceController = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController discountController = TextEditingController(
+    text: '0',
+  );
 
   void dispose() {
     nameController.dispose();
@@ -54,7 +58,8 @@ class AdminCreateQuoteSheet extends StatefulWidget {
 class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
   final List<_ItemEntry> _items = [];
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _internalNotesController = TextEditingController();
+  final TextEditingController _internalNotesController =
+      TextEditingController();
   DateTime? _validUntil;
   bool _isSubmitting = false;
 
@@ -223,7 +228,10 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
             // Encabezado
             Row(
               children: [
-                const Icon(Icons.request_quote_outlined, color: Color(0xFF0D9488)),
+                const Icon(
+                  Icons.request_quote_outlined,
+                  color: Color(0xFF024C8B),
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -257,12 +265,19 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.person_outline, size: 16, color: Color(0xFF64748B)),
+                      const Icon(
+                        Icons.person_outline,
+                        size: 16,
+                        color: Color(0xFF64748B),
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           'Cliente: ${widget.clientName}',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
@@ -270,24 +285,39 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.confirmation_number_outlined, size: 16, color: Color(0xFF64748B)),
+                      const Icon(
+                        Icons.confirmation_number_outlined,
+                        size: 16,
+                        color: Color(0xFF64748B),
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Ticket: ${widget.ticketNumber}',
-                        style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155)),
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF334155),
+                        ),
                       ),
                     ],
                   ),
-                  if (widget.equipmentSummary != null && widget.equipmentSummary!.isNotEmpty) ...[
+                  if (widget.equipmentSummary != null &&
+                      widget.equipmentSummary!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.biotech_outlined, size: 16, color: Color(0xFF64748B)),
+                        const Icon(
+                          Icons.biotech_outlined,
+                          size: 16,
+                          color: Color(0xFF64748B),
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             'Equipo: ${widget.equipmentSummary}',
-                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155)),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF334155),
+                            ),
                           ),
                         ),
                       ],
@@ -303,19 +333,34 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
               onTap: _pickValidUntilDate,
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey.shade300),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.event_outlined, size: 18, color: Color(0xFF0D9488)),
+                    const Icon(
+                      Icons.event_outlined,
+                      size: 18,
+                      color: Color(0xFF024C8B),
+                    ),
                     const SizedBox(width: 8),
-                    const Text('Válida hasta: ', style: TextStyle(fontSize: 13)),
+                    const Text(
+                      'Válida hasta: ',
+                      style: TextStyle(fontSize: 13),
+                    ),
                     Text(
-                      _validUntil != null ? _formatDate(_validUntil!) : 'Sin vigencia',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      _validUntil != null
+                          ? _formatDate(_validUntil!)
+                          : 'Sin vigencia',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                     const Spacer(),
                     const Icon(Icons.arrow_drop_down, color: Colors.grey),
@@ -336,9 +381,12 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                 TextButton.icon(
                   onPressed: () => _addNewItem(),
                   icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Agregar Concepto', style: TextStyle(fontSize: 12.5)),
+                  label: const Text(
+                    'Agregar Concepto',
+                    style: TextStyle(fontSize: 12.5),
+                  ),
                   style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF0D9488),
+                    foregroundColor: const Color(0xFF024C8B),
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
@@ -377,17 +425,25 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                             controller: item.nameController,
                             onChanged: (_) => setState(() {}),
                             decoration: const InputDecoration(
-                              hintText: 'Ej. Diagnóstico técnico / Mantenimiento',
+                              hintText:
+                                  'Ej. Diagnóstico técnico / Mantenimiento',
                               isDense: true,
                               border: UnderlineInputBorder(),
                               contentPadding: EdgeInsets.symmetric(vertical: 4),
                             ),
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                         if (_items.length > 1)
                           IconButton(
-                            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                              size: 20,
+                            ),
                             onPressed: () => _removeItem(idx),
                             visualDensity: VisualDensity.compact,
                           ),
@@ -401,7 +457,9 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                           flex: 2,
                           child: TextFormField(
                             controller: item.qtyController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             onChanged: (_) => setState(() {}),
                             decoration: const InputDecoration(
                               labelText: 'Cant.',
@@ -417,7 +475,9 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                           flex: 3,
                           child: TextFormField(
                             controller: item.priceController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             onChanged: (_) => setState(() {}),
                             decoration: const InputDecoration(
                               labelText: 'P. Unitario (\$)',
@@ -433,7 +493,9 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                           flex: 3,
                           child: TextFormField(
                             controller: item.discountController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             onChanged: (_) => setState(() {}),
                             decoration: const InputDecoration(
                               labelText: 'Desc. (\$)',
@@ -453,7 +515,7 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0D9488),
+                          color: Color(0xFF024C8B),
                         ),
                       ),
                     ),
@@ -468,7 +530,8 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
               maxLines: 2,
               decoration: const InputDecoration(
                 labelText: 'Notas para el cliente (Opcional)',
-                hintText: 'Tiempos de entrega, términos o condiciones del servicio...',
+                hintText:
+                    'Tiempos de entrega, términos o condiciones del servicio...',
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
@@ -488,8 +551,14 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Subtotal estimado:', style: TextStyle(fontSize: 13)),
-                      Text(formatFinancialPrice(totals.subtotal), style: const TextStyle(fontSize: 13)),
+                      const Text(
+                        'Subtotal estimado:',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      Text(
+                        formatFinancialPrice(totals.subtotal),
+                        style: const TextStyle(fontSize: 13),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -497,7 +566,10 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('IVA (16%):', style: TextStyle(fontSize: 13)),
-                      Text(formatFinancialPrice(totals.tax), style: const TextStyle(fontSize: 13)),
+                      Text(
+                        formatFinancialPrice(totals.tax),
+                        style: const TextStyle(fontSize: 13),
+                      ),
                     ],
                   ),
                   const Divider(height: 12),
@@ -506,14 +578,17 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
                     children: [
                       const Text(
                         'TOTAL ESTIMADO:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                       Text(
                         formatFinancialPrice(totals.total),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
-                          color: Color(0xFF0D9488),
+                          color: Color(0xFF024C8B),
                         ),
                       ),
                     ],
@@ -528,28 +603,47 @@ class _AdminCreateQuoteSheetState extends State<AdminCreateQuoteSheet> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: _isSubmitting ? null : () => _submitQuote(sendImmediately: false),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => _submitQuote(sendImmediately: false),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: _isSubmitting
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Text('Guardar Borrador'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : () => _submitQuote(sendImmediately: true),
+                    onPressed: _isSubmitting
+                        ? null
+                        : () => _submitQuote(sendImmediately: true),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
+                      backgroundColor: const Color(0xFF024C8B),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: _isSubmitting
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : const Text('Enviar al Cliente'),
                   ),
                 ),

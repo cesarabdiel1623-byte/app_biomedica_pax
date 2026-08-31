@@ -13,9 +13,9 @@ class RecentlyViewedScreen extends StatefulWidget {
 }
 
 class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
-  static const _kPrimary = Color(0xFF0D9488);
-  static const _kNavy = Color(0xFF1E3A5F);
-  static const _kGreyBg = Color(0xFFF8FAFC);
+  static const _kPrimary = Color(0xFF024C8B);
+  static const _kNavy = Color(0xFF024C8B);
+  static const _kGreyBg = Color(0xFFF7F9FC);
 
   List<Product> _historyList = [];
   bool _loading = true;
@@ -90,7 +90,7 @@ class _RecentlyViewedScreenState extends State<RecentlyViewedScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+              colors: [Color(0xFF024C8B), Color(0xFF013663)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),

@@ -23,9 +23,9 @@ void main() {
         loginTitleWithAccent.evaluate().isNotEmpty ||
         textFields.evaluate().isNotEmpty) {
       final currentContext = tester.element(find.byType(Navigator).first);
-      Navigator.of(currentContext).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      Navigator.of(
+        currentContext,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
       await tester.pumpAndSettle();
       await Future.delayed(const Duration(seconds: 2));
       await tester.pumpAndSettle();

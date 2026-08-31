@@ -7,11 +7,7 @@ import '../../models/payment_test_result.dart';
 import '../../services/mercado_pago_service.dart';
 
 class PaymentResultScreen extends StatefulWidget {
-  const PaymentResultScreen({
-    super.key,
-    this.returnData,
-    this.result,
-  });
+  const PaymentResultScreen({super.key, this.returnData, this.result});
 
   final PaymentReturnData? returnData;
   final PaymentTestResult? result;
@@ -139,7 +135,7 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
-                          color: Color(0xFF0D9488),
+                          color: Color(0xFF024C8B),
                           strokeWidth: 3,
                         ),
                         SizedBox(height: 20),
@@ -172,7 +168,11 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                             color: config.backgroundColor,
                             borderRadius: BorderRadius.circular(28),
                           ),
-                          child: Icon(config.icon, size: 42, color: config.color),
+                          child: Icon(
+                            config.icon,
+                            size: 42,
+                            color: config.color,
+                          ),
                         ),
                         const SizedBox(height: 24),
                         Text(
@@ -225,7 +225,7 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                                   : 'Verificar nuevamente',
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0D9488),
+                              backgroundColor: const Color(0xFF024C8B),
                               foregroundColor: Colors.white,
                               minimumSize: const Size.fromHeight(52),
                               shape: const StadiumBorder(),

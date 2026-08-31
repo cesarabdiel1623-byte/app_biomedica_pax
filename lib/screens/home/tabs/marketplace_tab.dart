@@ -25,8 +25,9 @@ import '../widgets/promotion_cards_section.dart';
 import '../widgets/abandoned_cart_dialog.dart';
 import '../../../widgets/load_error_state.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
+const _kSecondary = Color(0xFF21AF97);
 
 class MouseDragScrollBehavior extends MaterialScrollBehavior {
   @override
@@ -782,8 +783,8 @@ class MarketplaceTabState extends State<MarketplaceTab> {
 
   Color _categoryColor(int index) {
     const colors = [
-      Color(0xFF0D9488),
-      Color(0xFF2563EB),
+      Color(0xFF024C8B),
+      Color(0xFF21AF97),
       Color(0xFF0891B2),
       Color(0xFFDB2777),
       Color(0xFF7C3AED),

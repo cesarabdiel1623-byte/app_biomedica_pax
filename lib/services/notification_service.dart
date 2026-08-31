@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../utils/notification_presentation.dart';
 import 'auth_identity_service.dart';
 
 // ──────────────────────────────────────────────
@@ -14,9 +15,10 @@ const String _kChannelId = 'go_medical_high';
 const String _kChannelName = 'Notificaciones Go Medical';
 const String _kChannelDesc =
     'Alertas en tiempo real de soporte, cotizaciones y pedidos';
+const String _kAndroidNotificationIcon = 'ic_stat_gomedical';
 
-/// Primary teal color (0xFF0D9488) encoded as int for Android notification LED / accent.
-const int _kNotificationColor = 0xFF0D9488;
+/// Primary corporate blue color (0xFF024C8B) encoded as int for Android notification LED / accent.
+const int _kNotificationColor = 0xFF024C8B;
 
 // ──────────────────────────────────────────────
 // SERVICE
@@ -85,7 +87,7 @@ class NotificationService {
 
     // ── Plugin initialisation settings ────────────────────────────────────
     const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings(_kAndroidNotificationIcon);
 
     const DarwinInitializationSettings darwinSettings =
         DarwinInitializationSettings(
@@ -192,10 +194,12 @@ class NotificationService {
                     final id = row['id']?.toString();
                     if (id == null || id.isEmpty) continue;
                     if (!_seenIds.contains(id)) {
-                      final title =
-                          row['title']?.toString() ?? 'Nueva Notificación';
-                      final body = row['body']?.toString() ?? '';
-                      showHeadsUp(title, body, payload: id);
+                      final presentation = notificationPresentation(row);
+                      showHeadsUp(
+                        presentation.title,
+                        presentation.body,
+                        payload: id,
+                      );
                     }
                   }
                 }
@@ -268,7 +272,7 @@ class NotificationService {
   /// floating heads-up card even when the app is in the foreground.
   Future<void> showHeadsUp(String title, String body, {String? payload}) async {
     // ignore: use_named_constants
-    final tealColor = const Color(0xFF0D9488);
+    final brandColor = const Color(0xFF024C8B);
     final AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
           _kChannelId,
@@ -276,7 +280,8 @@ class NotificationService {
           channelDescription: _kChannelDesc,
           importance: Importance.max,
           priority: Priority.high,
-          color: tealColor,
+          icon: _kAndroidNotificationIcon,
+          color: brandColor,
           showWhen: true,
           playSound: true,
           enableVibration: true,

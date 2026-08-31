@@ -26,18 +26,56 @@ class ServiceCompletionCard extends StatelessWidget {
     return '$day/$month/$year $hour:$minute';
   }
 
+  List<String> _buildCombinedParts(ServiceCompletion sc) {
+    final result = <String>[];
+    final seen = <String>{};
+
+    // 1. Refacciones libres ingresadas como texto
+    if (sc.partsUsedNotes != null && sc.partsUsedNotes!.trim().isNotEmpty) {
+      final lines = sc.partsUsedNotes!
+          .trim()
+          .split('\n')
+          .map((l) => l.startsWith('•') ? l.substring(1).trim() : l.trim())
+          .where((l) => l.isNotEmpty);
+      for (final line in lines) {
+        final key = line.toLowerCase();
+        if (!seen.contains(key)) {
+          seen.add(key);
+          result.add(line);
+        }
+      }
+    }
+
+    // 2. Refacciones estructuradas asociadas (sin mostrar costos)
+    for (final part in sc.partsUsed) {
+      final name =
+          part.productName?.trim() ?? 'Refacción biomédica (${part.productId})';
+      final qtyStr = part.quantity == part.quantity.roundToDouble()
+          ? part.quantity.toInt().toString()
+          : part.quantity.toString();
+      final formatted = '$name — $qtyStr ${qtyStr == '1' ? 'pieza' : 'piezas'}';
+      final key = name.toLowerCase();
+      if (!seen.contains(key)) {
+        seen.add(key);
+        result.add(formatted);
+      }
+    }
+
+    return result;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasParts = serviceCompletion.partsUsed.isNotEmpty;
+    final combinedParts = _buildCombinedParts(serviceCompletion);
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFF0D9488), width: 1.5),
+        side: const BorderSide(color: Color(0xFFBBF7D0), width: 1.5),
       ),
-      color: const Color(0xFFF0FDFA),
+      color: const Color(0xFFF0FDF4),
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -50,10 +88,14 @@ class ServiceCompletionCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFCCFBF1),
+                    color: const Color(0xFFDCFCE7),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.verified, color: Color(0xFF0F766E), size: 22),
+                  child: const Icon(
+                    Icons.verified,
+                    color: Color(0xFF16A34A),
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -64,44 +106,65 @@ class ServiceCompletionCard extends StatelessWidget {
                         'Servicio Técnico Finalizado',
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF134E4A),
+                          color: const Color(0xFF14532D),
                         ),
                       ),
                       Text(
                         'Concluido: ${_formatDate(serviceCompletion.completedAt)}',
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF0F766E)),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF166534),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
-            const Divider(color: Color(0xFF99F6E4), height: 24),
+            const Divider(color: Color(0xFFBBF7D0), height: 24),
 
             // Diagnóstico Técnico
-            if (serviceCompletion.diagnosis != null && serviceCompletion.diagnosis!.isNotEmpty) ...[
+            if (serviceCompletion.diagnosis != null &&
+                serviceCompletion.diagnosis!.isNotEmpty) ...[
               const Text(
                 'Diagnóstico Técnico Final:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF115E59)),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Color(0xFF166534),
+                ),
               ),
               const SizedBox(height: 3),
               Text(
                 serviceCompletion.diagnosis!,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF1F2937), height: 1.3),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF1F2937),
+                  height: 1.3,
+                ),
               ),
               const SizedBox(height: 12),
             ],
 
             // Trabajo Realizado y Solución
-            if (serviceCompletion.solution != null && serviceCompletion.solution!.isNotEmpty) ...[
+            if (serviceCompletion.solution != null &&
+                serviceCompletion.solution!.isNotEmpty) ...[
               const Text(
                 'Trabajo Realizado y Solución:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF115E59)),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Color(0xFF166534),
+                ),
               ),
               const SizedBox(height: 3),
               Text(
                 serviceCompletion.solution!,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF1F2937), height: 1.3),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF1F2937),
+                  height: 1.3,
+                ),
               ),
               const SizedBox(height: 12),
             ],
@@ -111,56 +174,94 @@ class ServiceCompletionCard extends StatelessWidget {
                 serviceCompletion.recommendations!.isNotEmpty) ...[
               const Text(
                 'Recomendaciones del Especialista:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF115E59)),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: Color(0xFF166534),
+                ),
               ),
               const SizedBox(height: 3),
               Text(
                 serviceCompletion.recommendations!,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF1F2937), height: 1.3),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF1F2937),
+                  height: 1.3,
+                ),
               ),
               const SizedBox(height: 12),
             ],
 
-            // Refacciones Empleadas (Sin costos unitarios)
-            if (hasParts) ...[
-              const Text(
-                'Refacciones / Materiales Utilizados:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF115E59)),
+            // Refacciones / Materiales Utilizados
+            const Text(
+              'Refacciones / Materiales Utilizados:',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: Color(0xFF166534),
               ),
-              const SizedBox(height: 6),
-              ...serviceCompletion.partsUsed.map(
-                (part) => Padding(
+            ),
+            const SizedBox(height: 6),
+            if (combinedParts.isNotEmpty) ...[
+              ...combinedParts.map(
+                (partText) => Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.check_circle_outline, size: 16, color: Color(0xFF0D9488)),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.check_circle_outline,
+                          size: 15,
+                          color: Color(0xFF16A34A),
+                        ),
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          part.productName ?? 'Refacción biomédica (${part.productId})',
-                          style: const TextStyle(fontSize: 12.5, color: Color(0xFF374151)),
+                          partText,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: Color(0xFF374151),
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Cant: ${part.quantity}',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF115E59)),
                       ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 12),
+            ] else ...[
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Ninguna',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF6B7280),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
             ],
 
             // Técnico asignado
             if (serviceCompletion.assignedTechnicianName != null) ...[
               Row(
                 children: [
-                  const Icon(Icons.engineering, size: 16, color: Color(0xFF0D9488)),
+                  const Icon(
+                    Icons.engineering,
+                    size: 16,
+                    color: Color(0xFF024C8B),
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Técnico Responsable: ${serviceCompletion.assignedTechnicianName}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF4B5563)),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF4B5563),
+                    ),
                   ),
                 ],
               ),
@@ -177,18 +278,36 @@ class ServiceCompletionCard extends StatelessWidget {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F766E)),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFF024C8B),
+                          ),
                         )
-                      : const Icon(Icons.picture_as_pdf, color: Color(0xFF0F766E), size: 18),
+                      : const Icon(
+                          Icons.picture_as_pdf,
+                          color: Color(0xFF024C8B),
+                          size: 18,
+                        ),
                   label: Text(
-                    isDownloadingPdf ? 'Generando documento...' : 'Descargar Orden de Servicio Oficial (PDF)',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF0F766E)),
+                    isDownloadingPdf
+                        ? 'Generando documento...'
+                        : 'Descargar Orden de Servicio Oficial (PDF)',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.5,
+                      color: Color(0xFF024C8B),
+                    ),
                   ),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF0D9488), width: 1.2),
+                    side: const BorderSide(
+                      color: Color(0xFF024C8B),
+                      width: 1.2,
+                    ),
                     backgroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),

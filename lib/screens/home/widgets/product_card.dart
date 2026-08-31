@@ -3,8 +3,8 @@ import '../../../models/product.dart';
 import '../../../utils/ui_helpers.dart';
 import '../../product/product_detail_screen.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kNavy = Color(0xFF1E3A5F);
+const _kPrimary = Color(0xFF024C8B);
+const _kNavy = Color(0xFF024C8B);
 const _kGreen = Color(0xFF16A34A);
 const _kRed = Color(0xFFEF4444);
 

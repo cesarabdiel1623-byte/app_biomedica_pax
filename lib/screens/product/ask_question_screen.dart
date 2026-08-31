@@ -17,9 +17,9 @@ class AskQuestionScreen extends StatefulWidget {
 }
 
 class _AskQuestionScreenState extends State<AskQuestionScreen> {
-  static const _kPrimary = Color(0xFF0D9488);
-  static const _kNavy = Color(0xFF1E3A5F);
-  static const _kGreyBg = Color(0xFFF8FAFC);
+  static const _kPrimary = Color(0xFF024C8B);
+  static const _kNavy = Color(0xFF024C8B);
+  static const _kGreyBg = Color(0xFFF7F9FC);
 
   final TextEditingController _questionController = TextEditingController();
   bool _isSending = false;
@@ -96,7 +96,7 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+              colors: [Color(0xFF024C8B), Color(0xFF013663)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -168,9 +168,9 @@ class _AskQuestionScreenState extends State<AskQuestionScreen> {
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDFA),
+                  color: const Color(0xFFEBF3FA),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFCCFBF1)),
+                  border: Border.all(color: const Color(0xFFD0E1F3)),
                 ),
                 child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.center,

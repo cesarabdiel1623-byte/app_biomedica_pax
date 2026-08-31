@@ -19,9 +19,9 @@ class AllProductQuestionsScreen extends StatefulWidget {
 }
 
 class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
-  static const _kPrimary = Color(0xFF0D9488);
-  static const _kNavy = Color(0xFF1E3A5F);
-  static const _kGreyBg = Color(0xFFF8FAFC);
+  static const _kPrimary = Color(0xFF024C8B);
+  static const _kNavy = Color(0xFF024C8B);
+  static const _kGreyBg = Color(0xFFF7F9FC);
 
   List<ProductQuestion> _questions = [];
   bool _loading = true;
@@ -72,7 +72,7 @@ class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+              colors: [Color(0xFF024C8B), Color(0xFF013663)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
@@ -131,7 +131,7 @@ class _AllProductQuestionsScreenState extends State<AllProductQuestionsScreen> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE0F2F1),
+                                  color: const Color(0xFFEBF3FA),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: const Text(

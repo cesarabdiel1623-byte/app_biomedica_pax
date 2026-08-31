@@ -48,12 +48,12 @@ class _AbandonedCartDialogState extends State<AbandonedCartDialog> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF0D9488).withValues(alpha: 0.08),
+                color: const Color(0xFF024C8B).withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.shopping_cart_outlined,
-                color: Color(0xFF0D9488),
+                color: Color(0xFF024C8B),
                 size: 56,
               ),
             ),
@@ -63,7 +63,7 @@ class _AbandonedCartDialogState extends State<AbandonedCartDialog> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E3A5F),
+                color: Color(0xFF1F2937),
               ),
               textAlign: TextAlign.center,
             ),
@@ -84,7 +84,7 @@ class _AbandonedCartDialogState extends State<AbandonedCartDialog> {
                   padding: EdgeInsets.all(8.0),
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      Color(0xFF0D9488),
+                      Color(0xFF024C8B),
                     ),
                   ),
                 ),
@@ -97,7 +97,7 @@ class _AbandonedCartDialogState extends State<AbandonedCartDialog> {
                     height: 48,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D9488),
+                        backgroundColor: const Color(0xFF024C8B),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),

@@ -192,8 +192,7 @@ class MercadoPagoService {
           'cart_id': cartId,
           if (shippingAddress?.trim().isNotEmpty == true)
             'shipping_address': shippingAddress!.trim(),
-          if (notes?.trim().isNotEmpty == true)
-            'notes': notes!.trim(),
+          if (notes?.trim().isNotEmpty == true) 'notes': notes!.trim(),
         },
       );
 
@@ -317,9 +316,7 @@ class MercadoPagoService {
         url,
         prefersDeepLink: true,
         customTabsOptions: const CustomTabsOptions(
-          browser: CustomTabsBrowserConfiguration(
-            prefersDefaultBrowser: true,
-          ),
+          browser: CustomTabsBrowserConfiguration(prefersDefaultBrowser: true),
           showTitle: true,
           shareState: CustomTabsShareState.off,
           urlBarHidingEnabled: false,
@@ -327,8 +324,7 @@ class MercadoPagoService {
         safariVCOptions: const SafariViewControllerOptions(
           entersReaderIfAvailable: false,
           barCollapsingEnabled: false,
-          dismissButtonStyle:
-              SafariViewControllerDismissButtonStyle.close,
+          dismissButtonStyle: SafariViewControllerDismissButtonStyle.close,
         ),
       );
     } catch (_) {
@@ -347,8 +343,7 @@ class MercadoPagoService {
           safariVCOptions: const SafariViewControllerOptions(
             entersReaderIfAvailable: false,
             barCollapsingEnabled: false,
-            dismissButtonStyle:
-                SafariViewControllerDismissButtonStyle.close,
+            dismissButtonStyle: SafariViewControllerDismissButtonStyle.close,
           ),
         );
       } catch (_) {

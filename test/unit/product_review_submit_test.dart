@@ -96,17 +96,25 @@ void main() {
       expect(review.videos.first, contains('.mp4'));
     });
 
-    test('write_review_screen limits text to 100 chars and uses onChanged handler', () {
-      expect(writeReviewSource, contains('maxLength: 100'));
-      expect(writeReviewSource, contains('onChanged: (_)'));
-    });
+    test(
+      'write_review_screen limits text to 100 chars and uses onChanged handler',
+      () {
+        expect(writeReviewSource, contains('maxLength: 100'));
+        expect(writeReviewSource, contains('onChanged: (_)'));
+      },
+    );
 
-    test('reviews_screen includes Mercado Libre card presentation with price and actions', () {
-      final reviewsScreenSource = File('lib/screens/quotes/reviews_screen.dart').readAsStringSync();
-      expect(reviewsScreenSource, contains('product.formattedPrice'));
-      expect(reviewsScreenSource, contains('PopupMenuButton'));
-      expect(reviewsScreenSource, contains('Eliminar opinión'));
-      expect(reviewsScreenSource, contains('Editar opinión'));
-    });
+    test(
+      'reviews_screen includes Mercado Libre card presentation with price and actions',
+      () {
+        final reviewsScreenSource = File(
+          'lib/screens/quotes/reviews_screen.dart',
+        ).readAsStringSync();
+        expect(reviewsScreenSource, contains('product.formattedPrice'));
+        expect(reviewsScreenSource, contains('PopupMenuButton'));
+        expect(reviewsScreenSource, contains('Eliminar opinión'));
+        expect(reviewsScreenSource, contains('Editar opinión'));
+      },
+    );
   });
 }

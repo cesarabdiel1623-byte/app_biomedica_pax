@@ -345,9 +345,7 @@ class UiHelpers {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(
-          0xFF0D9488,
-        ), // Color teal de éxito (estilo Biomedica/GoMedical)
+        backgroundColor: const Color(0xFF024C8B),
         elevation: 6,
         margin: EdgeInsets.only(bottom: bottomMargin, left: 20, right: 20),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -379,7 +377,7 @@ class UiHelpers {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF1E3A5F),
+        backgroundColor: const Color(0xFF024C8B),
         elevation: 6,
         margin: EdgeInsets.only(bottom: bottomMargin, left: 20, right: 20),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -410,9 +408,7 @@ class UiHelpers {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(
-          0xFF0D9488,
-        ), // Teal de éxito (igual al carrito)
+        backgroundColor: const Color(0xFF024C8B),
         elevation: 6,
         margin: EdgeInsets.only(bottom: bottomMargin, left: 20, right: 20),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -441,7 +437,7 @@ class UiHelpers {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF0D9488), // Teal de éxito
+        backgroundColor: const Color(0xFF024C8B),
         elevation: 6,
         margin: EdgeInsets.only(bottom: bottomMargin, left: 20, right: 20),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -499,7 +495,7 @@ class UiHelpers {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF0D9488), // Teal de éxito
+        backgroundColor: const Color(0xFF024C8B),
         elevation: 6,
         margin: EdgeInsets.only(bottom: bottomMargin, left: 20, right: 20),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

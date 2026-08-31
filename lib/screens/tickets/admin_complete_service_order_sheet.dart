@@ -23,18 +23,32 @@ class AdminCompleteServiceOrderSheet extends StatefulWidget {
   });
 
   @override
-  State<AdminCompleteServiceOrderSheet> createState() => _AdminCompleteServiceOrderSheetState();
+  State<AdminCompleteServiceOrderSheet> createState() =>
+      _AdminCompleteServiceOrderSheetState();
 }
 
-class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrderSheet> {
+class _FreePartEntry {
+  final TextEditingController nameController;
+  final TextEditingController quantityController;
+
+  _FreePartEntry({String name = '', String quantity = '1'})
+    : nameController = TextEditingController(text: name),
+      quantityController = TextEditingController(text: quantity);
+
+  void dispose() {
+    nameController.dispose();
+    quantityController.dispose();
+  }
+}
+
+class _AdminCompleteServiceOrderSheetState
+    extends State<AdminCompleteServiceOrderSheet> {
   final TextEditingController _diagnosisController = TextEditingController();
   final TextEditingController _solutionController = TextEditingController();
-  final TextEditingController _recommendationsController = TextEditingController();
+  final TextEditingController _recommendationsController =
+      TextEditingController();
 
-  // Para captura de refacción rápida
-  final TextEditingController _partProductIdController = TextEditingController();
-  final TextEditingController _partWarehouseIdController = TextEditingController();
-  final TextEditingController _partQtyController = TextEditingController(text: '1');
+  final List<_FreePartEntry> _freeParts = [];
 
   ServiceCompletion? _serviceOrder;
   bool _isLoading = false;
@@ -48,8 +62,36 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
       _diagnosisController.text = _serviceOrder!.diagnosis ?? '';
       _solutionController.text = _serviceOrder!.solution ?? '';
       _recommendationsController.text = _serviceOrder!.recommendations ?? '';
+      _initFreePartsFromNotes(_serviceOrder!.partsUsedNotes);
     } else {
       _loadDetails();
+    }
+  }
+
+  void _initFreePartsFromNotes(String? notes) {
+    _freeParts.clear();
+    if (notes == null || notes.trim().isEmpty) return;
+    final lines = notes.split('\n');
+    for (final rawLine in lines) {
+      var line = rawLine.trim();
+      if (line.startsWith('•')) line = line.substring(1).trim();
+      if (line.isEmpty) continue;
+
+      // Check if ends with (Cant: X) or (X)
+      final cantMatch = RegExp(
+        r'^(.*?)\s*\((?:Cant:\s*)?([0-9.]+)\)$',
+        caseSensitive: false,
+      ).firstMatch(line);
+      if (cantMatch != null) {
+        _freeParts.add(
+          _FreePartEntry(
+            name: cantMatch.group(1)?.trim() ?? line,
+            quantity: cantMatch.group(2)?.trim() ?? '1',
+          ),
+        );
+      } else {
+        _freeParts.add(_FreePartEntry(name: line, quantity: '1'));
+      }
     }
   }
 
@@ -58,9 +100,9 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
     _diagnosisController.dispose();
     _solutionController.dispose();
     _recommendationsController.dispose();
-    _partProductIdController.dispose();
-    _partWarehouseIdController.dispose();
-    _partQtyController.dispose();
+    for (final part in _freeParts) {
+      part.dispose();
+    }
     super.dispose();
   }
 
@@ -82,6 +124,9 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
             if (_recommendationsController.text.isEmpty) {
               _recommendationsController.text = details.recommendations ?? '';
             }
+            if (_freeParts.isEmpty && details.partsUsedNotes != null) {
+              _initFreePartsFromNotes(details.partsUsedNotes);
+            }
           }
         });
       }
@@ -100,6 +145,35 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
       widget.currentTicketStatus == 'resolved' ||
       widget.currentTicketStatus == 'closed';
 
+  void _addFreePart() {
+    setState(() {
+      _freeParts.add(_FreePartEntry());
+    });
+  }
+
+  void _removeFreePart(int index) {
+    setState(() {
+      final removed = _freeParts.removeAt(index);
+      removed.dispose();
+    });
+  }
+
+  String? _buildPartsUsedNotes() {
+    final lines = <String>[];
+    for (final part in _freeParts) {
+      final name = part.nameController.text.trim();
+      final qty = part.quantityController.text.trim();
+      if (name.isNotEmpty) {
+        if (qty.isNotEmpty && qty != '1') {
+          lines.add('• $name (Cant: $qty)');
+        } else {
+          lines.add('• $name');
+        }
+      }
+    }
+    return lines.isEmpty ? null : lines.join('\n');
+  }
+
   Future<void> _startService() async {
     if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
@@ -109,49 +183,17 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
       await service.startServiceOrder(ticketId: widget.ticketId);
       if (!mounted) return;
 
-      UiHelpers.showFloatingSuccessToast(context, 'Servicio iniciado exitosamente.');
-      await _loadDetails();
-    } catch (e) {
-      if (!mounted) return;
-      UiHelpers.showErrorToast(context, e.toString().replaceAll('Exception: ', ''));
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
-    }
-  }
-
-  Future<void> _registerPart() async {
-    if (_serviceOrder == null) {
-      UiHelpers.showErrorToast(context, 'Debes iniciar el servicio antes de registrar partes.');
-      return;
-    }
-
-    final pId = _partProductIdController.text.trim();
-    final wId = _partWarehouseIdController.text.trim();
-    final qty = double.tryParse(_partQtyController.text.trim()) ?? 0.0;
-
-    if (pId.isEmpty || wId.isEmpty || qty <= 0) {
-      UiHelpers.showErrorToast(context, 'Ingresa ID de producto, almacén y cantidad > 0.');
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-    try {
-      final service = AdminServiceOrderService(Supabase.instance.client);
-      await service.registerPartUsage(
-        serviceOrderId: _serviceOrder!.id,
-        productId: pId,
-        warehouseId: wId,
-        quantity: qty,
+      UiHelpers.showFloatingSuccessToast(
+        context,
+        'Servicio iniciado exitosamente.',
       );
-
-      if (!mounted) return;
-      _partProductIdController.clear();
-      _partQtyController.text = '1';
-      UiHelpers.showFloatingSuccessToast(context, 'Refacción registrada en inventario.');
       await _loadDetails();
     } catch (e) {
       if (!mounted) return;
-      UiHelpers.showErrorToast(context, e.toString().replaceAll('Exception: ', ''));
+      UiHelpers.showErrorToast(
+        context,
+        e.toString().replaceAll('Exception: ', ''),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -161,7 +203,10 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
     if (_isSubmitting) return;
 
     if (_serviceOrder == null) {
-      UiHelpers.showErrorToast(context, 'La orden de servicio no ha sido iniciada.');
+      UiHelpers.showErrorToast(
+        context,
+        'La orden de servicio no ha sido iniciada.',
+      );
       return;
     }
 
@@ -171,7 +216,10 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
         solution: _solutionController.text,
       );
     } catch (e) {
-      UiHelpers.showErrorToast(context, e.toString().replaceAll('ArgumentError: ', ''));
+      UiHelpers.showErrorToast(
+        context,
+        e.toString().replaceAll('ArgumentError: ', ''),
+      );
       return;
     }
 
@@ -183,14 +231,21 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
         diagnosis: _diagnosisController.text.trim(),
         solution: _solutionController.text.trim(),
         recommendations: _recommendationsController.text.trim(),
+        partsUsedNotes: _buildPartsUsedNotes(),
       );
 
       if (!mounted) return;
-      UiHelpers.showFloatingSuccessToast(context, 'Orden de servicio completada exitosamente.');
+      UiHelpers.showFloatingSuccessToast(
+        context,
+        'Orden de servicio completada exitosamente.',
+      );
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      UiHelpers.showErrorToast(context, e.toString().replaceAll('Exception: ', ''));
+      UiHelpers.showErrorToast(
+        context,
+        e.toString().replaceAll('Exception: ', ''),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -205,11 +260,17 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
       await service.closeServiceTicket(ticketId: widget.ticketId);
 
       if (!mounted) return;
-      UiHelpers.showFloatingSuccessToast(context, 'Ticket cerrado definitivamente.');
+      UiHelpers.showFloatingSuccessToast(
+        context,
+        'Ticket cerrado definitivamente.',
+      );
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      UiHelpers.showErrorToast(context, e.toString().replaceAll('Exception: ', ''));
+      UiHelpers.showErrorToast(
+        context,
+        e.toString().replaceAll('Exception: ', ''),
+      );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -229,7 +290,12 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
         right: 16,
       ),
       child: _isLoading
-          ? const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: CircularProgressIndicator(),
+              ),
+            )
           : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,7 +316,10 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                   // Encabezado
                   Row(
                     children: [
-                      const Icon(Icons.engineering_outlined, color: Color(0xFF0D9488)),
+                      const Icon(
+                        Icons.engineering_outlined,
+                        color: Color(0xFF024C8B),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -284,18 +353,28 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                       children: [
                         Text(
                           'Ticket: ${widget.ticketNumber} · Estado: ${widget.currentTicketStatus.toUpperCase()}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Cliente: ${widget.clientName}',
-                          style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            color: Color(0xFF475569),
+                          ),
                         ),
-                        if (widget.equipmentSummary != null && widget.equipmentSummary!.isNotEmpty) ...[
+                        if (widget.equipmentSummary != null &&
+                            widget.equipmentSummary!.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
                             'Equipo: ${widget.equipmentSummary}',
-                            style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569)),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: Color(0xFF475569),
+                            ),
                           ),
                         ],
                       ],
@@ -303,7 +382,8 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                   ),
                   const SizedBox(height: 16),
 
-                  if (_serviceOrder == null && widget.currentTicketStatus != 'in_progress') ...[
+                  if (_serviceOrder == null &&
+                      widget.currentTicketStatus != 'in_progress') ...[
                     // Botón para Iniciar Servicio
                     Center(
                       child: Padding(
@@ -313,10 +393,15 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                           icon: const Icon(Icons.play_arrow),
                           label: const Text('Iniciar Ejecución Técnica'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D9488),
+                            backgroundColor: const Color(0xFF024C8B),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                         ),
                       ),
@@ -329,7 +414,8 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                       maxLines: 2,
                       decoration: const InputDecoration(
                         labelText: 'Diagnóstico Técnico Final *',
-                        hintText: 'Causa raíz identificada durante la revisión...',
+                        hintText:
+                            'Causa raíz identificada durante la revisión...',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -343,7 +429,8 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                       maxLines: 3,
                       decoration: const InputDecoration(
                         labelText: 'Trabajo Realizado y Solución *',
-                        hintText: 'Acciones correctivas, ajustes, calibración y pruebas realizadas...',
+                        hintText:
+                            'Acciones correctivas, ajustes, calibración y pruebas realizadas...',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -357,7 +444,8 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                       maxLines: 2,
                       decoration: const InputDecoration(
                         labelText: 'Recomendaciones al Cliente (Opcional)',
-                        hintText: 'Condiciones de operación, fechas de mantenimiento sugeridas...',
+                        hintText:
+                            'Condiciones de operación, fechas de mantenimiento sugeridas...',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
@@ -365,106 +453,194 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                     ),
                     const SizedBox(height: 16),
 
-                    // Refacciones Utilizadas
+                    // REFACCIONES Y PARTES UTILIZADAS
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Refacciones Físicas Empleadas',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          'REFACCIONES Y PARTES UTILIZADAS',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                            color: Color(0xFF1E293B),
+                          ),
                         ),
-                        if (_serviceOrder?.partsUsed.isNotEmpty == true)
-                          Text(
-                            '${_serviceOrder!.partsUsed.length} registradas',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        if (!_isReadOnly)
+                          TextButton.icon(
+                            onPressed: _addFreePart,
+                            icon: const Icon(
+                              Icons.add,
+                              size: 18,
+                              color: Color(0xFF024C8B),
+                            ),
+                            label: const Text(
+                              'Agregar refacción',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF024C8B),
+                              ),
+                            ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const Text(
+                      'Registra las piezas o materiales utilizados durante el servicio.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 8),
 
-                    if (_serviceOrder?.partsUsed.isEmpty ?? true)
+                    if (_freeParts.isEmpty) ...[
                       Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
                         ),
-                        child: const Center(
-                          child: Text(
-                            'No se han registrado refacciones consumidas de almacén.',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Text(
+                          'No se utilizaron refacciones.',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: Color(0xFF64748B),
+                            fontStyle: FontStyle.italic,
                           ),
                         ),
-                      )
-                    else
+                      ),
+                    ] else ...[
+                      ..._freeParts.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final part = entry.value;
+
+                        if (_isReadOnly) {
+                          final name = part.nameController.text.trim();
+                          final qty = part.quantityController.text.trim();
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_outline,
+                                  size: 16,
+                                  color: Color(0xFF16A34A),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                ),
+                                if (qty.isNotEmpty && qty != '1')
+                                  Text(
+                                    'Cant: $qty',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12.5,
+                                      color: Color(0xFF024C8B),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                flex: 7,
+                                child: TextFormField(
+                                  controller: part.nameController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Refacción / pieza / material',
+                                    hintText:
+                                        'Ej. Fusible 5A, Cable de poder...',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                  style: const TextStyle(fontSize: 12.5),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 3,
+                                child: TextFormField(
+                                  controller: part.quantityController,
+                                  keyboardType: TextInputType.text,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Cant.',
+                                    hintText: '1',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                  style: const TextStyle(fontSize: 12.5),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Color(0xFFEF4444),
+                                  size: 20,
+                                ),
+                                tooltip: 'Eliminar',
+                                onPressed: () => _removeFreePart(index),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+
+                    // Si existen partes de almacén estructuradas heredadas de otros flujos, mostrarlas sin romper
+                    if (_serviceOrder?.partsUsed.isNotEmpty == true) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Refacciones de inventario registradas:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       ..._serviceOrder!.partsUsed.map(
                         (p) => ListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.settings_suggest, size: 20, color: Color(0xFF0D9488)),
-                          title: Text(p.productName ?? p.productId, style: const TextStyle(fontSize: 12.5)),
+                          leading: const Icon(
+                            Icons.inventory_2_outlined,
+                            size: 18,
+                            color: Color(0xFF024C8B),
+                          ),
+                          title: Text(
+                            p.productName ?? p.productId,
+                            style: const TextStyle(fontSize: 12.5),
+                          ),
                           trailing: Text(
                             'Cant: ${p.quantity}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ),
-
-                    if (!_isReadOnly) ...[
-                      const SizedBox(height: 8),
-                      // Formulario pequeño para agregar refacción
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: TextField(
-                                controller: _partProductIdController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Product UUID',
-                                  isDense: true,
-                                  border: OutlineInputBorder(),
-                                ),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              flex: 3,
-                              child: TextField(
-                                controller: _partWarehouseIdController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Almacén UUID',
-                                  isDense: true,
-                                  border: OutlineInputBorder(),
-                                ),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              flex: 2,
-                              child: TextField(
-                                controller: _partQtyController,
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                decoration: const InputDecoration(
-                                  hintText: 'Cant',
-                                  isDense: true,
-                                  border: OutlineInputBorder(),
-                                ),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle, color: Color(0xFF0D9488)),
-                              onPressed: _isSubmitting ? null : _registerPart,
-                            ),
-                          ],
                         ),
                       ),
                     ],
@@ -482,14 +658,19 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : const Text('Completar Orden de Servicio'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D9488),
+                            backgroundColor: const Color(0xFF024C8B),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                         ),
                       )
@@ -503,14 +684,19 @@ class _AdminCompleteServiceOrderSheetState extends State<AdminCompleteServiceOrd
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : const Text('Cerrar Ticket Definitivamente'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF334155),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                           ),
                         ),
                       ),

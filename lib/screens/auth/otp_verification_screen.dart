@@ -29,7 +29,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
 
-  static const _primaryColor = Color(0xFF0D9488);
+  static const _primaryColor = Color(0xFF024C8B);
 
   @override
   void dispose() {

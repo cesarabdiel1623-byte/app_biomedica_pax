@@ -7,8 +7,8 @@ import '../../utils/responsive_grid.dart';
 import '../../widgets/load_error_state.dart';
 import '../home/widgets/product_card.dart';
 
-const _kPrimary = Color(0xFF0D9488);
-const _kBackground = Color(0xFFF8FAFC);
+const _kPrimary = Color(0xFF024C8B);
+const _kBackground = Color(0xFFF7F9FC);
 
 class PromotionProductsScreen extends StatefulWidget {
   const PromotionProductsScreen({
